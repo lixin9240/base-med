@@ -1,0 +1,78 @@
+/* 仅 Mobile 壳内生效，参考 wellness / mint + forest green 配色 */
+.mobile-layout {
+  --brand-primary: #1b4332;
+  --brand-primary-hover: #2d6a4f;
+  --brand-primary-active: #081c15;
+  --brand-soft: #d8f3dc;
+  --brand-soft-text: #1b4332;
+  --brand-tint: #ecfdf3;
+  --brand-glow: rgb(27 67 50 / 0.28);
+
+  --accent-teal: #52b788;
+  --accent-teal-soft: #b7e4c7;
+  --accent-pink: #f497b6;
+  --accent-pink-soft: #ffd6e0;
+  --accent-lavender: #9d84b7;
+  --accent-lavender-soft: #e2cfea;
+
+  --bg-page: #f3faf6;
+  --bg-page-gradient: linear-gradient(165deg, #eef9f3 0%, #f7fcf9 45%, #fafdfb 100%);
+  --bg-surface: rgb(255 255 255 / 0.92);
+  --bg-surface-solid: #ffffff;
+  --bg-muted: #e8f5ee;
+  --border: rgb(27 67 50 / 0.08);
+  --border-light: rgb(27 67 50 / 0.05);
+
+  --text-primary: #0f1f17;
+  --text-secondary: #5c6f65;
+  --text-disabled: #94a89e;
+
+  --success-bg: #d8f3dc;
+  --success-text: #1b4332;
+  --success: #40916c;
+  --warning-bg: #fff8e6;
+  --warning-text: #7a5c00;
+  --danger-bg: #ffe5e9;
+  --danger-text: #9b1c31;
+  --danger: #e63946;
+  --info-bg: #e3f6ef;
+  --info-text: #1b4332;
+
+  --fs-xs: 12px;
+  --fs-sm: 14px;
+  --fs-base: 15px;
+  --fs-md: 16px;
+  --fs-lg: 18px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
+  --fs-3xl: 30px;
+
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-xl: 20px;
+  --r-full: 999px;
+
+  --shadow-sm: 0 2px 8px rgb(27 67 50 / 0.06);
+  --shadow-md: 0 8px 24px rgb(27 67 50 / 0.08);
+  --shadow-lg: 0 16px 40px rgb(27 67 50 / 0.1);
+
+  --t-fast: 0.15s ease;
+  --t-normal: 0.25s ease;
+  --tap-comfort: 52px;
+  --mobile-max: 480px;
+}
