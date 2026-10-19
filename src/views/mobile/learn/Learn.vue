@@ -1,5 +1,386 @@
-<script setup></script>
+<script setup>
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import AppIcon from '@/components/mobile/AppIcon.vue'
+import PageNav from '@/components/mobile/PageNav.vue'
+import { formatArticleHtml } from '@/utils/article'
+import { toast } from '@/utils/toast'
+import {
+  WATCH_PERCENT,
+  ensureLearner,
+  getCourse,
+  getProgress,
+  listQuestions,
+  saveProgress,
+} from '@/store'
+
+const route = useRoute()
+const router = useRouter()
+const courseId = String(route.query.courseId || '')
+
+const course = ref(null)
+const userId = ref('')
+const videoEl = ref(null)
+const watched = ref(0)
+const canQuiz = ref(false)
+const badRate = ref(false)
+const noVideoMode = ref(false)
+
+let watchedSeconds = 0
+let maxTime = 0
+let lastTick = 0
+let saveTimer
+
+const articleHtml = computed(() => formatArticleHtml(course.value?.articleBody || ''))
+
+onMounted(() => {
+  const learner = ensureLearner()
+  userId.value = learner.userId
+  if (!courseId) {
+    router.replace('/mobile/home')
+    return
+  }
+  course.value = getCourse(courseId)
+  if (!course.value) return
+  const p = getProgress(userId.value, courseId)
+  watched.value = p.watchedPercent || 0
+  if (watched.value >= WATCH_PERCENT) canQuiz.value = true
+  saveTimer = window.setInterval(persistProgress, 5000)
+  document.addEventListener('visibilitychange', onVisibility)
+})
+
+onUnmounted(() => {
+  clearInterval(saveTimer)
+  document.removeEventListener('visibilitychange', onVisibility)
+  persistProgress()
+})
+
+function persistProgress() {
+  if (!userId.value) return
+  const p = getProgress(userId.value, courseId)
+  saveProgress(userId.value, courseId, {
+    ...p,
+    watchedPercent: Math.max(p.watchedPercent || 0, Math.round(watched.value)),
+  })
+}
+
+function onVisibility() {
+  if (document.visibilityState === 'hidden' && videoEl.value) {
+    lastTick = videoEl.value.currentTime
+  }
+}
+
+function setProgress(next) {
+  const prev = watched.value
+  watched.value = Math.min(100, Math.max(0, next))
+  if (prev < WATCH_PERCENT && watched.value >= WATCH_PERCENT) {
+    canQuiz.value = true
+    persistProgress()
+    toast('已看完，可以去答题了')
+  }
+}
+
+function onTimeUpdate() {
+  const el = videoEl.value
+  if (!el || !el.duration) return
+  if (!el.paused && !el.seeking && Number(el.playbackRate) === 1 && document.visibilityState === 'visible') {
+    const delta = el.currentTime - lastTick
+    if (delta > 0 && delta < 1.5) {
+      watchedSeconds += delta
+      if (el.currentTime > maxTime) maxTime = el.currentTime
+    }
+  }
+  lastTick = el.currentTime
+  setProgress((watchedSeconds / el.duration) * 100)
+}
+
+function onSeeking() {
+  const el = videoEl.value
+  if (!el) return
+  if (!canQuiz.value && el.currentTime > maxTime + 1.5) {
+    el.currentTime = maxTime
+    toast('请完整观看视频后再继续')
+  }
+  lastTick = el.currentTime
+}
+
+function onRateChange() {
+  const el = videoEl.value
+  if (el) badRate.value = Number(el.playbackRate) !== 1
+}
+
+function onEnded() {
+  const el = videoEl.value
+  if (el?.duration) {
+    watchedSeconds = el.duration
+    maxTime = el.duration
+    lastTick = el.duration
+    setProgress(100)
+    persistProgress()
+  }
+}
+
+function onVideoError() {
+  noVideoMode.value = true
+  setProgress(100)
+  persistProgress()
+}
+
+function goQuiz() {
+  persistProgress()
+  if (!listQuestions(courseId, 'post').length) {
+    toast('这条视频还没有配置检测题')
+    router.replace('/mobile/home')
+    return
+  }
+  router.push({ name: 'mobile-quiz', query: { courseId, stage: 'post' } })
+}
+</script>
 
 <template>
-  <p>学习视频（待开发）</p>
+  <div class="learn">
+    <PageNav title="观看视频" />
+
+    <div v-if="!course" class="empty">
+      <div class="empty__icon">
+        <AppIcon name="alert" :size="44" />
+      </div>
+      <p class="empty__text">视频不存在或已下架</p>
+      <div class="empty__actions">
+        <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
+          返回列表
+        </button>
+      </div>
+    </div>
+
+    <template v-else>
+      <div v-if="course.videoUrl && !noVideoMode" class="player">
+        <video
+          ref="videoEl"
+          class="player__el"
+          :src="course.videoUrl"
+          controls
+          playsinline
+          webkit-playsinline
+          preload="metadata"
+          :aria-label="`播放视频：${course.title}`"
+          @timeupdate="onTimeUpdate"
+          @seeking="onSeeking"
+          @seeked="onSeeking"
+          @ratechange="onRateChange"
+          @ended="onEnded"
+          @error="onVideoError"
+        />
+        <div v-if="badRate" class="player__tip">
+          <AppIcon name="alert" :size="14" />
+          倍速播放不计入观看进度
+        </div>
+      </div>
+      <div v-else class="player-fallback">
+        <AppIcon name="alert" :size="26" />
+        <b>{{ course.videoUrl ? '视频暂时无法播放' : '本条内容暂无视频' }}</b>
+        <span>可直接阅读下方的文字说明，读完后同样可以答题。</span>
+      </div>
+
+      <section class="info">
+        <h1 class="info__title">{{ course.title }}</h1>
+        <p class="info__meta">
+          <span class="badge badge--info">{{ course.category }}</span>
+          <span>
+            {{ course.speaker }}
+            <template v-if="course.speakerTitle"> · {{ course.speakerTitle }}</template>
+          </span>
+        </p>
+        <p class="info__intro">{{ course.intro }}</p>
+        <p v-if="course.speakerOrg" class="info__speaker-org">{{ course.speakerOrg }}</p>
+      </section>
+
+      <section v-if="course.articleBody" class="article">
+        <h2 class="article__title">文字要点</h2>
+        <div class="article__body" v-html="articleHtml" />
+      </section>
+
+      <div class="learn__footer">
+        <div class="learn__bar">
+          <div class="learn__bar-head">
+            <span>{{ noVideoMode ? '已可答题' : '观看进度' }}</span>
+            <b :class="{ 'is-ok': canQuiz }">{{ Math.min(100, Math.round(watched)) }}%</b>
+          </div>
+          <div class="learn__bar-track">
+            <div class="learn__bar-fill" :class="{ 'is-ok': canQuiz }" :style="{ width: `${Math.min(100, watched)}%` }" />
+          </div>
+        </div>
+        <button type="button" class="btn btn--primary btn--lg btn--block" :disabled="!canQuiz" @click="goQuiz">
+          {{ canQuiz ? '去答题' : `请看完视频（${WATCH_PERCENT}% 后可答题）` }}
+        </button>
+      </div>
+    </template>
+  </div>
 </template>
+
+<style scoped>
+.learn {
+  min-height: 100vh;
+  background: var(--bg-page);
+  padding-bottom: 150px;
+  margin: calc(-1 * var(--sp-4));
+}
+
+.player {
+  position: relative;
+  background: #111827;
+}
+
+.player__el {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #111827;
+}
+
+.player__tip {
+  position: absolute;
+  left: var(--sp-3);
+  bottom: var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: var(--fs-xs);
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+}
+
+.player-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-8) var(--sp-5);
+  text-align: center;
+  background: var(--bg-surface);
+  color: var(--warning-text);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.player-fallback span {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  line-height: 1.7;
+  max-width: 320px;
+}
+
+.info {
+  background: var(--bg-surface);
+  padding: var(--sp-5) var(--sp-4);
+}
+
+.info__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  line-height: 1.45;
+}
+
+.info__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.info__intro {
+  margin: var(--sp-3) 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  line-height: 1.75;
+}
+
+.info__speaker-org {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--text-disabled);
+}
+
+.article {
+  margin-top: var(--sp-2);
+  background: var(--bg-surface);
+  padding: var(--sp-5) var(--sp-4);
+}
+
+.article__title {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+
+.article__body :deep(p) {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-base);
+  line-height: 1.85;
+  color: var(--text-secondary);
+}
+
+.article__body :deep(.art__h) {
+  margin: var(--sp-5) 0 var(--sp-3);
+  padding-left: var(--sp-3);
+  border-left: 3px solid var(--brand-primary);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+}
+
+.learn__footer {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 0;
+  width: 100%;
+  max-width: var(--mobile-max);
+  padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom));
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border);
+  z-index: 30;
+}
+
+.learn__bar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  margin-bottom: var(--sp-2);
+}
+
+.learn__bar-head b {
+  color: var(--brand-primary);
+  font-size: var(--fs-sm);
+}
+
+.learn__bar-head b.is-ok {
+  color: var(--success-text);
+}
+
+.learn__bar-track {
+  height: 6px;
+  background: var(--bg-muted);
+  border-radius: var(--r-full);
+  overflow: hidden;
+  margin-bottom: var(--sp-3);
+}
+
+.learn__bar-fill {
+  height: 100%;
+  background: var(--brand-primary);
+  border-radius: var(--r-full);
+  transition: width 0.4s ease;
+}
+
+.learn__bar-fill.is-ok {
+  background: var(--success);
+}
+</style>
