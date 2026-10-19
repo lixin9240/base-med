@@ -1,5 +1,6 @@
-/* 仅 Mobile 壳内生效，参考 wellness / mint + forest green 配色 */
-.mobile-layout {
+/* Mobile 与 Admin 壳共享，参考 wellness / mint + forest green 配色 */
+.mobile-layout,
+.admin-layout {
   --brand-primary: #1b4332;
   --brand-primary-hover: #2d6a4f;
   --brand-primary-active: #081c15;
