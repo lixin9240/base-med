@@ -42,59 +42,66 @@ function handleLogout() {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: #fff;
-  border-right: 1px solid #e2e8f0;
+  background: var(--brand-primary);
+  color: #fff;
 }
 
 .admin-sidebar__brand {
-  padding: 16px 20px;
-  font-size: 20px;
-  font-weight: 700;
-  color: #2563eb;
-  border-bottom: 1px solid #e2e8f0;
+  padding: var(--sp-4) var(--sp-5);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgb(255 255 255 / 0.12);
 }
 
 .admin-sidebar__nav {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
 }
 
 .admin-sidebar__item {
   display: block;
-  padding: 10px 12px;
-  font-size: 15px;
-  color: #374151;
+  padding: 10px var(--sp-3);
+  font-size: var(--fs-sm);
+  color: rgb(255 255 255 / 0.75);
   text-decoration: none;
-  border-radius: 8px;
-  transition: background 0.2s, color 0.2s;
+  border-radius: var(--r-md);
+  transition:
+    background var(--t-fast),
+    color var(--t-fast);
 }
 
 .admin-sidebar__item:hover {
-  background: #f3f4f6;
+  color: #fff;
+  background: rgb(255 255 255 / 0.08);
 }
 
 .admin-sidebar__item--active {
-  color: #2563eb;
-  background: #eff6ff;
-  font-weight: 600;
+  color: var(--brand-soft-text);
+  background: var(--brand-soft);
+  font-weight: var(--fw-semibold);
 }
 
 .admin-sidebar__logout {
-  margin: 12px;
+  margin: var(--sp-3);
   padding: 10px;
-  font-size: 15px;
-  color: #dc2626;
-  background: #fff;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--accent-pink-soft);
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.15);
+  border-radius: var(--r-md);
   cursor: pointer;
-  transition: background 0.2s;
+  transition:
+    background var(--t-fast),
+    color var(--t-fast);
 }
 
 .admin-sidebar__logout:hover {
-  background: #fef2f2;
+  color: #fff;
+  background: rgb(255 255 255 / 0.12);
 }
 </style>

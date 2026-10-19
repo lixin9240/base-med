@@ -147,7 +147,7 @@ function togglePassword() {
 .login-page {
   display: flex;
   min-height: 100vh;
-  background: #f5f6f8;
+  background: #f3faf6;
 }
 
 /* ===== 左侧品牌区 ===== */
@@ -159,7 +159,7 @@ function togglePassword() {
   justify-content: center;
   align-items: center;
   padding: 48px;
-  background: linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #0ea5e9 100%);
+  background: linear-gradient(135deg, #081c15 0%, #1b4332 55%, #2d6a4f 100%);
   color: #fff;
   overflow: hidden;
 }
@@ -222,7 +222,7 @@ function togglePassword() {
   justify-content: center;
   align-items: center;
   padding: 48px;
-  background: #fff;
+  background: #f7fcf9;
 }
 
 .form-wrapper {
@@ -238,12 +238,12 @@ function togglePassword() {
   font-size: 26px;
   font-weight: 600;
   margin: 0 0 8px;
-  color: #1a1a1a;
+  color: #0f1f17;
 }
 
 .form-desc {
   font-size: 14px;
-  color: #6b7280;
+  color: #5c6f65;
   margin: 0;
 }
 
@@ -256,7 +256,7 @@ function togglePassword() {
   display: block;
   font-size: 14px;
   font-weight: 500;
-  color: #374151;
+  color: #3f5648;
   margin-bottom: 8px;
 }
 
@@ -268,21 +268,21 @@ function togglePassword() {
   width: 100%;
   padding: 12px 40px 12px 14px;
   font-size: 15px;
-  border: 1px solid #d1d5db;
+  border: 1px solid rgb(27 67 50 / 0.14);
   border-radius: 8px;
   background: #fff;
-  color: #1a1a1a;
+  color: #0f1f17;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px #2563eb20;
+  border-color: #2d6a4f;
+  box-shadow: 0 0 0 3px rgb(45 106 79 / 0.14);
 }
 
 .form-input:disabled {
-  background: #f9fafb;
+  background: #e8f5ee;
   cursor: not-allowed;
 }
 
@@ -302,7 +302,7 @@ function togglePassword() {
 }
 
 .toggle-pwd:hover {
-  background: #f3f4f6;
+  background: #e8f5ee;
 }
 
 /* ===== 选项行 ===== */
@@ -318,23 +318,24 @@ function togglePassword() {
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: #374151;
+  color: #3f5648;
   cursor: pointer;
   user-select: none;
 }
 
 .remember input[type="checkbox"] {
-  accent-color: #2563eb;
+  accent-color: #2d6a4f;
   cursor: pointer;
 }
 
 .forgot-link {
   font-size: 14px;
-  color: #2563eb;
+  color: #1b4332;
   text-decoration: none;
 }
 
 .forgot-link:hover {
+  color: #2d6a4f;
   text-decoration: underline;
 }
 
@@ -343,9 +344,9 @@ function togglePassword() {
   margin-bottom: 12px;
   padding: 8px 12px;
   font-size: 13px;
-  color: #dc2626;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
+  color: #9b1c31;
+  background: #ffe5e9;
+  border: 1px solid rgb(155 28 49 / 0.25);
   border-radius: 6px;
 }
 
@@ -356,16 +357,18 @@ function togglePassword() {
   font-size: 16px;
   font-weight: 600;
   color: #fff;
-  background: #2563eb;
+  background: linear-gradient(165deg, #2d6a4f 0%, #1b4332 55%, #081c15 100%);
+  box-shadow: 0 10px 28px rgb(27 67 50 / 0.28);
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
   letter-spacing: 4px;
 }
 
 .login-btn:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: linear-gradient(165deg, #1b4332 0%, #081c15 100%);
+  box-shadow: 0 14px 32px rgb(27 67 50 / 0.32);
 }
 
 .login-btn:active:not(:disabled) {
@@ -373,7 +376,8 @@ function togglePassword() {
 }
 
 .login-btn:disabled {
-  background: #93c5fd;
+  background: #52b788;
+  box-shadow: none;
   cursor: not-allowed;
 }
 
