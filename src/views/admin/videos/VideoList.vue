@@ -2,12 +2,21 @@
 import { ref } from 'vue'
 import { listVideos } from '@/store/video/video'
 import QuestionImportModal from '@/components/admin/videos/QuestionImportModal.vue'
+import QuestionConfigDrawer from '@/components/admin/videos/QuestionConfigDrawer.vue'
 
 const importOpen = ref(false)
 const videos = ref(listVideos())
 
-function onImported() {
+const configOpen = ref(false)
+const configVideo = ref(null)
+
+function refreshVideos() {
   videos.value = listVideos()
+}
+
+function openConfig(video) {
+  configVideo.value = video
+  configOpen.value = true
 }
 </script>
 
@@ -131,7 +140,7 @@ function onImported() {
 
         <!-- 操作 -->
         <div class="col col--ops">
-          <button type="button" class="link-btn">题目配置</button>
+          <button type="button" class="link-btn" @click="openConfig(video)">题目配置</button>
           <button type="button" class="link-btn">编辑</button>
           <button type="button" class="link-btn">生成视频链接</button>
           <button type="button" class="link-btn link-btn--danger">删除</button>
@@ -142,7 +151,14 @@ function onImported() {
     <QuestionImportModal
       :open="importOpen"
       @close="importOpen = false"
-      @imported="onImported"
+      @imported="refreshVideos"
+    />
+
+    <QuestionConfigDrawer
+      :open="configOpen"
+      :video="configVideo"
+      @close="configOpen = false"
+      @changed="refreshVideos"
     />
   </section>
 </template>
