@@ -15,7 +15,7 @@ const router = createRouter({
     {
       path: '/admin',
       component: () => import('@/layouts/AdminLayout.vue'),
-      redirect: '/admin/records',
+      redirect: '/admin/videos',
       children: [
         {
           path: 'records',

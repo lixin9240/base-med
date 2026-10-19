@@ -30,7 +30,7 @@ function handleLogin() {
   setTimeout(() => {
     loading.value = false
     // mock 登录成功
-    router.push('/admin/records')
+    router.push('/admin')
   }, 800)
 }
 
