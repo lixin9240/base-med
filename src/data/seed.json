@@ -1,0 +1,356 @@
+{
+  "courses": [
+    {
+      "id": "c_cpr",
+      "title": "心肺复苏基础操作",
+      "category": "急救技能",
+      "cover": "",
+      "speaker": "郭军",
+      "speakerOrg": "四川大学华西医院",
+      "speakerTitle": "主任医师",
+      "intro": "成人基础生命支持的规范动作：按压位置、深度、频率与通气比例，以及基层最常见的三个操作误区。",
+      "videoUrl": "/videos/demo.mp4",
+      "articleBody": "【按压要点】\n成人胸外按压深度至少 5 厘米、不超过 6 厘米，频率 100～120 次/分。\n每次按压后应让胸廓**完全回弹**，避免过度通气。",
+      "status": "published",
+      "order": 1,
+      "createdAt": 1789799057679
+    },
+    {
+      "id": "c_bp",
+      "title": "高血压患者的日常管理",
+      "category": "慢病管理",
+      "cover": "",
+      "speaker": "王雅琴",
+      "speakerOrg": "成都市武侯区玉林社区卫生服务中心",
+      "speakerTitle": "副主任医师",
+      "intro": "家庭血压怎么测才准？生活方式干预该抓哪几条？一条视频讲清居民最常问的问题。",
+      "videoUrl": "/videos/demo.mp4",
+      "articleBody": "【家庭测压】\n测量前静坐 5 分钟，袖带与心脏同高。\n【生活方式】\n限盐、规律运动、戒烟限酒是基层随访的**三大抓手**。",
+      "status": "published",
+      "order": 2,
+      "createdAt": 1790490257679
+    },
+    {
+      "id": "c_xray",
+      "title": "胸片检查前的准备与配合",
+      "category": "影像检查",
+      "cover": "",
+      "speaker": "陈志远",
+      "speakerOrg": "成都市双流区西航港社区卫生服务中心",
+      "speakerTitle": "主治医师",
+      "intro": "为什么总被要求重拍？检查前要去掉什么、拍摄时怎么配合，两分钟说清楚。",
+      "videoUrl": "/videos/demo.mp4",
+      "articleBody": "【检查前】\n去除金属饰品，按要求**屏气**配合。\n屏气不充分是最常见的重拍原因。",
+      "status": "published",
+      "order": 3,
+      "createdAt": 1791354257679
+    },
+    {
+      "id": "c_vaccine",
+      "title": "儿童疫苗接种后不良反应识别",
+      "category": "妇幼保健",
+      "cover": "",
+      "speaker": "未指定",
+      "speakerOrg": "",
+      "speakerTitle": "",
+      "intro": "示例：已下架的视频不会出现在用户端列表里。",
+      "videoUrl": "",
+      "articleBody": "",
+      "status": "offline",
+      "order": 4,
+      "createdAt": 1792131857679
+    }
+  ],
+  "questions": [
+    {
+      "courseId": "c_cpr",
+      "stage": "pre",
+      "order": 1,
+      "type": "single",
+      "stem": "成人心肺复苏时，胸外按压的深度应为多少？",
+      "options": [
+        "至少 2 厘米",
+        "至少 3 厘米",
+        "至少 5 厘米",
+        "至少 8 厘米"
+      ],
+      "answer": "C",
+      "analysis": "成人胸外按压深度至少 5 厘米、不超过 6 厘米，深度不足是复苏失败的主要原因之一。",
+      "id": "q_c_cpr_pre_1"
+    },
+    {
+      "courseId": "c_cpr",
+      "stage": "pre",
+      "order": 2,
+      "type": "single",
+      "stem": "成人胸外按压的频率应保持在每分钟多少次？",
+      "options": [
+        "60～80 次",
+        "80～100 次",
+        "100～120 次",
+        "120～140 次"
+      ],
+      "answer": "C",
+      "analysis": "指南推荐成人胸外按压频率为 100～120 次/分。",
+      "id": "q_c_cpr_pre_2"
+    },
+    {
+      "courseId": "c_cpr",
+      "stage": "pre",
+      "order": 3,
+      "type": "judge",
+      "stem": "每次胸外按压后，应让患者胸廓完全回弹。",
+      "options": [
+        "正确",
+        "错误"
+      ],
+      "answer": "A",
+      "analysis": "胸廓完全回弹才能保证心脏舒张期血液回流。",
+      "id": "q_c_cpr_pre_3"
+    },
+    {
+      "courseId": "c_cpr",
+      "stage": "post",
+      "order": 1,
+      "type": "single",
+      "stem": "成人基础生命支持中，按压与通气的比例应为？",
+      "options": [
+        "15∶2",
+        "30∶2",
+        "5∶1",
+        "10∶1"
+      ],
+      "answer": "B",
+      "analysis": "成人基础生命支持推荐按压与通气比例为 30∶2。",
+      "id": "q_c_cpr_post_1"
+    },
+    {
+      "courseId": "c_cpr",
+      "stage": "post",
+      "order": 2,
+      "type": "multiple",
+      "stem": "下列哪些情形可以停止心肺复苏？（多选）",
+      "options": [
+        "患者恢复自主呼吸与心跳",
+        "专业急救人员接手",
+        "施救者体力耗尽无法继续",
+        "家属要求停止即立即停止"
+      ],
+      "answer": [
+        "A",
+        "B",
+        "C"
+      ],
+      "analysis": "复苏终止应由客观指征或专业判断决定，家属单方面要求不构成医学终止指征。",
+      "id": "q_c_cpr_post_2"
+    },
+    {
+      "courseId": "c_cpr",
+      "stage": "post",
+      "order": 3,
+      "type": "judge",
+      "stem": "为提高效率，胸外按压的中断时间可以放宽到 30 秒以上。",
+      "options": [
+        "正确",
+        "错误"
+      ],
+      "answer": "B",
+      "analysis": "按压中断时间应控制在 10 秒以内，频繁或长时间中断会显著降低复苏成功率。",
+      "id": "q_c_cpr_post_3"
+    },
+    {
+      "courseId": "c_bp",
+      "stage": "pre",
+      "order": 1,
+      "type": "single",
+      "stem": "家庭自测血压前，一般建议先静坐休息多长时间？",
+      "options": [
+        "不需要休息",
+        "1 分钟",
+        "5 分钟",
+        "30 分钟"
+      ],
+      "answer": "C",
+      "analysis": "测量前应静坐休息 5 分钟，30 分钟内避免吸烟和含咖啡因饮品。",
+      "id": "q_c_bp_pre_1"
+    },
+    {
+      "courseId": "c_bp",
+      "stage": "pre",
+      "order": 2,
+      "type": "single",
+      "stem": "测量血压时，袖带下缘应位于肘窝上方多少厘米？",
+      "options": [
+        "0.5～1 厘米",
+        "2～3 厘米",
+        "5～6 厘米",
+        "8～10 厘米"
+      ],
+      "answer": "B",
+      "analysis": "袖带下缘位于肘窝上方 2～3 厘米，松紧以能插入 1～2 指为宜。",
+      "id": "q_c_bp_pre_2"
+    },
+    {
+      "courseId": "c_bp",
+      "stage": "pre",
+      "order": 3,
+      "type": "judge",
+      "stem": "高血压患者每日食盐摄入量应控制在 5 克以内。",
+      "options": [
+        "正确",
+        "错误"
+      ],
+      "answer": "A",
+      "analysis": "限盐是高血压生活方式干预的核心，同时要注意\"隐形盐\"。",
+      "id": "q_c_bp_pre_3"
+    },
+    {
+      "courseId": "c_bp",
+      "stage": "post",
+      "order": 1,
+      "type": "multiple",
+      "stem": "关于家庭血压测量，下列说法正确的有哪些？（多选）",
+      "options": [
+        "上臂应与心脏保持同一水平",
+        "袖带过小会使读数偏高",
+        "每次间隔 1 分钟连测 2～3 遍取平均值",
+        "测量时可以把上臂垫低一些更舒服"
+      ],
+      "answer": [
+        "A",
+        "B",
+        "C"
+      ],
+      "analysis": "上臂位置过低会因流体静压使读数偏高，因此测量时必须保证上臂与心脏同高。",
+      "id": "q_c_bp_post_1"
+    },
+    {
+      "courseId": "c_bp",
+      "stage": "post",
+      "order": 2,
+      "type": "single",
+      "stem": "出现下列哪种情况应及时就医？",
+      "options": [
+        "家庭自测血压 135/85 mmHg",
+        "家庭自测血压 180/110 mmHg 并伴头痛",
+        "服药后血压 128/78 mmHg",
+        "晨起血压略高于夜间"
+      ],
+      "answer": "B",
+      "analysis": "血压 ≥180/110 mmHg 或伴持续头痛、视物模糊、胸闷胸痛时，需及时就医。",
+      "id": "q_c_bp_post_2"
+    },
+    {
+      "courseId": "c_bp",
+      "stage": "post",
+      "order": 3,
+      "type": "judge",
+      "stem": "血压稳定后可以完全停止家庭血压监测。",
+      "options": [
+        "正确",
+        "错误"
+      ],
+      "answer": "B",
+      "analysis": "血压稳定后仍建议每周监测 1～2 天，以便及时发现波动。",
+      "id": "q_c_bp_post_3"
+    },
+    {
+      "courseId": "c_xray",
+      "stage": "pre",
+      "order": 1,
+      "type": "single",
+      "stem": "拍摄胸片前，以下哪项物品最需要去除？",
+      "options": [
+        "棉质外衣",
+        "项链、胸罩钢圈等金属物品",
+        "眼镜",
+        "袜子"
+      ],
+      "answer": "B",
+      "analysis": "金属影会遮挡肺野导致误判甚至重拍。",
+      "id": "q_c_xray_pre_1"
+    },
+    {
+      "courseId": "c_xray",
+      "stage": "pre",
+      "order": 2,
+      "type": "single",
+      "stem": "拍摄胸片时技师常要求患者做的配合动作是？",
+      "options": [
+        "大口呼吸",
+        "深吸气后屏住呼吸",
+        "连续咳嗽",
+        "小幅活动肩膀"
+      ],
+      "answer": "B",
+      "analysis": "深吸气后屏气可使肺野充分充气并减少运动伪影。",
+      "id": "q_c_xray_pre_2"
+    },
+    {
+      "courseId": "c_xray",
+      "stage": "pre",
+      "order": 3,
+      "type": "judge",
+      "stem": "胸片可以完全替代胸部 CT 用于所有肺部疾病的诊断。",
+      "options": [
+        "正确",
+        "错误"
+      ],
+      "answer": "B",
+      "analysis": "胸片与 CT 适应症不同，不能互相替代。",
+      "id": "q_c_xray_pre_3"
+    },
+    {
+      "courseId": "c_xray",
+      "stage": "post",
+      "order": 1,
+      "type": "multiple",
+      "stem": "导致胸片重拍或影像质量不佳的常见原因有哪些？（多选）",
+      "options": [
+        "屏气不充分产生运动伪影",
+        "衣物上的金属饰件未去除",
+        "发辫投影落在肺野内",
+        "患者保持体位不动"
+      ],
+      "answer": [
+        "A",
+        "B",
+        "C"
+      ],
+      "analysis": "运动伪影、金属影和体表投影都属于可控的技术性因素。",
+      "id": "q_c_xray_post_1"
+    },
+    {
+      "courseId": "c_xray",
+      "stage": "post",
+      "order": 2,
+      "type": "single",
+      "stem": "孕妇或备孕人群进行胸片检查前，正确的做法是？",
+      "options": [
+        "不必特别说明",
+        "主动告知技师，由医生评估必要性并做好防护",
+        "自行取消检查",
+        "改做其他检查即可"
+      ],
+      "answer": "B",
+      "analysis": "应主动告知并由医生评估必要性，确需检查时做好放射防护。",
+      "id": "q_c_xray_post_2"
+    },
+    {
+      "courseId": "c_xray",
+      "stage": "post",
+      "order": 3,
+      "type": "judge",
+      "stem": "为避免影像模糊，拍摄瞬间应保持体位不动、不说话不咳嗽。",
+      "options": [
+        "正确",
+        "错误"
+      ],
+      "answer": "A",
+      "analysis": "拍摄瞬间的体位稳定是保证影像清晰的基础要求。",
+      "id": "q_c_xray_post_3"
+    }
+  ],
+  "passPercent": 60,
+  "storeVersion": "2.1.0"
+}
