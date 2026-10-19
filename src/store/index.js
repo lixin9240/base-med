@@ -112,6 +112,12 @@ export function saveRecord(record) {
   return record
 }
 
+export function listRecords() {
+  return read(KEYS.records, [])
+    .slice()
+    .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))
+}
+
 export function getRecord(id) {
   return read(KEYS.records, []).find((r) => r.id === id) ?? null
 }
