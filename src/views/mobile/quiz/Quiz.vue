@@ -5,7 +5,7 @@ import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
 import { toast } from '@/utils/toast'
-import { gradeQuiz } from '@/utils/video/question'
+import { gradeQuiz } from '@/utils/question'
 import {
   PASS_PERCENT,
   WATCH_PERCENT,

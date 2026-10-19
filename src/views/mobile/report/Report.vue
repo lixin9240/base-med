@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
-import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/video/question'
+import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
 import { PASS_PERCENT, getRecord } from '@/store'
 
 const route = useRoute()

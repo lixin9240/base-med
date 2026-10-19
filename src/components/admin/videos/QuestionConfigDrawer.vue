@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/video/question'
+import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
 import { TEMPLATE_PATH } from '@/utils/video/questionImport'
 import { exportQuestionGroup } from '@/utils/video/questionExport'
 import {

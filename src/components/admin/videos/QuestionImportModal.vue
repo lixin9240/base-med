@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { QUESTION_TYPE_LABEL } from '@/utils/video/question'
+import { QUESTION_TYPE_LABEL } from '@/utils/question'
 import { TEMPLATE_PATH, parseQuestionFile } from '@/utils/video/questionImport'
 import { importVideoQuestions, listVideos } from '@/store/video/video'
 
