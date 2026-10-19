@@ -62,6 +62,24 @@ export function listQuestions(courseId, stage) {
   return list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
 }
 
+export function findCourseByTitle(title) {
+  const target = String(title ?? '').trim()
+  if (!target) return null
+  return read(KEYS.courses, []).find((c) => String(c.title ?? '').trim() === target) ?? null
+}
+
+/**
+ * 整组替换某课程某阶段的题目（导入时使用）。
+ */
+export function replaceQuestions(courseId, stage, questions) {
+  const all = read(KEYS.questions, [])
+  const next = all
+    .filter((q) => !(q.courseId === courseId && q.stage === stage))
+    .concat(questions)
+  write(KEYS.questions, next)
+  return questions.length
+}
+
 export function getProgress(userId, courseId) {
   const all = read(KEYS.progress, {})
   return (

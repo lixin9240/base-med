@@ -1,5 +1,14 @@
 <script setup>
-import { adminVideos as videos } from '@/mock/admin'
+import { ref } from 'vue'
+import { listVideos } from '@/store/video/video'
+import QuestionImportModal from '@/components/admin/videos/QuestionImportModal.vue'
+
+const importOpen = ref(false)
+const videos = ref(listVideos())
+
+function onImported() {
+  videos.value = listVideos()
+}
 </script>
 
 <template>
@@ -14,7 +23,7 @@ import { adminVideos as videos } from '@/mock/admin'
       </div>
 
       <div class="video-page__actions">
-        <button type="button" class="btn btn--secondary">
+        <button type="button" class="btn btn--secondary" @click="importOpen = true">
           <svg
             class="btn__icon"
             viewBox="0 0 24 24"
@@ -129,6 +138,12 @@ import { adminVideos as videos } from '@/mock/admin'
         </div>
       </div>
     </div>
+
+    <QuestionImportModal
+      :open="importOpen"
+      @close="importOpen = false"
+      @imported="onImported"
+    />
   </section>
 </template>
 
