@@ -114,6 +114,45 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        /**
+         * =========================
+         * 业务日志（business）
+         * =========================
+         * 记录正常业务行为：订单创建、审批流转、合同变更、支付成功等
+         */
+        'business' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/business.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 14,
+        ],
+
+        /**
+         * =========================
+         * 异常日志（exception）
+         * =========================
+         * 记录系统异常、错误、崩溃，用于问题排查与事故复盘
+         */
+        'exception' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/exception.log'),
+            'level' => 'error',
+            'days' => 30,
+        ],
+
+        /**
+         * =========================
+         * 接口日志（api）
+         * =========================
+         * 记录所有 HTTP API 请求，用于性能分析、接口监控、流量分析
+         */
+        'api' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/api.log'),
+            'level' => env('LOG_LEVEL', 'info'),
+            'days' => 7,
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],
