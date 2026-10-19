@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import AppIcon from '@/components/mobile/AppIcon.vue'
-import { QUESTION_TYPE_LABEL, hasAnswer, optionLetter } from '@/utils/question'
+import { QUESTION_TYPE_LABEL, hasAnswer, optionLetter } from '@/utils/video/question'
 import { toast } from '@/utils/toast'
 
 const props = defineProps({

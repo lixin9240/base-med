@@ -131,7 +131,7 @@ function collectOptions(row, columns, errors) {
   return { options: values, letters }
 }
 
-function validateRow(row, columns, rowNumber, videos, seenKeys, errors, items) {
+function validateRow(row, columns, rowNumber, videos, seenKeys, errors, items, expectedStage) {
   const videoTitle = text(row[columns['视频标题']])
   const stageLabel = text(row[columns['题目用途']])
   const orderRaw = text(row[columns['题序']])
@@ -152,6 +152,9 @@ function validateRow(row, columns, rowNumber, videos, seenKeys, errors, items) {
 
   const stage = STAGE_MAP[stageLabel]
   if (stageLabel && !stage) errors.push('题目用途只能填「前测」或「后测」')
+  if (expectedStage && stage && stage !== expectedStage) {
+    errors.push(`本组只能导入${expectedStage === 'pre' ? '前测' : '后测'}题目`)
+  }
 
   const type = TYPE_MAP[typeLabel]
   if (typeLabel && !type) errors.push('题型只能填「单选题」「多选题」或「判断题」')
@@ -208,12 +211,13 @@ function validateRow(row, columns, rowNumber, videos, seenKeys, errors, items) {
  *
  * @param {File} file Excel 文件（.xlsx / .xls）
  * @param {Array} videos 视频列表（需包含 id、title、courseId）
+ * @param {{ stage?: 'pre' | 'post' }} options 限定导入阶段（「导入本组」时使用）
  * @returns {Promise<{
  *   items: Array, errors: Array<{ rowNumber: number, messages: string[] }>,
  *   groups: Array<{ videoId: number, videoTitle: string, courseId: string, stage: string, questions: Array }>
  * }>}
  */
-export async function parseQuestionFile(file, videos) {
+export async function parseQuestionFile(file, videos, options = {}) {
   const rows = await readTemplateSheet(file)
   const columns = mapColumns(rows[0] ?? [])
 
@@ -227,7 +231,7 @@ export async function parseQuestionFile(file, videos) {
     if (isEmpty) return
 
     const rowErrors = []
-    validateRow(row, columns, rowNumber, videos, seenKeys, rowErrors, items)
+    validateRow(row, columns, rowNumber, videos, seenKeys, rowErrors, items, options.stage)
     if (rowErrors.length) errors.push({ rowNumber, messages: rowErrors })
   })
 

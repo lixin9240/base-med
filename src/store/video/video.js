@@ -47,11 +47,74 @@ export function findVideoByTitle(title) {
   return listVideos().find((video) => String(video.title).trim() === target) ?? null
 }
 
+export function getVideo(videoId) {
+  ensureCoreStoreSeed()
+  const video = adminVideos.find((item) => item.id === videoId)
+  if (!video) return null
+  return { ...video, courseId: resolveCourseId(video) }
+}
+
 export function listVideoQuestions(videoId, stage) {
   ensureCoreStoreSeed()
   const video = adminVideos.find((item) => item.id === videoId)
   if (!video) return []
   return listCoreQuestions(resolveCourseId(video), stage)
+}
+
+/**
+ * 新增 / 编辑单道题。
+ * 传入 question.id 时视为编辑，保留原题序；否则追加到本组末尾。
+ */
+export function saveVideoQuestion(videoId, stage, question) {
+  ensureCoreStoreSeed()
+  const video = adminVideos.find((item) => item.id === videoId)
+  if (!video) throw new Error('视频不存在')
+
+  const courseId = resolveCourseId(video)
+  const group = listCoreQuestions(courseId, stage)
+  let next
+
+  if (question.id) {
+    const index = group.findIndex((item) => item.id === question.id)
+    if (index === -1) throw new Error('题目不存在')
+
+    next = group.map((item, i) =>
+      i === index
+        ? { ...question, courseId, stage, id: item.id, order: item.order }
+        : item,
+    )
+  } else {
+    const maxOrder = group.reduce((max, item) => Math.max(max, Number(item.order) || 0), 0)
+    const order = maxOrder + 1
+    next = group.concat({
+      ...question,
+      courseId,
+      stage,
+      order,
+      id: `q_${courseId}_${stage}_${order}`,
+    })
+  }
+
+  next.sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+  replaceCoreQuestions(courseId, stage, next)
+  return next
+}
+
+/**
+ * 删除单道题。保留剩余题目题序，避免改变既有 questionId。
+ */
+export function removeVideoQuestion(videoId, stage, questionId) {
+  ensureCoreStoreSeed()
+  const video = adminVideos.find((item) => item.id === videoId)
+  if (!video) return []
+
+  const courseId = resolveCourseId(video)
+  const group = listCoreQuestions(courseId, stage)
+  const next = group.filter((item) => item.id !== questionId)
+  if (next.length === group.length) return group
+
+  replaceCoreQuestions(courseId, stage, next)
+  return next
 }
 
 /**

@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { QUESTION_TYPE_LABEL } from '@/utils/question'
-import { TEMPLATE_PATH, parseQuestionFile } from '@/utils/questionImport'
+import { QUESTION_TYPE_LABEL } from '@/utils/video/question'
+import { TEMPLATE_PATH, parseQuestionFile } from '@/utils/video/questionImport'
 import { importVideoQuestions, listVideos } from '@/store/video/video'
 
 const props = defineProps({
@@ -9,11 +9,27 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  video: {
+    type: Object,
+    default: null,
+  },
+  stage: {
+    type: String,
+    default: '',
+  },
 })
 
 const emit = defineEmits(['close', 'imported'])
 
 const STAGE_LABEL = { pre: '前测', post: '后测' }
+
+const isScoped = computed(() => Boolean(props.video))
+const modalTitle = computed(() => (isScoped.value ? '导入本组题目' : '批量导入题目'))
+const scopeHint = computed(() => {
+  if (!isScoped.value) return ''
+  const stageLabel = STAGE_LABEL[props.stage] ?? ''
+  return `当前只导入「${props.video.title}${stageLabel ? ` · ${stageLabel}` : ''}」的题目，其他视频或阶段的题目会校验失败。`
+})
 
 const fileInput = ref(null)
 const dragging = ref(false)
@@ -97,7 +113,8 @@ async function handleFile(file) {
 
   phase.value = 'parsing'
   try {
-    const parsed = await parseQuestionFile(file, listVideos())
+    const videos = props.video ? [props.video] : listVideos()
+    const parsed = await parseQuestionFile(file, videos, { stage: props.stage || undefined })
     result.value = parsed
     if (!parsed.items.length && !parsed.errors.length) {
       phase.value = 'error'
@@ -141,7 +158,7 @@ function confirmImport() {
     >
       <!-- 标题栏 -->
       <header class="import-modal__head">
-        <h2 id="import-modal-title" class="import-modal__title">批量导入题目</h2>
+        <h2 id="import-modal-title" class="import-modal__title">{{ modalTitle }}</h2>
         <button
           type="button"
           class="import-modal__close"
@@ -206,6 +223,8 @@ function confirmImport() {
             <span class="import-step__index">2</span>
             <h3 class="import-step__title">上传填好的文件</h3>
           </div>
+
+          <p v-if="scopeHint" class="import-step__desc">{{ scopeHint }}</p>
 
           <input
             ref="fileInput"
