@@ -32,6 +32,11 @@ const router = createRouter({
           name: 'admin-videos',
           component: () => import('@/views/admin/videos/VideoList.vue'),
         },
+        {
+          path: 'users',
+          name: 'admin-users',
+          component: () => import('@/views/admin/users/UserList.vue'),
+        },
       ],
     },
     {
