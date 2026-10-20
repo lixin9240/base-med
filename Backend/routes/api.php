@@ -12,6 +12,11 @@ use App\Http\Controllers\Wjc\Admin\AuthController;
 use App\Http\Controllers\Wjc\Admin\CategoryController;
 use App\Http\Controllers\Wjc\Admin\VideoQuestionController;
 
+use App\Http\Controllers\Gyz\ImportTaskController;
+use App\Http\Controllers\Gyz\VideoController as GyzVideoController;
+use App\Http\Controllers\Gyz\OperationLogController;
+use App\Http\Controllers\Gyz\StatisticsController;
+
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -167,4 +172,87 @@ Route::prefix('public')->group(function () {
 
     // 3.8 获取答题结果
     Route::get(uri: '/exam/result', action: [ExamController::class, 'result']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| GYZ-视频管理模块（2.2）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/video')->middleware('auth:admin')->group(function () {
+    // 2.2.1 视频列表
+    Route::get(uri: '/list', action: [GyzVideoController::class, 'list']);
+
+    // 2.2.2 视频详情（编辑弹窗回填）
+    Route::get(uri: '/detail', action: [GyzVideoController::class, 'detail']);
+
+    // 2.2.3 新增视频（弹窗保存）
+    Route::post(uri: '/create', action: [GyzVideoController::class, 'create']);
+
+    // 2.2.4 编辑视频（弹窗保存）
+    Route::post(uri: '/update', action: [GyzVideoController::class, 'update']);
+
+    // 2.2.5 上架/下架切换（列表页开关）
+    Route::post(uri: '/update-status', action: [GyzVideoController::class, 'updateStatus']);
+
+    // 2.2.6 删除视频（软删除）
+    Route::post(uri: '/delete', action: [GyzVideoController::class, 'delete']);
+
+    // 2.2.7 初始化视频上传（本地上传，source_type=2）
+    Route::post(uri: '/upload/init', action: [GyzVideoController::class, 'uploadInit']);
+
+    // 本地模拟辅助：上传单个分片（OSS 直传时由前端 SDK 分片，可跳过）
+    Route::post(uri: '/upload/chunk', action: [GyzVideoController::class, 'uploadChunk']);
+
+    // 2.2.8 完成视频上传
+    Route::post(uri: '/upload/complete', action: [GyzVideoController::class, 'uploadComplete']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| GYZ-数据统计模块（2.5）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/statistics')->middleware('auth:admin')->group(function () {
+    // 2.5.1 统计大盘（4 张指标卡）
+    Route::get(uri: '/overview', action: [StatisticsController::class, 'overview']);
+
+    // 2.5.2 各视频答题情况
+    Route::get(uri: '/video-list', action: [StatisticsController::class, 'videoList']);
+
+    // 2.5.3 最容易答错的题
+    Route::get(uri: '/wrong-question', action: [StatisticsController::class, 'wrongQuestion']);
+
+    // 2.5.4 导出统计（Excel 文件流）
+    Route::get(uri: '/export', action: [StatisticsController::class, 'export']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| GYZ-批量导入任务模块（2.8）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/import')->middleware('auth:admin')->group(function () {
+    // 2.8.1 任务列表（懒触发校验：校验中的任务就地完成校验）
+    Route::get(uri: '/task-list', action: [ImportTaskController::class, 'taskList']);
+
+    // 2.8.2 任务详情（校验结果与错误报告）
+    Route::get(uri: '/task-detail', action: [ImportTaskController::class, 'taskDetail']);
+
+    // 2.8.3 确认导入
+    Route::post(uri: '/confirm', action: [ImportTaskController::class, 'confirm']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| GYZ-操作日志模块（2.9）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/operation-log')->middleware('auth:admin')->group(function () {
+    // 2.9.1 操作日志列表
+    Route::get(uri: '/list', action: [OperationLogController::class, 'list']);
 });
