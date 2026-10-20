@@ -13,10 +13,14 @@ import {
   listQuestions,
   saveProgress,
 } from '@/store'
+import { resolveShareLink } from '@/store/video/shareLink'
 
 const route = useRoute()
 const router = useRouter()
-const courseId = String(route.query.courseId || '')
+const shareToken = String(route.query.share || '')
+const sharedLink = shareToken ? resolveShareLink(shareToken) : null
+const shareInvalid = Boolean(shareToken) && !sharedLink
+const courseId = String(sharedLink?.courseId || route.query.courseId || '')
 
 const course = ref(null)
 const userId = ref('')
@@ -36,6 +40,7 @@ const articleHtml = computed(() => formatArticleHtml(course.value?.articleBody |
 onMounted(() => {
   const learner = ensureLearner()
   userId.value = learner.userId
+  if (shareInvalid) return
   if (!courseId) {
     router.replace('/mobile/home')
     return
@@ -56,7 +61,7 @@ onUnmounted(() => {
 })
 
 function persistProgress() {
-  if (!userId.value) return
+  if (!userId.value || !courseId) return
   const p = getProgress(userId.value, courseId)
   saveProgress(userId.value, courseId, {
     ...p,
@@ -141,7 +146,19 @@ function goQuiz() {
   <div class="learn">
     <PageNav title="观看视频" />
 
-    <div v-if="!course" class="empty">
+    <div v-if="shareInvalid" class="empty">
+      <div class="empty__icon">
+        <AppIcon name="alert" :size="44" />
+      </div>
+      <p class="empty__text">链接已过期或已撤回，请重新生成</p>
+      <div class="empty__actions">
+        <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
+          返回列表
+        </button>
+      </div>
+    </div>
+
+    <div v-else-if="!course" class="empty">
       <div class="empty__icon">
         <AppIcon name="alert" :size="44" />
       </div>

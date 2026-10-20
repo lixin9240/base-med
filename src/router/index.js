@@ -13,6 +13,11 @@ const router = createRouter({
       component: () => import('@/views/admin/login/Login.vue'),
     },
     {
+      path: '/admin/forget-password',
+      name: 'admin-forget-password',
+      component: () => import('@/views/admin/login/ForgetPassword.vue'),
+    },
+    {
       path: '/admin',
       component: () => import('@/layouts/AdminLayout.vue'),
       redirect: '/admin/videos',
