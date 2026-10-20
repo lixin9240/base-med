@@ -64,8 +64,8 @@ class AuthService
             'last_login_at' => now(),
         ]);
 
-        // 签发 token
-        $token = $admin->createToken('admin_login')->plainTextToken;
+        // 签发 JWT token
+        $token = auth('admin')->login($admin);
 
         Log::channel('business')->info('管理员登录成功', [
             'admin_id' => $admin->id,
@@ -88,11 +88,15 @@ class AuthService
     }
 
     /**
-     * 管理员登出（销毁当前 token）
+     * 管理员登出（JWT 加入黑名单失效）
      */
     public function logout(AdminUser $admin): void
     {
-        $admin->currentAccessToken()?->delete();
+        try {
+            auth('admin')->logout();
+        } catch (\Throwable $e) {
+            // token 已过期/无 token 时无需处理
+        }
 
         Log::channel('business')->info('管理员登出', [
             'admin_id' => $admin->id,
