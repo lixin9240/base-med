@@ -1,6 +1,9 @@
 <?php
 
 
+use App\Http\Controllers\Fmy\DrController;
+use App\Http\Controllers\Fmy\ExamController;
+use App\Http\Controllers\Fmy\VideoController;
 use App\Http\Controllers\Lx\ExamRecordController;
 use App\Http\Controllers\Lx\QuestionController;
 use App\Http\Controllers\Lx\ShareLinkController;
@@ -146,4 +149,36 @@ Route::prefix('admin/category')->middleware('auth:admin')->group(function () {
 
     // 2.7.4 删除分类
     Route::post(uri: '/delete', action: [CategoryController::class, 'delete']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| FMY-用户端接口（匿名免登录，仅传 dr_id）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('public')->group(function () {
+    // 3.1 获取匿名 DR 编号（点击链接进入时生成访问记录）
+    Route::get(uri: '/dr/create', action: [DrController::class, 'create']);
+
+    // 3.2 用户端首页视频列表
+    Route::get(uri: '/video/list', action: [VideoController::class, 'list']);
+
+    // 3.3 视频详情（观看视频页）
+    Route::get(uri: '/video/detail', action: [VideoController::class, 'detail']);
+
+    // 3.4 上报视频观看进度（观看进度≥90%解锁后测）
+    Route::post(uri: '/video/progress', action: [VideoController::class, 'progress']);
+
+    // 3.6 获取视频题目列表（学前/看完答题页共用）
+    Route::get(uri: '/video/question-list', action: [VideoController::class, 'questionList']);
+
+    // 3.5 提交学前答题
+    Route::post(uri: '/exam/submit-pre', action: [ExamController::class, 'submitPre']);
+
+    // 3.7 提交看完答题（后测，需观看进度达到门槛）
+    Route::post(uri: '/exam/submit-post', action: [ExamController::class, 'submitPost']);
+
+    // 3.8 获取答题结果
+    Route::get(uri: '/exam/result', action: [ExamController::class, 'result']);
 });
