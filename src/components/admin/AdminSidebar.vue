@@ -7,6 +7,7 @@ const router = useRouter()
 const menuItems = [
   { label: '视频管理', name: 'admin-videos' },
   { label: '答题记录', name: 'admin-records' },
+  { label: '用户管理', name: 'admin-users' },
   { label: '数据统计', name: 'admin-stats' },
 ]
 

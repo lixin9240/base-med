@@ -101,6 +101,51 @@ function buildStageDetail(courseId, stage, correctCount) {
   })
 }
 
+// ===== 用户管理 mock =====
+const SURNAMES = [
+  ['张', 'zhang'], ['王', 'wang'], ['李', 'li'], ['赵', 'zhao'], ['刘', 'liu'],
+  ['陈', 'chen'], ['杨', 'yang'], ['黄', 'huang'], ['周', 'zhou'], ['吴', 'wu'],
+  ['徐', 'xu'], ['孙', 'sun'], ['马', 'ma'], ['朱', 'zhu'], ['胡', 'hu'],
+  ['郭', 'guo'], ['何', 'he'], ['高', 'gao'], ['林', 'lin'], ['罗', 'luo'],
+  ['郑', 'zheng'], ['梁', 'liang'], ['谢', 'xie'], ['唐', 'tang'], ['邓', 'deng'],
+  ['冯', 'feng'], ['韩', 'han'], ['曹', 'cao'], ['曾', 'zeng'], ['彭', 'peng'],
+]
+
+const GIVEN = [
+  ['伟', 'wei'], ['芳', 'fang'], ['娜', 'na'], ['敏', 'min'], ['静', 'jing'],
+  ['强', 'qiang'], ['磊', 'lei'], ['洋', 'yang'], ['艳', 'yan'], ['勇', 'yong'],
+  ['军', 'jun'], ['杰', 'jie'], ['娟', 'juan'], ['涛', 'tao'], ['明', 'ming'],
+  ['超', 'chao'], ['秀兰', 'xiulan'], ['霞', 'xia'], ['平', 'ping'], ['刚', 'gang'],
+  ['桂英', 'guiying'], ['建国', 'jianguo'], ['文', 'wen'], ['丽', 'li'], ['斌', 'bin'],
+  ['雪', 'xue'], ['辉', 'hui'], ['鹏', 'peng'], ['宇', 'yu'], ['梅', 'mei'],
+]
+
+const DOMAINS = ['163.com', 'qq.com', '126.com', 'outlook.com', 'foxmail.com', 'sina.com']
+const PHONE_PREFIX = ['38', '39', '50', '58', '86', '88']
+
+/** 由种子生成固定数字串，保证每次刷新数据一致 */
+function pseudoDigits(seed, len) {
+  let s = seed * 9301 + 49297
+  let out = ''
+  for (let i = 0; i < len; i += 1) {
+    s = (s * 9301 + 49297) % 233280
+    out += String(Math.floor((s / 233280) * 10))
+  }
+  return out
+}
+
+export const adminUsers = Array.from({ length: 63 }, (_, i) => {
+  const [surname, surnamePy] = SURNAMES[i % SURNAMES.length]
+  const [given, givenPy] = GIVEN[Math.floor(i / SURNAMES.length) % GIVEN.length]
+  return {
+    id: `u_${String(i + 1).padStart(3, '0')}`,
+    name: surname + given,
+    email: `${surnamePy}${givenPy}@${DOMAINS[i % DOMAINS.length]}`,
+    phone: `1${PHONE_PREFIX[i % PHONE_PREFIX.length]}${pseudoDigits(i + 7, 8)}`,
+    disabled: i % 21 === 0,
+  }
+})
+
 // [时间, 课程, 学员序号, 前测答对, 看课答题答对]
 const MOCK_ROWS = [
   ['2026-10-18 10:40', 'c_cpr', 3, 2, 3],

@@ -9,6 +9,7 @@ const KEYS = {
   courses: 'pv.courses',
   questions: 'pv.questions',
   records: 'pv.records',
+  disabledUsers: 'pv.users.disabled',
   learners: 'pv.learners',
   progress: 'pv.progress',
   identity: 'pv.identity',
@@ -144,6 +145,15 @@ export function listRecords() {
 
 export function getRecord(id) {
   return read(KEYS.records, []).find((r) => r.id === id) ?? null
+}
+
+/** 被禁用登录的用户 id 列表 */
+export function listDisabledUsers() {
+  return read(KEYS.disabledUsers, [])
+}
+
+export function saveDisabledUsers(ids) {
+  return write(KEYS.disabledUsers, [...ids])
 }
 
 function nextUserSeq(year) {
