@@ -543,7 +543,7 @@
 | video_id | bigint | 否 | 筛选视频（同列表筛选条件） |
 | result_status | string | 否 | pass 通过 / fail 未通过 |
 
-返回 CSV 文件流（`Content-Type: text/csv`，带 UTF-8 BOM，Excel 可直接打开；列与 2.4.1 列表一致：时间 / 视频 / 编号 / 猜测 / 看完答题 / 正确率 / 结果）。
+导出为真正的 `.xlsx` 文件并上传阿里云 OSS，返回 JSON（`code=0`），`data` 结构：`{ "filename": "exam_records_YYYYmmdd_His.xlsx", "url": "https://wjc1127.oss-cn-chengdu.aliyuncs.com/exam-records/xxx.xlsx?...&Signature=..." }`。`url` 为带签名的临时下载链接，有效期 7 天（Bucket 为私有 ACL 也可正常下载）；前端直接打开 `url` 即可下载；列与 2.4.1 列表一致：时间 / 视频 / 编号 / 猜测 / 看完答题 / 正确率 / 结果。
 
 ## 2.5 GYZ-数据统计模块（对应【数据统计】页面）
 

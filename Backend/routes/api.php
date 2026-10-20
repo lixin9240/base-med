@@ -8,6 +8,7 @@ use App\Http\Controllers\Lx\ExamRecordController;
 use App\Http\Controllers\Lx\QuestionController;
 use App\Http\Controllers\Lx\TopicController;
 
+use App\Http\Controllers\Wjc\Admin\AdminUserController;
 use App\Http\Controllers\Wjc\Admin\AuthController;
 use App\Http\Controllers\Wjc\Admin\CategoryController;
 use App\Http\Controllers\Wjc\Admin\VideoQuestionController;
@@ -32,7 +33,7 @@ Route::prefix('admin/exam-record')->middleware('auth:admin')->group(function () 
 | LX-课程管理模块
 |--------------------------------------------------------------------------
 */
-Route::prefix('admin/topic')->group(function () {
+Route::prefix('admin/topic')->middleware('auth:admin')->group(function () {
     Route::get(uri: '/list', action: [TopicController::class, 'list']);
     Route::post(uri: '/create', action: [TopicController::class, 'create']);
     Route::post(uri: '/update', action: [TopicController::class, 'update']);
@@ -44,7 +45,7 @@ Route::prefix('admin/topic')->group(function () {
 | LX-题库管理模块
 |--------------------------------------------------------------------------
 */
-Route::prefix('admin/question')->group(function () {
+Route::prefix('admin/question')->middleware('auth:admin')->group(function () {
     Route::get(uri: '/list', action: [QuestionController::class, 'list']);
     Route::post(uri: '/update', action: [QuestionController::class, 'update']);
     Route::post(uri: '/delete', action: [QuestionController::class, 'delete']);
@@ -78,6 +79,19 @@ Route::prefix('admin/auth')->group(function () {
         // 2.1.3 管理员登出
         Route::post('logout', [AuthController::class, 'logout']);
     });
+});
+
+/*
+|--------------------------------------------------------------------------
+| WJC-管理员用户管理模块
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/admin-user')->middleware('auth:admin')->group(function () {
+    Route::get(uri: '/list', action: [AdminUserController::class, 'list']);
+    Route::post(uri: '/create', action: [AdminUserController::class, 'create']);
+    Route::post(uri: '/update', action: [AdminUserController::class, 'update']);
+    Route::post(uri: '/delete', action: [AdminUserController::class, 'delete']);
 });
 
 /*
