@@ -142,7 +142,7 @@ class AuthService
 
         // 发送邮件（MAIL_MAILER=log 时仅写日志，验证码可见于日志）
         try {
-            Mail::raw("您的重置密码验证码为：{$code}，{$this->CODE_EXPIRE_MINUTES} 分钟内有效。", function ($message) use ($admin) {
+            Mail::raw('您的重置密码验证码为：'.$code.'，'.self::CODE_EXPIRE_MINUTES.' 分钟内有效。', function ($message) use ($admin) {
                 /** @var \Illuminate\Mail\Message $message */
                 $message->to($admin->email)->subject('基层医生DR平台 - 重置密码验证码');
             });
