@@ -7,6 +7,8 @@ use App\Http\Controllers\Lx\ShareLinkController;
 use App\Http\Controllers\Lx\TopicController;
 
 use App\Http\Controllers\Wjc\Admin\AuthController;
+use App\Http\Controllers\Wjc\Admin\CategoryController;
+use App\Http\Controllers\Wjc\Admin\VideoQuestionController;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -87,4 +89,61 @@ Route::prefix('admin/auth')->group(function () {
         // 2.1.3 管理员登出
         Route::post('logout', [AuthController::class, 'logout']);
     });
+});
+
+/*
+|--------------------------------------------------------------------------
+| WJC-题目配置模块（2.3）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/video-question')->middleware('auth:admin')->group(function () {
+    // 2.3.1 获取前/后测题目列表
+    Route::get(uri: '/list', action: [VideoQuestionController::class, 'list']);
+
+    // 2.3.2 新增题目
+    Route::post(uri: '/add-question', action: [VideoQuestionController::class, 'addQuestion']);
+
+    // 2.3.3 编辑题目
+    Route::post(uri: '/update-question', action: [VideoQuestionController::class, 'updateQuestion']);
+
+    // 2.3.4 下载模板
+    Route::get(uri: '/download-template', action: [VideoQuestionController::class, 'downloadTemplate']);
+
+    // 2.3.6 导出本组题目
+    Route::get(uri: '/export', action: [VideoQuestionController::class, 'export']);
+
+    // 2.3.7 移除本组题目
+    Route::post(uri: '/remove', action: [VideoQuestionController::class, 'remove']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| WJC-题目导入（2.3.5，独立前缀 video）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/video')->middleware('auth:admin')->group(function () {
+    // 2.3.5 导入本组题目（创建导入任务）
+    Route::post(uri: '/import-question', action: [VideoQuestionController::class, 'importQuestion']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| WJC-分类管理模块（2.7）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/category')->middleware('auth:admin')->group(function () {
+    // 2.7.1 分类列表
+    Route::get(uri: '/list', action: [CategoryController::class, 'list']);
+
+    // 2.7.2 新增分类
+    Route::post(uri: '/create', action: [CategoryController::class, 'create']);
+
+    // 2.7.3 编辑分类
+    Route::post(uri: '/update', action: [CategoryController::class, 'update']);
+
+    // 2.7.4 删除分类
+    Route::post(uri: '/delete', action: [CategoryController::class, 'delete']);
 });
