@@ -1,3 +1,5 @@
+import { getAdminToken } from '@/store/admin/auth'
+
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? ''
 
 async function parseBody(response) {
@@ -18,6 +20,11 @@ export async function request(path, options = {}) {
     headers.set('Content-Type', 'application/json')
   }
 
+  const token = getAdminToken()
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
   const response = await fetch(url, {
     ...options,
     headers,
@@ -30,8 +37,17 @@ export async function request(path, options = {}) {
   const data = await parseBody(response)
 
   if (!response.ok) {
-    const error = new Error(data?.message || response.statusText || '请求失败')
+    const error = new Error(data?.msg || data?.message || response.statusText || '请求失败')
     error.status = response.status
+    error.code = data?.code
+    error.data = data
+    throw error
+  }
+
+  // 统一信封：code !== 0 视为业务失败
+  if (data && typeof data === 'object' && 'code' in data && data.code !== 0) {
+    const error = new Error(data.msg || '请求失败')
+    error.code = data.code
     error.data = data
     throw error
   }

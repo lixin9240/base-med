@@ -1,6 +1,7 @@
 <script setup>
-import { ref } from 'vue'
-import { listVideos, setVideoPublished } from '@/store/video/video'
+import { computed, onMounted, ref } from 'vue'
+import { listAdminVideos, updateAdminVideoStatus } from '@/api'
+import { findVideoByTitle } from '@/store/video/video'
 import QuestionImportModal from '@/components/admin/videos/QuestionImportModal.vue'
 import QuestionConfigDrawer from '@/components/admin/videos/QuestionConfigDrawer.vue'
 import VideoFormModal from '@/components/admin/videos/VideoFormModal.vue'
@@ -8,7 +9,18 @@ import VideoShareLinkModal from '@/components/admin/videos/VideoShareLinkModal.v
 import VideoDeleteModal from '@/components/admin/videos/VideoDeleteModal.vue'
 
 const importOpen = ref(false)
-const videos = ref(listVideos())
+
+/** 每页条数，对应接口的 page_size */
+const PAGE_SIZE = 20
+
+const videos = ref([])
+const total = ref(0)
+const page = ref(1)
+const loading = ref(false)
+const loadError = ref('')
+const switchingId = ref(null)
+
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
 const configOpen = ref(false)
 const configVideo = ref(null)
@@ -22,12 +34,74 @@ const shareVideo = ref(null)
 const deleteOpen = ref(false)
 const deleteVideo = ref(null)
 
-function refreshVideos() {
-  videos.value = listVideos()
+/** 题目配置 / 编辑 / 删除 / 分享仍读本地记录，按标题匹配同一条；找不到时用接口行兜底 */
+function resolveLocalVideo(video) {
+  return findVideoByTitle(video.title) ?? video
 }
 
+function countTone(count, total) {
+  if (!total) return 'danger'
+  if (count >= total) return 'success'
+  return count > 0 ? 'warning' : 'danger'
+}
+
+function rateTone(rate) {
+  if (rate === null || rate === undefined) return ''
+  if (rate >= 80) return 'success'
+  return rate >= 60 ? 'warning' : 'danger'
+}
+
+/** 把 2.2.1 接口返回的一条记录转成列表页展示需要的字段 */
+function toVideoRow(item) {
+  const preCount = Number(item.pre_count) || 0
+  const preTotal = Number(item.pre_total) || 0
+  const postCount = Number(item.post_count) || 0
+  const postTotal = Number(item.post_total) || 0
+  const rate = item.accuracy_rate
+
+  return {
+    id: item.id,
+    title: item.title,
+    category: item.category_name ?? '',
+    speakerLabel: item.speaker
+      ? [item.speaker, item.speaker_title].filter(Boolean).join(' · ')
+      : '未指定',
+    pre: `${preCount}/${preTotal}`,
+    preTone: countTone(preCount, preTotal),
+    post: `${postCount}/${postTotal}`,
+    postTone: countTone(postCount, postTotal),
+    published: Number(item.status) === 1,
+    attempts: `${Number(item.answer_times) || 0} 次`,
+    accuracy: rate === null || rate === undefined ? '' : `${rate}%`,
+    accuracyTone: rateTone(rate),
+  }
+}
+
+async function refreshVideos() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const data = await listAdminVideos({ page: page.value, pageSize: PAGE_SIZE })
+    videos.value = data.list.map(toVideoRow)
+    total.value = data.total
+  } catch (error) {
+    videos.value = []
+    total.value = 0
+    loadError.value = error?.message || '视频列表加载失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
+}
+
+function goPage(next) {
+  page.value = next
+  refreshVideos()
+}
+
+onMounted(refreshVideos)
+
 function openConfig(video) {
-  configVideo.value = video
+  configVideo.value = resolveLocalVideo(video)
   configOpen.value = true
 }
 
@@ -37,23 +111,33 @@ function openCreate() {
 }
 
 function openEdit(video) {
-  editingVideo.value = video
+  editingVideo.value = resolveLocalVideo(video)
   formOpen.value = true
 }
 
 function openShare(video) {
-  shareVideo.value = video
+  shareVideo.value = resolveLocalVideo(video)
   shareOpen.value = true
 }
 
 function openDelete(video) {
-  deleteVideo.value = video
+  deleteVideo.value = resolveLocalVideo(video)
   deleteOpen.value = true
 }
 
-function togglePublished(video) {
-  setVideoPublished(video.id, !video.published)
-  refreshVideos()
+async function togglePublished(video) {
+  if (switchingId.value !== null) return
+
+  const nextStatus = video.published ? 0 : 1
+  switchingId.value = video.id
+  try {
+    await updateAdminVideoStatus({ id: video.id, status: nextStatus })
+    video.published = nextStatus === 1
+  } catch (error) {
+    loadError.value = error?.message || '状态切换失败，请稍后重试'
+  } finally {
+    switchingId.value = null
+  }
 }
 </script>
 
@@ -103,8 +187,15 @@ function togglePublished(video) {
       </div>
     </header>
 
+    <!-- 加载中 / 加载失败提示 -->
+    <div v-if="loading" class="video-banner">正在加载视频列表…</div>
+    <div v-else-if="loadError" class="video-banner video-banner--error">
+      <span>{{ loadError }}</span>
+      <button type="button" class="link-btn" @click="refreshVideos">重试</button>
+    </div>
+
     <!-- 视频列表 -->
-    <div class="video-table">
+    <div v-if="videos.length" class="video-table">
       <div class="video-table__head">
         <span class="col col--video">视频</span>
         <span class="col col--quiz">题目</span>
@@ -190,6 +281,30 @@ function togglePublished(video) {
       </div>
     </div>
 
+    <p v-else-if="!loading && !loadError" class="video-banner">暂无视频</p>
+
+    <!-- 分页 -->
+    <div v-if="videos.length" class="video-pager">
+      <span class="video-pager__total">共 {{ total }} 条</span>
+      <button
+        type="button"
+        class="link-btn"
+        :disabled="page <= 1 || loading"
+        @click="goPage(page - 1)"
+      >
+        上一页
+      </button>
+      <span class="video-pager__page">第 {{ page }} / {{ totalPages }} 页</span>
+      <button
+        type="button"
+        class="link-btn"
+        :disabled="page >= totalPages || loading"
+        @click="goPage(page + 1)"
+      >
+        下一页
+      </button>
+    </div>
+
     <QuestionImportModal
       :open="importOpen"
       @close="importOpen = false"
@@ -230,6 +345,45 @@ function togglePublished(video) {
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
+}
+
+/* ===== 加载 / 错误 / 空态提示 ===== */
+.video-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  background: var(--bg-surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.video-banner--error {
+  color: var(--danger-text);
+  background: var(--danger-bg);
+  border-color: rgb(155 28 49 / 0.25);
+}
+
+/* ===== 分页 ===== */
+.video-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.video-pager__total {
+  margin-right: auto;
+}
+
+.video-pager .link-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ===== 页头 ===== */

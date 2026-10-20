@@ -1,5 +1,7 @@
 <script setup>
 import { useRoute, useRouter } from 'vue-router'
+import { adminLogout } from '@/api'
+import { clearAdminAuth, getAdminToken } from '@/store/admin/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -11,9 +13,16 @@ const menuItems = [
   { label: '数据统计', name: 'admin-stats' },
 ]
 
-function handleLogout() {
-  // TODO: 调用后端退出登录接口 / 清除 token
-  router.push('/admin/login')
+async function handleLogout() {
+  try {
+    if (getAdminToken()) await adminLogout()
+  } catch (error) {
+    console.error('[admin] logout failed', error)
+  } finally {
+    // 无论接口是否成功，本地登录态都要清掉
+    clearAdminAuth()
+    router.push('/admin/login')
+  }
 }
 </script>
 
