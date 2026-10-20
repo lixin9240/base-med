@@ -4,15 +4,23 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Sanctum\HasApiTokens;
 
+/**
+ * 管理员模型
+ *
+ * @method \Laravel\Sanctum\PersonalAccessToken|null currentAccessToken()
+ */
 class AdminUser extends Model
 {
+    use HasApiTokens;
     use SoftDeletes;
 
     protected $table = 'admin_user';
 
     protected $fillable = [
         'username',
+        'email',
         'password_hash',
         'name',
         'role',
