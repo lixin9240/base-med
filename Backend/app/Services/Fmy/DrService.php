@@ -2,51 +2,38 @@
 
 namespace App\Services\Fmy;
 
-use App\Enums\ResponseCode;
-use App\Exceptions\BusinessException;
-use App\Models\VideoShareLink;
 use App\Models\VisitRecord;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class DrService
 {
+    public function __construct(
+        private readonly VideoService $videoService
+    ) {
+    }
+
     /**
-     * 获取匿名 DR 编号（点击链接进入时签发访问记录）
+     * 获取匿名 DR 编号（用户每次点击一条视频数据时生成动态ID）
      *
      * @return array{dr_id: string}
      */
-    public function create(string $token): array
+    public function create(int $videoId): array
     {
-        $link = VideoShareLink::query()->where('token', $token)->first();
+        $video = $this->videoService->onShelfVideo($videoId);
 
-        if (! $link) {
-            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '链接不存在');
-        }
-
-        if ((int) $link->status !== 1) {
-            throw new BusinessException(ResponseCode::STATUS_NOT_OPERABLE, '链接已失效');
-        }
-
-        if ($link->expire_at && $link->expire_at->isPast()) {
-            throw new BusinessException(ResponseCode::STATUS_NOT_OPERABLE, '链接已过期');
-        }
-
-        return DB::transaction(function () use ($link) {
+        return DB::transaction(function () use ($video) {
             $drId = $this->issueDrId();
 
             VisitRecord::create([
                 'dr_id' => $drId,
-                'share_link_id' => $link->id,
+                'video_id' => $video->id,
                 'entered_at' => now(),
             ]);
 
-            $link->increment('visit_count');
-
             Log::channel('business')->info('匿名访问记录创建', [
                 'dr_id' => $drId,
-                'share_link_id' => $link->id,
-                'video_id' => $link->video_id,
+                'video_id' => $video->id,
             ]);
 
             return ['dr_id' => $drId];

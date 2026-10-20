@@ -3,22 +3,23 @@
 namespace App\Http\Requests\Fmy;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class DrCreateRequest extends FormRequest
 {
     public function rules(): array
     {
         return [
-            'token' => ['required', 'string', 'max:64'],
+            'video_id' => ['required', 'integer', Rule::exists('video', 'id')],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'token.required' => '访问令牌不能为空',
-            'token.string' => '访问令牌格式不正确',
-            'token.max' => '访问令牌长度不能超过64个字符',
+            'video_id.required' => '视频ID不能为空',
+            'video_id.integer' => '视频ID必须为整数',
+            'video_id.exists' => '视频不存在',
         ];
     }
 }

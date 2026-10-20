@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Fmy;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Fmy\QuestionListRequest;
 use App\Http\Requests\Fmy\VideoDetailRequest;
-use App\Http\Requests\Fmy\VideoListRequest;
 use App\Http\Requests\Fmy\VideoProgressRequest;
 use App\Services\Fmy\VideoService;
 use Illuminate\Http\JsonResponse;
@@ -18,13 +17,11 @@ class VideoController extends Controller
     }
 
     /**
-     * 用户端首页视频列表（3.2）
+     * 用户端首页视频列表（3.2，免登录、无需 dr_id）
      */
-    public function list(VideoListRequest $request): JsonResponse
+    public function list(): JsonResponse
     {
-        $data = $this->videoService->list(
-            (string) $request->validated('dr_id')
-        );
+        $data = $this->videoService->list();
 
         return $this->success($data);
     }
