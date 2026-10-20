@@ -34,6 +34,20 @@ const submitting = ref(false)
 const isPre = computed(() => stage === 'pre')
 const stageTitle = computed(() => (isPre.value ? '学前答题' : '看完答题'))
 
+function categoryIcon(category) {
+  if (category === '影像检查') return 'monitor'
+  if (category === '急救技能') return 'heartPulse'
+  if (category === '用药安全') return 'activity'
+  return 'stethoscope'
+}
+
+function categoryTone(category) {
+  if (category === '影像检查') return 'teal'
+  if (category === '妇幼保健' || category === '慢病管理') return 'pink'
+  if (category === '用药安全') return 'lavender'
+  return 'mint'
+}
+
 onMounted(() => {
   learner.value = ensureLearner()
   course.value = getCourse(courseId)
@@ -127,6 +141,13 @@ function onSubmit(answers) {
       </template>
     </PageNav>
 
+    <div v-if="course" class="qp__cover">
+      <img v-if="course.cover" :src="course.cover" :alt="course.title" />
+      <span v-else class="vcard__thumb-ph qp__cover-ph" :class="`vcard__thumb-ph--${categoryTone(course.category)}`">
+        <AppIcon :name="categoryIcon(course.category)" :size="30" />
+      </span>
+    </div>
+
     <div v-if="course" class="qp__head" :class="isPre ? 'qp__head--pre' : 'qp__head--post'">
       <AppIcon :name="isPre ? 'info' : 'shield'" :size="17" class="qp__head-icon" />
       <div>
@@ -213,5 +234,29 @@ function onSubmit(answers) {
 .qp__head-icon {
   margin-top: 1px;
   flex-shrink: 0;
+}
+
+.qp__cover {
+  width: calc(100% - var(--sp-4) * 2);
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  margin: var(--sp-3) var(--sp-4) 0;
+  box-shadow: var(--shadow-sm);
+  background: var(--brand-tint);
+}
+
+.qp__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qp__cover-ph {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>
