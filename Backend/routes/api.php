@@ -1,9 +1,12 @@
 <?php
 
 
+use App\Http\Controllers\Fmy\DrController;
+use App\Http\Controllers\Fmy\ExamController;
+use App\Http\Controllers\Fmy\VideoController;
 use App\Http\Controllers\Lx\ExamRecordController;
 use App\Http\Controllers\Lx\QuestionController;
-use App\Http\Controllers\Lx\ShareLinkController;
+use App\Http\Controllers\Lx\TopicController;
 
 use App\Http\Controllers\Wjc\Admin\AuthController;
 use App\Http\Controllers\Wjc\Admin\CategoryController;
@@ -18,7 +21,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('admin/exam-record')->middleware('auth:admin')->group(function () {
+Route::prefix('admin/exam-record')->group(function () {
     Route::get(uri: '/list', action: [ExamRecordController::class, 'list']);
     Route::get(uri: '/detail', action: [ExamRecordController::class, 'detail']);
     Route::get(uri: '/export', action: [ExamRecordController::class, 'export']);
@@ -26,26 +29,25 @@ Route::prefix('admin/exam-record')->middleware('auth:admin')->group(function () 
 
 /*
 |--------------------------------------------------------------------------
-| LX-题库管理模块
+| LX-课程管理模块
 |--------------------------------------------------------------------------
 */
-Route::prefix('admin/question')->middleware('auth:admin')->group(function () {
-    Route::get(uri: '/list', action: [QuestionController::class, 'list']);
-    Route::post(uri: '/update', action: [QuestionController::class, 'update']);
-    Route::post(uri: '/delete', action: [QuestionController::class, 'delete']);
+Route::prefix('admin/topic')->group(function () {
+    Route::get(uri: '/list', action: [TopicController::class, 'list']);
+    Route::post(uri: '/create', action: [TopicController::class, 'create']);
+    Route::post(uri: '/update', action: [TopicController::class, 'update']);
+    Route::post(uri: '/delete', action: [TopicController::class, 'delete']);
 });
 
 /*
 |--------------------------------------------------------------------------
-| LX-访问链接管理模块
+| LX-题库管理模块
 |--------------------------------------------------------------------------
 */
-Route::prefix('admin/share-link')->middleware('auth:admin')->group(function () {
-    Route::post(uri: '/create', action: [ShareLinkController::class, 'create']);
-    Route::get(uri: '/list', action: [ShareLinkController::class, 'list']);
-    Route::post(uri: '/update-status', action: [ShareLinkController::class, 'updateStatus']);
-    Route::post(uri: '/delete', action: [ShareLinkController::class, 'delete']);
-    Route::get(uri: '/visit-record-list', action: [ShareLinkController::class, 'visitRecordList']);
+Route::prefix('admin/question')->group(function () {
+    Route::get(uri: '/list', action: [QuestionController::class, 'list']);
+    Route::post(uri: '/update', action: [QuestionController::class, 'update']);
+    Route::post(uri: '/delete', action: [QuestionController::class, 'delete']);
 });
 
 Route::get('/user', function (Request $request) {
@@ -133,4 +135,36 @@ Route::prefix('admin/category')->middleware('auth:admin')->group(function () {
 
     // 2.7.4 删除分类
     Route::post(uri: '/delete', action: [CategoryController::class, 'delete']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| FMY-用户端接口（匿名免登录，仅传 dr_id）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('public')->group(function () {
+    // 3.1 获取匿名 DR 编号（点击视频进入时生成访问记录，免登录）
+    Route::get(uri: '/dr/create', action: [DrController::class, 'create']);
+
+    // 3.2 用户端首页视频列表（免登录、无需 dr_id）
+    Route::get(uri: '/video/list', action: [VideoController::class, 'list']);
+
+    // 3.3 视频详情（观看视频页）
+    Route::get(uri: '/video/detail', action: [VideoController::class, 'detail']);
+
+    // 3.4 上报视频观看进度（观看进度≥90%解锁后测）
+    Route::post(uri: '/video/progress', action: [VideoController::class, 'progress']);
+
+    // 3.6 获取视频题目列表（学前/看完答题页共用）
+    Route::get(uri: '/video/question-list', action: [VideoController::class, 'questionList']);
+
+    // 3.5 提交学前答题
+    Route::post(uri: '/exam/submit-pre', action: [ExamController::class, 'submitPre']);
+
+    // 3.7 提交看完答题（后测，需观看进度达到门槛）
+    Route::post(uri: '/exam/submit-post', action: [ExamController::class, 'submitPost']);
+
+    // 3.8 获取答题结果
+    Route::get(uri: '/exam/result', action: [ExamController::class, 'result']);
 });
