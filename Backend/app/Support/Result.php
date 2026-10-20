@@ -53,6 +53,6 @@ class Result
 
             // TraceId 链路追踪 ID
             'trace_id' => request()->attributes->get('trace_id'),
-        ]);
+        ], $code->httpStatus());
     }
 }

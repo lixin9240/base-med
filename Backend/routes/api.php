@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('admin/exam-record')->group(function () {
+Route::prefix('admin/exam-record')->middleware('auth:admin')->group(function () {
     Route::get(uri: '/list', action: [ExamRecordController::class, 'list']);
     Route::get(uri: '/detail', action: [ExamRecordController::class, 'detail']);
     Route::get(uri: '/export', action: [ExamRecordController::class, 'export']);
