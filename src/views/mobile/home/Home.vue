@@ -1,17 +1,33 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
-import { ensureLearner, getProgress, listPublishedCourses, listQuestions } from '@/store'
+import { listPublicVideos } from '@/api/public'
+import { resolveDrId } from '@/store/mobile/session'
 
 const router = useRouter()
-const courses = ref([])
-const userId = ref('')
+const videos = ref([])
+const error = ref('')
 
-onMounted(() => {
-  const learner = ensureLearner()
-  userId.value = learner.userId
-  courses.value = listPublishedCourses()
+const cards = computed(() =>
+  videos.value.map((video) => ({
+    id: video.id,
+    title: video.title,
+    category: video.category_name,
+    speaker: video.speaker,
+    intro: video.brief_intro,
+    cover: video.cover_url,
+    examStatus: video.exam_status,
+  })),
+)
+
+onMounted(async () => {
+  try {
+    const drId = await resolveDrId()
+    videos.value = await listPublicVideos(drId)
+  } catch (e) {
+    error.value = e?.message || '加载失败'
+  }
 })
 
 function categoryIcon(category) {
@@ -28,19 +44,19 @@ function categoryTone(category) {
   return 'mint'
 }
 
-function progressHint(courseId) {
-  const p = getProgress(userId.value, courseId)
-  if (p.postDone) return p.passed ? `已答对 ${p.bestPercent}%` : '已作答'
-  if (p.preDone) return '前测已完成，待看视频'
+function examHint(status) {
+  if (status === 'done') return '已完成'
+  if (status === 'pre') return '前测已完成，待看视频'
   return ''
 }
 
-function openCourse(course) {
-  const pre = listQuestions(course.id, 'pre')
-  if (pre.length) {
-    router.push({ name: 'mobile-quiz', query: { courseId: course.id, stage: 'pre' } })
+function openCourse(item) {
+  if (item.examStatus === 'none') {
+    router.push({ name: 'mobile-quiz', query: { videoId: item.id, stage: 'pre' } })
+  } else if (item.examStatus === 'pre') {
+    router.push({ name: 'mobile-learn', query: { videoId: item.id } })
   } else {
-    router.push({ name: 'mobile-learn', query: { courseId: course.id } })
+    router.push({ name: 'mobile-report', query: { videoId: item.id } })
   }
 }
 </script>
@@ -60,7 +76,14 @@ function openCourse(course) {
     </section>
 
     <section class="home__list">
-      <div v-if="courses.length === 0" class="empty">
+      <div v-if="error" class="empty">
+        <div class="empty__icon">
+          <AppIcon name="alert" :size="48" />
+        </div>
+        <p class="empty__text">{{ error }}</p>
+      </div>
+
+      <div v-else-if="cards.length === 0" class="empty">
         <div class="empty__icon">
           <AppIcon name="inbox" :size="48" />
         </div>
@@ -68,7 +91,7 @@ function openCourse(course) {
       </div>
 
       <article
-        v-for="item in courses"
+        v-for="item in cards"
         :key="item.id"
         class="vcard"
         tabindex="0"
@@ -92,9 +115,9 @@ function openCourse(course) {
             <span>{{ item.speaker }}</span>
           </p>
           <p class="vcard__intro">{{ item.intro }}</p>
-          <p v-if="progressHint(item.id)" class="vcard__state">
+          <p v-if="examHint(item.examStatus)" class="vcard__state">
             <AppIcon name="checkCircle" :size="13" />
-            {{ progressHint(item.id) }}
+            {{ examHint(item.examStatus) }}
           </p>
         </div>
         <span class="vcard__go">
@@ -109,10 +132,17 @@ function openCourse(course) {
 
 <style scoped>
 .home {
+  /* 顶部消去 main padding，避免首屏跳动到顶栏背后 */
+  margin: calc(-1 * var(--sp-4));
+  margin-top: calc(-1 * var(--sp-4));
+  /* 用 layout 透传的安全区在左右各留出余量 */
+  margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
+  margin-right: calc(-1 * max(var(--sp-4), env(safe-area-inset-right, 0px)));
+  margin-bottom: calc(-1 * var(--sp-4) - env(safe-area-inset-bottom, 0px));
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-page);
   padding-bottom: var(--sp-8);
-  margin: calc(-1 * var(--sp-4));
 }
 
 .home__bar {
@@ -141,6 +171,9 @@ function openCourse(course) {
 .home__bar-title {
   font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home__hero {
@@ -151,6 +184,8 @@ function openCourse(course) {
   margin: 0;
   font-size: var(--fs-lg);
   font-weight: var(--fw-bold);
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .home__hero p {
@@ -185,7 +220,15 @@ function openCourse(course) {
   border-radius: var(--r-lg);
   overflow: hidden;
   flex-shrink: 0;
+  flex-grow: 0;
   background: var(--brand-tint);
+}
+
+@media (max-width: 340px) {
+  .vcard__thumb {
+    width: 88px;
+    height: 60px;
+  }
 }
 
 .vcard__thumb img {

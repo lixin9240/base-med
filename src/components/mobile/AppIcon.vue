@@ -50,7 +50,8 @@ const d = computed(() => paths[props.name] ?? paths.info)
 
 <style scoped>
 .app-icon {
-  display: block;
+  display: inline-block;
+  vertical-align: middle;
   flex-shrink: 0;
 }
 </style>

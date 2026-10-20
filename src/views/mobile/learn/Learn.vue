@@ -5,25 +5,17 @@ import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import { formatArticleHtml } from '@/utils/article'
 import { toast } from '@/utils/toast'
-import {
-  WATCH_PERCENT,
-  ensureLearner,
-  getCourse,
-  getProgress,
-  listQuestions,
-  saveProgress,
-} from '@/store'
-import { resolveShareLink } from '@/store/video/shareLink'
+import { WATCH_PERCENT, getProgress, saveProgress } from '@/store'
+import { resolveDrId } from '@/store/mobile/session'
+import { getPublicVideoDetail } from '@/api/public'
 
 const route = useRoute()
 const router = useRouter()
-const shareToken = String(route.query.share || '')
-const sharedLink = shareToken ? resolveShareLink(shareToken) : null
-const shareInvalid = Boolean(shareToken) && !sharedLink
-const courseId = String(sharedLink?.courseId || route.query.courseId || '')
+const videoId = String(route.query.videoId || '')
 
-const course = ref(null)
-const userId = ref('')
+const video = ref(null)
+const drId = ref('')
+const error = ref('')
 const videoEl = ref(null)
 const watched = ref(0)
 const canQuiz = ref(false)
@@ -35,23 +27,38 @@ let maxTime = 0
 let lastTick = 0
 let saveTimer
 
-const articleHtml = computed(() => formatArticleHtml(course.value?.articleBody || ''))
+const articleHtml = computed(() => formatArticleHtml(video.value?.articleBody || ''))
 
-onMounted(() => {
-  const learner = ensureLearner()
-  userId.value = learner.userId
-  if (shareInvalid) return
-  if (!courseId) {
-    router.replace('/mobile/home')
-    return
+onMounted(async () => {
+  try {
+    if (!videoId) {
+      router.replace('/mobile/home')
+      return
+    }
+    drId.value = await resolveDrId()
+    const detail = await getPublicVideoDetail(drId.value, videoId)
+    video.value = {
+      id: detail.id,
+      title: detail.title,
+      category: detail.category_name,
+      cover: detail.cover_url,
+      speaker: detail.speaker,
+      speakerTitle: detail.speaker_title,
+      speakerOrg: detail.speaker_org,
+      intro: detail.brief_intro,
+      videoUrl: detail.video_url,
+      articleBody: detail.text_key_points,
+      examState: detail.exam_state,
+    }
+
+    const p = getProgress(drId.value, videoId)
+    watched.value = p.watchedPercent || 0
+    if (watched.value >= WATCH_PERCENT) canQuiz.value = true
+    saveTimer = window.setInterval(persistProgress, 5000)
+    document.addEventListener('visibilitychange', onVisibility)
+  } catch (e) {
+    error.value = e?.message || '加载失败'
   }
-  course.value = getCourse(courseId)
-  if (!course.value) return
-  const p = getProgress(userId.value, courseId)
-  watched.value = p.watchedPercent || 0
-  if (watched.value >= WATCH_PERCENT) canQuiz.value = true
-  saveTimer = window.setInterval(persistProgress, 5000)
-  document.addEventListener('visibilitychange', onVisibility)
 })
 
 onUnmounted(() => {
@@ -61,9 +68,9 @@ onUnmounted(() => {
 })
 
 function persistProgress() {
-  if (!userId.value || !courseId) return
-  const p = getProgress(userId.value, courseId)
-  saveProgress(userId.value, courseId, {
+  if (!drId.value || !videoId) return
+  const p = getProgress(drId.value, videoId)
+  saveProgress(drId.value, videoId, {
     ...p,
     watchedPercent: Math.max(p.watchedPercent || 0, Math.round(watched.value)),
   })
@@ -133,12 +140,7 @@ function onVideoError() {
 
 function goQuiz() {
   persistProgress()
-  if (!listQuestions(courseId, 'post').length) {
-    toast('这条视频还没有配置检测题')
-    router.replace('/mobile/home')
-    return
-  }
-  router.push({ name: 'mobile-quiz', query: { courseId, stage: 'post' } })
+  router.push({ name: 'mobile-quiz', query: { videoId, stage: 'post' } })
 }
 </script>
 
@@ -146,11 +148,11 @@ function goQuiz() {
   <div class="learn">
     <PageNav title="观看视频" />
 
-    <div v-if="shareInvalid" class="empty">
+    <div v-if="error" class="empty">
       <div class="empty__icon">
         <AppIcon name="alert" :size="44" />
       </div>
-      <p class="empty__text">链接已过期或已撤回，请重新生成</p>
+      <p class="empty__text">{{ error }}</p>
       <div class="empty__actions">
         <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
           返回列表
@@ -158,7 +160,7 @@ function goQuiz() {
       </div>
     </div>
 
-    <div v-else-if="!course" class="empty">
+    <div v-else-if="!video" class="empty">
       <div class="empty__icon">
         <AppIcon name="alert" :size="44" />
       </div>
@@ -171,16 +173,16 @@ function goQuiz() {
     </div>
 
     <template v-else>
-      <div v-if="course.videoUrl && !noVideoMode" class="player">
+      <div v-if="video.videoUrl && !noVideoMode" class="player">
         <video
           ref="videoEl"
           class="player__el"
-          :src="course.videoUrl"
+          :src="video.videoUrl"
           controls
           playsinline
           webkit-playsinline
           preload="metadata"
-          :aria-label="`播放视频：${course.title}`"
+          :aria-label="`播放视频：${video.title}`"
           @timeupdate="onTimeUpdate"
           @seeking="onSeeking"
           @seeked="onSeeking"
@@ -195,25 +197,25 @@ function goQuiz() {
       </div>
       <div v-else class="player-fallback">
         <AppIcon name="alert" :size="26" />
-        <b>{{ course.videoUrl ? '视频暂时无法播放' : '本条内容暂无视频' }}</b>
+        <b>{{ video.videoUrl ? '视频暂时无法播放' : '本条内容暂无视频' }}</b>
         <span>可直接阅读下方的文字说明，读完后同样可以答题。</span>
       </div>
 
       <section class="info">
-        <h1 class="info__title">{{ course.title }}</h1>
+        <h1 class="info__title">{{ video.title }}</h1>
         <p class="info__meta">
-          <span class="badge badge--info">{{ course.category }}</span>
+          <span class="badge badge--info">{{ video.category }}</span>
           <span>
-            {{ course.speaker }}
-            <template v-if="course.speakerTitle"> · {{ course.speakerTitle }}</template>
+            {{ video.speaker }}
+            <template v-if="video.speakerTitle"> · {{ video.speakerTitle }}</template>
           </span>
         </p>
-        <p class="info__intro">{{ course.intro }}</p>
-        <p v-if="course.speakerOrg" class="info__speaker-org">{{ course.speakerOrg }}</p>
+        <p class="info__intro">{{ video.intro }}</p>
+        <p v-if="video.speakerOrg" class="info__speaker-org">{{ video.speakerOrg }}</p>
       </section>
 
-      <section v-if="course.articleBody" class="article">
-        <h2 class="article__title">文字要点</h2>
+      <section v-if="video.articleBody" class="article">
+        <h2 class="article__title">视频要点</h2>
         <div class="article__body" v-html="articleHtml" />
       </section>
 
@@ -238,19 +240,30 @@ function goQuiz() {
 <style scoped>
 .learn {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-page);
-  padding-bottom: 150px;
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
   margin: calc(-1 * var(--sp-4));
+  margin-top: calc(-1 * var(--sp-4));
+  margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
+  margin-right: calc(-1 * max(var(--sp-4), env(safe-area-inset-right, 0px)));
 }
 
 .player {
   position: relative;
   background: #111827;
+  /* 锁比例的视频，保留控制条可见 */
+  max-height: 70vh;
+  max-height: 70dvh;
+  overflow: hidden;
 }
 
 .player__el {
+  display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
+  max-height: 70vh;
+  max-height: 70dvh;
   object-fit: contain;
   background: #111827;
 }
@@ -358,10 +371,23 @@ function goQuiz() {
   bottom: 0;
   width: 100%;
   max-width: var(--mobile-max);
-  padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom));
-  background: var(--bg-surface);
+  /* 左右安全区：layout 为 max-width 容器，居中后水平方向有外溢，
+     用 padding 抵消让 footer 内容跟着视口左右缩进 */
+  padding: var(--sp-3) max(var(--sp-4), env(safe-area-inset-left, 0px))
+    calc(var(--sp-3) + env(safe-area-inset-bottom, 0px))
+    max(var(--sp-4), env(safe-area-inset-right, 0px));
+  background: var(--bg-surface-solid);
+  /* 不用 --bg-surface 半透明，避免背后视频穿透 */
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   z-index: 30;
+}
+
+@supports not ((-webkit-backdrop-filter: initial) or (backdrop-filter: initial)) {
+  .learn__footer {
+    background: var(--bg-surface-solid);
+  }
 }
 
 .learn__bar-head {

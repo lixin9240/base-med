@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import AppIcon from '@/components/mobile/AppIcon.vue'
-import { QUESTION_TYPE_LABEL, hasAnswer, optionLetter } from '@/utils/question'
+import { QUESTION_TYPE_LABEL, hasAnswer } from '@/utils/question'
 import { toast } from '@/utils/toast'
 
 const props = defineProps({
@@ -23,24 +23,29 @@ watch(
   { deep: true, immediate: true },
 )
 
-function isSelected(optIndex) {
-  const val = answers.value[index.value]
-  const letter = optionLetter(optIndex)
-  if (Array.isArray(val)) return val.includes(letter)
-  return val === letter
+// 选项对应的答案值：判断题用 content（正确/错误），单选/多选用 key（A/B/C）
+function optionValue(question, opt) {
+  return question.type === 'judge' ? opt.content : opt.key
 }
 
-function pick(optIndex) {
-  const letter = optionLetter(optIndex)
+function isSelected(opt) {
+  const val = answers.value[index.value]
+  const value = optionValue(current.value, opt)
+  if (Array.isArray(val)) return val.includes(value)
+  return val === value
+}
+
+function pick(opt) {
+  const value = optionValue(current.value, opt)
   if (current.value.type === 'multiple') {
     const list = Array.isArray(answers.value[index.value]) ? [...answers.value[index.value]] : []
-    const pos = list.indexOf(letter)
+    const pos = list.indexOf(value)
     if (pos >= 0) list.splice(pos, 1)
-    else list.push(letter)
+    else list.push(value)
     list.sort()
     answers.value[index.value] = list
   } else {
-    answers.value[index.value] = letter
+    answers.value[index.value] = value
   }
 }
 
@@ -109,13 +114,13 @@ function submit() {
           :key="i"
           type="button"
           class="opt"
-          :class="{ 'is-selected': isSelected(i) }"
-          @click="pick(i)"
+          :class="{ 'is-selected': isSelected(opt) }"
+          @click="pick(opt)"
         >
-          <span class="opt__letter">{{ optionLetter(i) }}</span>
-          <span class="opt__text">{{ opt }}</span>
+          <span class="opt__letter">{{ opt.key }}</span>
+          <span class="opt__text">{{ opt.content }}</span>
           <span class="opt__mark">
-            <AppIcon v-if="isSelected(i)" name="check" :size="16" />
+            <AppIcon v-if="isSelected(opt)" name="check" :size="16" />
           </span>
         </button>
       </div>
@@ -125,13 +130,13 @@ function submit() {
           :key="i"
           type="button"
           class="jopt"
-          :class="{ 'is-selected': isSelected(i) }"
-          @click="pick(i)"
+          :class="{ 'is-selected': isSelected(opt) }"
+          @click="pick(opt)"
         >
           <span class="jopt__icon">
             <AppIcon :name="i === 0 ? 'checkCircle' : 'xCircle'" :size="24" />
           </span>
-          <span class="jopt__text">{{ opt }}</span>
+          <span class="jopt__text">{{ opt.content }}</span>
         </button>
       </div>
       <p class="quiz__hint">
@@ -168,9 +173,11 @@ function submit() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sp-2);
   margin-bottom: var(--sp-2);
   font-size: var(--fs-sm);
   color: var(--text-secondary);
+  flex-wrap: wrap;
 }
 
 .quiz__progress-top b {
@@ -181,6 +188,7 @@ function submit() {
 .quiz__type {
   font-size: var(--fs-xs);
   color: var(--text-disabled);
+  white-space: nowrap;
 }
 
 .quiz__bar {
@@ -205,14 +213,20 @@ function submit() {
 }
 
 .qdot {
-  width: 28px;
-  height: 28px;
+  /* 28px 容易误触（手指目标 < 32px），用稍大的可视尺寸 */
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--bg-surface);
   color: var(--text-disabled);
   font-size: var(--fs-xs);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .qdot.is-answered {
@@ -247,6 +261,7 @@ function submit() {
   font-weight: var(--fw-semibold);
   line-height: 1.65;
   margin: 0 0 var(--sp-4);
+  word-break: break-word;
 }
 
 .quiz__options {
@@ -267,6 +282,7 @@ function submit() {
   background: var(--bg-surface);
   text-align: left;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .opt.is-selected {
@@ -294,8 +310,10 @@ function submit() {
 
 .opt__text {
   flex: 1;
+  min-width: 0;
   font-size: var(--fs-base);
   line-height: 1.55;
+  word-break: break-word;
 }
 
 .opt__mark {
@@ -303,6 +321,7 @@ function submit() {
   display: flex;
   justify-content: center;
   color: var(--brand-primary);
+  flex-shrink: 0;
 }
 
 .quiz__judge {
@@ -311,8 +330,10 @@ function submit() {
 }
 
 .jopt {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 84px;
+  padding: var(--sp-3) var(--sp-2);
   border: 1.5px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--bg-surface);
@@ -322,11 +343,33 @@ function submit() {
   justify-content: center;
   gap: var(--sp-2);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .jopt.is-selected {
   border-color: var(--brand-primary);
   background: var(--brand-soft);
+}
+
+.jopt__text {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  word-break: break-word;
+  text-align: center;
+}
+
+@media (max-width: 340px) {
+  .quiz__card {
+    padding: var(--sp-4) var(--sp-3);
+  }
+  .opt {
+    padding: var(--sp-3);
+    gap: var(--sp-2);
+  }
+  .opt__letter {
+    width: 22px;
+    height: 22px;
+  }
 }
 
 .quiz__hint {
@@ -346,5 +389,7 @@ function submit() {
 
 .quiz__btn {
   flex: 1;
+  /* 保证按钮文字在 iOS Safari 不会垂直居中漂移 */
+  min-width: 0;
 }
 </style>
