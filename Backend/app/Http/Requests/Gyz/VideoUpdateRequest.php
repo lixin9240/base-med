@@ -29,6 +29,8 @@ class VideoUpdateRequest extends FormRequest
             'id' => ['required', 'integer', 'min:1'],
             'title' => ['required', 'string', 'max:60'],
             'category_id' => ['required', 'integer', 'min:1'],
+            // 同 2.2.3：可选课程参数，未传时保持原归属
+            'topic_id' => ['nullable', 'integer', 'min:1'],
             'speaker' => ['required', 'string', 'max:32'],
             'speaker_title' => ['nullable', 'string', 'max:32'],
             'speaker_org' => ['nullable', 'string', 'max:64'],

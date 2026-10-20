@@ -28,6 +28,8 @@ class VideoCreateRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:60'],
             'category_id' => ['required', 'integer', 'min:1'],
+            // 文档 2.2.3 暂无课程参数，先支持可选传入（未传时服务端挂「默认课程」）
+            'topic_id' => ['nullable', 'integer', 'min:1'],
             'speaker' => ['required', 'string', 'max:32'],
             'speaker_title' => ['nullable', 'string', 'max:32'],
             'speaker_org' => ['nullable', 'string', 'max:64'],
