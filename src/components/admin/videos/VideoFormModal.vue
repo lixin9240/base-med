@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { updateAdminVideo } from '@/api'
+import { createAdminVideo, updateAdminVideo } from '@/api'
 import {
   VIDEO_CATEGORIES,
   VIDEO_INTRO_MAX,
@@ -15,7 +15,7 @@ import {
   validateCoverFile,
   validateVideoFile,
 } from '@/utils/video/upload'
-import { createVideo, listVideos } from '@/store/video/video'
+import { listVideos } from '@/store/video/video'
 
 const props = defineProps({
   open: {
@@ -48,6 +48,8 @@ const coverInput = ref(null)
 const isEdit = computed(() => Boolean(props.video?.id))
 const modalTitle = computed(() => (isEdit.value ? '编辑视频' : '新增视频'))
 const isUpload = computed(() => draft.source === VIDEO_SOURCE.UPLOAD)
+/** 分片上传接口（2.2.7 / 2.2.8）尚未接入：新增时禁用本地上传，编辑保留原有能力 */
+const canUpload = computed(() => isEdit.value)
 const titleCount = computed(() => draft.title.length)
 const introCount = computed(() => draft.intro.length)
 const submitLabel = computed(() => (saving.value ? '保存中…' : '保存'))
@@ -101,6 +103,7 @@ function clearError(key) {
 }
 
 function selectSource(source) {
+  if (source === VIDEO_SOURCE.UPLOAD && !canUpload.value) return
   if (draft.source === source) return
   draft.source = source
   uploadError.value = ''
@@ -182,34 +185,37 @@ async function submit() {
   saving.value = true
   uploadError.value = ''
   try {
-    if (isEdit.value) {
-      // 编辑保存走 2.2.4，分类要提交真实的 category_id
-      const categoryId = categoryIdOf(draft.category)
-      if (categoryId === null) {
-        errors.value = { ...errors.value, category: '该分类不在分类列表中，请重新选择' }
-        return
-      }
-
-      await updateAdminVideo({
-        id: props.video.id,
-        title: draft.title.trim(),
-        category_id: categoryId,
-        speaker: draft.speaker.trim(),
-        speaker_title: draft.speakerTitle.trim(),
-        speaker_org: draft.speakerOrg.trim(),
-        brief_intro: draft.intro.trim(),
-        source_type: draft.source === VIDEO_SOURCE.UPLOAD ? 2 : 1,
-        video_url: draft.videoUrl.trim(),
-        cover_url: draft.cover,
-        text_key_points: draft.articleBody,
-        status: draft.published ? 1 : 0,
-        sort_order: Number(draft.order) || 1,
-      })
-      // 编辑不再写本地记录，列表以接口为准，由父组件重新拉取
-      emit('saved', null)
-    } else {
-      emit('saved', createVideo(draft))
+    // 新增和编辑都要提交真实的 category_id
+    const categoryId = categoryIdOf(draft.category)
+    if (categoryId === null) {
+      errors.value = { ...errors.value, category: '该分类不在分类列表中，请重新选择' }
+      return
     }
+
+    // 2.2.3 新增 / 2.2.4 编辑共用同一组字段
+    const payload = {
+      title: draft.title.trim(),
+      category_id: categoryId,
+      speaker: draft.speaker.trim(),
+      speaker_title: draft.speakerTitle.trim(),
+      speaker_org: draft.speakerOrg.trim(),
+      brief_intro: draft.intro.trim(),
+      source_type: draft.source === VIDEO_SOURCE.UPLOAD ? 2 : 1,
+      video_url: draft.videoUrl.trim(),
+      cover_url: draft.cover,
+      text_key_points: draft.articleBody,
+      status: draft.published ? 1 : 0,
+      sort_order: Number(draft.order) || 1,
+    }
+
+    if (isEdit.value) {
+      await updateAdminVideo({ id: props.video.id, ...payload })
+    } else {
+      await createAdminVideo(payload)
+    }
+
+    // 不再写本地记录，列表以接口为准，由父组件重新拉取
+    emit('saved', null)
     emit('close')
   } catch (error) {
     uploadError.value = error?.message || '保存失败，请重试'
@@ -325,18 +331,22 @@ async function submit() {
               <span class="radio__dot"></span>
               填写视频链接
             </label>
-            <label class="radio" :class="{ 'radio--on': isUpload }">
+            <label class="radio" :class="{ 'radio--on': isUpload, 'radio--disabled': !canUpload }">
               <input
                 type="radio"
                 name="video-source"
                 :value="VIDEO_SOURCE.UPLOAD"
                 :checked="isUpload"
+                :disabled="!canUpload"
                 @change="selectSource(VIDEO_SOURCE.UPLOAD)"
               />
               <span class="radio__dot"></span>
               本地上传
             </label>
           </div>
+          <p v-if="!canUpload" class="field__hint">
+            分片上传接口（2.2.7 / 2.2.8）尚未接入，新增视频暂只支持填写视频链接。
+          </p>
         </div>
 
         <!-- 视频链接 -->
@@ -779,6 +789,11 @@ async function submit() {
   inset: 3px;
   background: var(--brand-primary-hover);
   border-radius: 50%;
+}
+
+.radio--disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
 }
 
 /* ===== 上传 ===== */

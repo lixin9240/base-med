@@ -2,6 +2,7 @@ import { get, post } from './http'
 
 const LIST_PATH = '/api/admin/video/list'
 const DETAIL_PATH = '/api/admin/video/detail'
+const CREATE_PATH = '/api/admin/video/create'
 const UPDATE_PATH = '/api/admin/video/update'
 const UPDATE_STATUS_PATH = '/api/admin/video/update-status'
 
@@ -29,6 +30,16 @@ export async function getAdminVideoDetail(id) {
 
   if (!body || typeof body !== 'object' || !('data' in body) || !body.data) {
     throw new Error('视频详情加载失败：服务未返回标准数据')
+  }
+  return body.data
+}
+
+/** 新增视频（2.2.3），payload 用后端字段名。返回新建记录，含 { id } */
+export async function createAdminVideo(payload) {
+  const body = await post(CREATE_PATH, payload)
+
+  if (!body || typeof body !== 'object' || !('data' in body) || !body.data) {
+    throw new Error('视频创建失败：服务未返回标准数据')
   }
   return body.data
 }
