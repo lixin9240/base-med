@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { adminLogin } from '@/api'
+import { saveAdminAuth } from '@/store/admin/auth'
 import LoginBrandPanel from '@/components/admin/login/LoginBrandPanel.vue'
 import '@/styles/tokens.css'
 
@@ -16,7 +18,7 @@ const loading = ref(false)
 const errorMsg = ref('')
 const showPassword = ref(false)
 
-function handleLogin() {
+async function handleLogin() {
   errorMsg.value = ''
   if (!form.value.username.trim()) {
     errorMsg.value = '请输入账号'
@@ -28,12 +30,20 @@ function handleLogin() {
   }
 
   loading.value = true
-  // TODO: 调用后端登录接口
-  setTimeout(() => {
-    loading.value = false
-    // mock 登录成功
+  try {
+    const { token, adminInfo } = await adminLogin({
+      username: form.value.username.trim(),
+      password: form.value.password,
+    })
+    if (!token) throw new Error('登录失败：服务未返回登录凭证')
+
+    saveAdminAuth({ token, adminInfo })
     router.push('/admin')
-  }, 800)
+  } catch (error) {
+    errorMsg.value = error?.message || '登录失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
 }
 
 function togglePassword() {
