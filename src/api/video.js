@@ -7,6 +7,7 @@ const UPDATE_PATH = '/api/admin/video/update'
 const UPDATE_STATUS_PATH = '/api/admin/video/update-status'
 const DELETE_PATH = '/api/admin/video/delete'
 const UPLOAD_INIT_PATH = '/api/admin/video/upload/init'
+const UPLOAD_COMPLETE_PATH = '/api/admin/video/upload/complete'
 
 /** 视频列表（管理端）。返回 { list, total, page, pageSize }，list 内字段保持后端命名。 */
 export async function listAdminVideos({ page = 1, pageSize = 20 } = {}) {
@@ -73,6 +74,16 @@ export async function initAdminVideoUpload({ file_name, file_size, video_id } = 
 
   if (!body || typeof body !== 'object' || !('data' in body) || !body.data) {
     throw new Error('上传初始化失败：服务未返回标准数据')
+  }
+  return body.data
+}
+
+/** 完成视频上传（2.2.8）：合并分片并触发转码，返回 { video_id, transcode_status }；转码异步，状态经 2.2.1/2.2.2 查看 */
+export async function completeAdminVideoUpload({ oss_upload_id, video_id }) {
+  const body = await post(UPLOAD_COMPLETE_PATH, { oss_upload_id, video_id })
+
+  if (!body || typeof body !== 'object' || !('data' in body) || !body.data) {
+    throw new Error('完成上传失败：服务未返回标准数据')
   }
   return body.data
 }
