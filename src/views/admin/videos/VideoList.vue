@@ -1,6 +1,12 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { listAdminVideos, updateAdminVideoStatus } from '@/api'
+import {
+  getAdminVideoDetail,
+  listAdminCategories,
+  listAdminVideos,
+  updateAdminVideoStatus,
+} from '@/api'
+import { VIDEO_SOURCE } from '@/utils/video/constants'
 import { findVideoByTitle } from '@/store/video/video'
 import QuestionImportModal from '@/components/admin/videos/QuestionImportModal.vue'
 import QuestionConfigDrawer from '@/components/admin/videos/QuestionConfigDrawer.vue'
@@ -19,6 +25,10 @@ const page = ref(1)
 const loading = ref(false)
 const loadError = ref('')
 const switchingId = ref(null)
+const editLoadingId = ref(null)
+
+/** 分类列表（视频表单下拉用），来自 2.7.1；保存时用它把分类名换成 category_id */
+const categories = ref([])
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
@@ -34,7 +44,7 @@ const shareVideo = ref(null)
 const deleteOpen = ref(false)
 const deleteVideo = ref(null)
 
-/** 题目配置 / 编辑 / 删除 / 分享仍读本地记录，按标题匹配同一条；找不到时用接口行兜底 */
+/** 题目配置 / 生成链接 / 删除仍读本地记录，按标题匹配同一条；找不到时用接口行兜底 */
 function resolveLocalVideo(video) {
   return findVideoByTitle(video.title) ?? video
 }
@@ -98,7 +108,38 @@ function goPage(next) {
   refreshVideos()
 }
 
-onMounted(refreshVideos)
+/** 把 2.2.2 详情接口的字段转成表单草稿字段 */
+function toEditDraft(detail) {
+  return {
+    id: detail.id,
+    courseId: '',
+    title: detail.title ?? '',
+    category: String(detail.category_name ?? ''),
+    speaker: detail.speaker ?? '',
+    speakerTitle: detail.speaker_title ?? '',
+    speakerOrg: detail.speaker_org ?? '',
+    intro: detail.brief_intro ?? '',
+    source: Number(detail.source_type) === 2 ? VIDEO_SOURCE.UPLOAD : VIDEO_SOURCE.URL,
+    videoUrl: detail.video_url ?? '',
+    cover: detail.cover_url ?? '',
+    articleBody: detail.text_key_points ?? '',
+    published: Number(detail.status) === 1,
+    order: Number(detail.sort_order) || 1,
+  }
+}
+
+async function loadCategories() {
+  try {
+    categories.value = await listAdminCategories()
+  } catch (error) {
+    if (!loadError.value) loadError.value = error?.message || '分类列表加载失败，请稍后重试'
+  }
+}
+
+onMounted(() => {
+  refreshVideos()
+  loadCategories()
+})
 
 function openConfig(video) {
   configVideo.value = resolveLocalVideo(video)
@@ -110,9 +151,20 @@ function openCreate() {
   formOpen.value = true
 }
 
-function openEdit(video) {
-  editingVideo.value = resolveLocalVideo(video)
-  formOpen.value = true
+async function openEdit(video) {
+  if (editLoadingId.value !== null) return
+
+  editLoadingId.value = video.id
+  loadError.value = ''
+  try {
+    const detail = await getAdminVideoDetail(video.id)
+    editingVideo.value = toEditDraft(detail)
+    formOpen.value = true
+  } catch (error) {
+    loadError.value = error?.message || '视频详情加载失败，请稍后重试'
+  } finally {
+    editLoadingId.value = null
+  }
 }
 
 function openShare(video) {
@@ -272,7 +324,14 @@ async function togglePublished(video) {
         <!-- 操作 -->
         <div class="col col--ops">
           <button type="button" class="link-btn" @click="openConfig(video)">题目配置</button>
-          <button type="button" class="link-btn" @click="openEdit(video)">编辑</button>
+          <button
+            type="button"
+            class="link-btn"
+            :disabled="editLoadingId === video.id"
+            @click="openEdit(video)"
+          >
+            {{ editLoadingId === video.id ? '加载中…' : '编辑' }}
+          </button>
           <button type="button" class="link-btn" @click="openShare(video)">生成视频链接</button>
           <button type="button" class="link-btn link-btn--danger" @click="openDelete(video)">
             删除
@@ -321,6 +380,7 @@ async function togglePublished(video) {
     <VideoFormModal
       :open="formOpen"
       :video="editingVideo"
+      :categories="categories"
       @close="formOpen = false"
       @saved="refreshVideos"
     />
@@ -381,7 +441,7 @@ async function togglePublished(video) {
   margin-right: auto;
 }
 
-.video-pager .link-btn:disabled {
+.link-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }

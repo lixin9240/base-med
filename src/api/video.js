@@ -1,6 +1,8 @@
 import { get, post } from './http'
 
 const LIST_PATH = '/api/admin/video/list'
+const DETAIL_PATH = '/api/admin/video/detail'
+const UPDATE_PATH = '/api/admin/video/update'
 const UPDATE_STATUS_PATH = '/api/admin/video/update-status'
 
 /** 视频列表（管理端）。返回 { list, total, page, pageSize }，list 内字段保持后端命名。 */
@@ -19,6 +21,26 @@ export async function listAdminVideos({ page = 1, pageSize = 20 } = {}) {
     page: Number(data.page) || page,
     pageSize: Number(data.page_size) || pageSize,
   }
+}
+
+/** 视频详情（编辑弹窗回填）。返回后端原始字段对象 */
+export async function getAdminVideoDetail(id) {
+  const body = await get(`${DETAIL_PATH}?id=${id}`)
+
+  if (!body || typeof body !== 'object' || !('data' in body) || !body.data) {
+    throw new Error('视频详情加载失败：服务未返回标准数据')
+  }
+  return body.data
+}
+
+/** 编辑视频（2.2.4），payload 用后端字段名 */
+export async function updateAdminVideo(payload) {
+  const body = await post(UPDATE_PATH, payload)
+
+  if (!body || typeof body !== 'object' || !('data' in body)) {
+    throw new Error('视频保存失败：服务未返回标准数据')
+  }
+  return body.data ?? null
 }
 
 /** 上架 / 下架切换，status：0 已下架，1 已上架 */

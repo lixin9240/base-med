@@ -1,5 +1,6 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { updateAdminVideo } from '@/api'
 import {
   VIDEO_CATEGORIES,
   VIDEO_INTRO_MAX,
@@ -14,7 +15,7 @@ import {
   validateCoverFile,
   validateVideoFile,
 } from '@/utils/video/upload'
-import { createVideo, listVideos, updateVideo } from '@/store/video/video'
+import { createVideo, listVideos } from '@/store/video/video'
 
 const props = defineProps({
   open: {
@@ -24,6 +25,11 @@ const props = defineProps({
   video: {
     type: Object,
     default: null,
+  },
+  /** 分类列表（来自 2.7.1），[{ id, name }] */
+  categories: {
+    type: Array,
+    default: () => [],
   },
 })
 
@@ -45,6 +51,21 @@ const isUpload = computed(() => draft.source === VIDEO_SOURCE.UPLOAD)
 const titleCount = computed(() => draft.title.length)
 const introCount = computed(() => draft.intro.length)
 const submitLabel = computed(() => (saving.value ? '保存中…' : '保存'))
+
+/** 分类下拉选项：优先用 2.7.1 接口返回的分类名，接口未就绪时退回本地常量 */
+const categoryOptions = computed(() =>
+  props.categories?.length ? props.categories.map((item) => item.name) : VIDEO_CATEGORIES,
+)
+
+/** 编辑回填的分类名不在列表里时的提示 */
+const categoryMissing = computed(
+  () => Boolean(draft.category) && !categoryOptions.value.includes(draft.category),
+)
+
+function categoryIdOf(name) {
+  const matched = props.categories?.find((item) => item.name === name)
+  return matched ? matched.id : null
+}
 
 watch(
   () => props.open,
@@ -151,7 +172,7 @@ function clearVideoFile() {
   clearError('videoUrl')
 }
 
-function submit() {
+async function submit() {
   if (saving.value || uploadingVideo.value || uploadingCover.value) return
 
   const result = validateVideoDraft(draft)
@@ -161,8 +182,34 @@ function submit() {
   saving.value = true
   uploadError.value = ''
   try {
-    const saved = isEdit.value ? updateVideo(props.video.id, draft) : createVideo(draft)
-    emit('saved', saved)
+    if (isEdit.value) {
+      // 编辑保存走 2.2.4，分类要提交真实的 category_id
+      const categoryId = categoryIdOf(draft.category)
+      if (categoryId === null) {
+        errors.value = { ...errors.value, category: '该分类不在分类列表中，请重新选择' }
+        return
+      }
+
+      await updateAdminVideo({
+        id: props.video.id,
+        title: draft.title.trim(),
+        category_id: categoryId,
+        speaker: draft.speaker.trim(),
+        speaker_title: draft.speakerTitle.trim(),
+        speaker_org: draft.speakerOrg.trim(),
+        brief_intro: draft.intro.trim(),
+        source_type: draft.source === VIDEO_SOURCE.UPLOAD ? 2 : 1,
+        video_url: draft.videoUrl.trim(),
+        cover_url: draft.cover,
+        text_key_points: draft.articleBody,
+        status: draft.published ? 1 : 0,
+        sort_order: Number(draft.order) || 1,
+      })
+      // 编辑不再写本地记录，列表以接口为准，由父组件重新拉取
+      emit('saved', null)
+    } else {
+      emit('saved', createVideo(draft))
+    }
     emit('close')
   } catch (error) {
     uploadError.value = error?.message || '保存失败，请重试'
@@ -216,11 +263,14 @@ function submit() {
           <label class="field field--category">
             <span class="field__label"><em class="req">*</em>分类</span>
             <select v-model="draft.category">
-              <option v-for="category in VIDEO_CATEGORIES" :key="category" :value="category">
-                {{ category }}
+              <option v-for="name in categoryOptions" :key="name" :value="name">
+                {{ name }}
               </option>
             </select>
             <p v-if="errors.category" class="field__error">{{ errors.category }}</p>
+            <p v-else-if="categoryMissing" class="field__error">
+              该分类不在分类列表中，请重新选择
+            </p>
           </label>
         </div>
 
