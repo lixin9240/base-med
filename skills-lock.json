@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "add-feature": {
+      "source": "./skills",
+      "sourceType": "local",
+      "computedHash": "7bdd0d1e0dfa50d3ea8649d2bbb45dadc182aee1581b54c651be87ae011f3dff"
+    },
+    "api-conventions": {
+      "source": "./skills",
+      "sourceType": "local",
+      "computedHash": "a8996ded9a350808d7596da6dcfc803d4787da6acdf92cc74fcc08de4b460ff3"
+    },
+    "frontend-conventions": {
+      "source": "./skills",
+      "sourceType": "local",
+      "computedHash": "d463653384fffabc5cb83b0ebf428bab5b544f3e3e3cdfc0c37f11b57175d56e"
+    }
+  }
+}
