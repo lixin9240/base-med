@@ -12,6 +12,11 @@ use Illuminate\Support\Str;
 
 class ShareLinkService
 {
+    public function __construct(
+        private readonly OperationLogService $operationLogService
+    ) {
+    }
+
     /**
      * 生成访问链接
      *
@@ -34,6 +39,13 @@ class ShareLinkService
             'visit_count' => 0,
             'status' => 1,
         ]);
+
+        $this->operationLogService->record(
+            module: 'share',
+            action: 'generate_link',
+            targetId: $link->id,
+            detail: ['video_id' => $link->video_id, 'expire_type' => $expireType],
+        );
 
         return [
             'id' => $link->id,
