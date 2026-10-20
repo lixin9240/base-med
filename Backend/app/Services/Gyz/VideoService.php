@@ -7,6 +7,7 @@ use App\Exceptions\BusinessException;
 use App\Models\Category;
 use App\Models\ExamRecord;
 use App\Models\SystemConfig;
+use App\Models\Topic;
 use App\Models\Video;
 use App\Models\VideoShareLink;
 use Illuminate\Support\Facades\Auth;
@@ -141,11 +142,14 @@ class VideoService
         $video = Video::create([
             'title' => $data['title'],
             'category_id' => $data['category_id'],
+            // 文档 2.2.3 未包含课程参数，但 video.topic_id 为非空外键，服务端兜底解析
+            'topic_id' => $this->resolveTopicId($data['topic_id'] ?? null),
             'speaker' => $data['speaker'],
-            'speaker_title' => $data['speaker_title'] ?? null,
-            'speaker_org' => $data['speaker_org'] ?? null,
+            // speaker_title/speaker_org/text_key_points 库里 NOT NULL 无默认值，未传时落空串
+            'speaker_title' => $data['speaker_title'] ?? '',
+            'speaker_org' => $data['speaker_org'] ?? '',
             'brief_intro' => $data['brief_intro'],
-            'text_key_points' => $data['text_key_points'] ?? null,
+            'text_key_points' => $data['text_key_points'] ?? '',
             'source_type' => $data['source_type'],
             // source_type=2（本地上传）时可先不传 video_url，由 2.2.7/2.2.8 完成上传后回填
             'video_url' => $data['video_url'] ?? '',
@@ -189,11 +193,13 @@ class VideoService
         $video->update([
             'title' => $data['title'],
             'category_id' => $data['category_id'],
+            // 未传课程参数时保持原归属
+            'topic_id' => $this->resolveTopicId($data['topic_id'] ?? null, (int) $video->topic_id),
             'speaker' => $data['speaker'],
-            'speaker_title' => $data['speaker_title'] ?? null,
-            'speaker_org' => $data['speaker_org'] ?? null,
+            'speaker_title' => $data['speaker_title'] ?? '',
+            'speaker_org' => $data['speaker_org'] ?? '',
             'brief_intro' => $data['brief_intro'],
-            'text_key_points' => $data['text_key_points'] ?? null,
+            'text_key_points' => $data['text_key_points'] ?? '',
             'source_type' => $data['source_type'],
             'video_url' => $data['video_url'] ?? $video->video_url,
             'cover_url' => $data['cover_url'] ?? $video->cover_url,
@@ -465,6 +471,43 @@ class VideoService
         if (! Category::query()->whereKey($categoryId)->exists()) {
             throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '分类不存在');
         }
+    }
+
+    /**
+     * 解析视频归属课程：传了 topic_id 校验存在；未传时挂到「默认课程」（不存在则创建）。
+     *
+     * 接口文档 2.2.3 未包含课程参数，但 video.topic_id 为非空外键——此处做服务端兜底，
+     * 待团队确认文档补充课程选择或调整库约束后可移除默认逻辑。
+     */
+    private function resolveTopicId(mixed $topicId, ?int $fallback = null): int
+    {
+        if (! empty($topicId)) {
+            $topicId = (int) $topicId;
+
+            if (! Topic::query()->whereKey($topicId)->exists()) {
+                throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '课程不存在');
+            }
+
+            return $topicId;
+        }
+
+        // 编辑场景未传课程参数时保持原归属
+        if ($fallback !== null && $fallback > 0) {
+            return $fallback;
+        }
+
+        /** @var Topic $topic */
+        $topic = Topic::withTrashed()->firstOrCreate(
+            ['name' => '默认课程'],
+            // cover_url/intro 库里 NOT NULL 无默认值，兜底空串
+            ['cover_url' => '', 'intro' => '', 'status' => 1, 'sort_order' => 0]
+        );
+
+        if ($topic->trashed()) {
+            $topic->restore();
+        }
+
+        return (int) $topic->id;
     }
 
     /**
