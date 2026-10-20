@@ -69,6 +69,38 @@
 - 路径：`POST /api/admin/auth/logout`
 - 说明：销毁当前 token，返回 success=true。
 
+### 2.1.4 发送重置密码验证码（忘记密码）
+- 路径：`POST /api/admin/auth/forgot-password`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| username | string | 是 | 登录账号 |
+
+返回示例：
+```json
+{ "success": true, "data": { "expire_minutes": 10 } }
+```
+
+> 说明：校验账号存在且已绑定 email 后，发送 6 位数字验证码（10 分钟有效，同一账号 60 秒内不可重复发送）；账号不存在或未绑定邮箱时统一按成功返回，避免用户名枚举。演示环境 `MAIL_MAILER=log` 时验证码仅写入日志，正式环境走 QQ 邮箱 SMTP。
+
+### 2.1.5 重置密码
+- 路径：`POST /api/admin/auth/reset-password`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| username | string | 是 | 登录账号 |
+| code | string | 是 | 邮箱收到的 6 位数字验证码 |
+| password | string | 是 | 新密码，6~32 位 |
+
+返回示例：
+```json
+{ "success": true }
+```
+
+> 说明：验证码错误或过期返回 422（msg：验证码错误或已过期）；重置成功后验证码立即失效，需用新密码重新登录。
+
 ## 2.2 GYZ-视频管理模块（对应【视频管理】列表页 + 新增/编辑视频弹窗）
 
 > 页面构成：①列表页（批量导入题目/新增视频按钮、上架开关、题目配置/编辑/删除操作）；②新增视频弹窗；③编辑视频弹窗（同表单回填）。
