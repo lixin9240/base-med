@@ -7,6 +7,7 @@ use App\Http\Controllers\Lx\ShareLinkController;
 use App\Http\Controllers\Lx\TopicController;
 
 use App\Http\Controllers\Wjc\Admin\AuthController;
+use App\Http\Controllers\Wjc\Admin\CategoryController;
 use App\Http\Controllers\Wjc\Admin\VideoQuestionController;
 
 use Illuminate\Http\Request;
@@ -125,4 +126,24 @@ Route::prefix('admin/video-question')->middleware('auth:admin')->group(function 
 Route::prefix('admin/video')->middleware('auth:admin')->group(function () {
     // 2.3.5 导入本组题目（创建导入任务）
     Route::post(uri: '/import-question', action: [VideoQuestionController::class, 'importQuestion']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| WJC-分类管理模块（2.7）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/category')->middleware('auth:admin')->group(function () {
+    // 2.7.1 分类列表
+    Route::get(uri: '/list', action: [CategoryController::class, 'list']);
+
+    // 2.7.2 新增分类
+    Route::post(uri: '/create', action: [CategoryController::class, 'create']);
+
+    // 2.7.3 编辑分类
+    Route::post(uri: '/update', action: [CategoryController::class, 'update']);
+
+    // 2.7.4 删除分类
+    Route::post(uri: '/delete', action: [CategoryController::class, 'delete']);
 });
