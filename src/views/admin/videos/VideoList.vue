@@ -1,14 +1,26 @@
 <script setup>
 import { ref } from 'vue'
-import { listVideos } from '@/store/video/video'
+import { listVideos, setVideoPublished } from '@/store/video/video'
 import QuestionImportModal from '@/components/admin/videos/QuestionImportModal.vue'
 import QuestionConfigDrawer from '@/components/admin/videos/QuestionConfigDrawer.vue'
+import VideoFormModal from '@/components/admin/videos/VideoFormModal.vue'
+import VideoShareLinkModal from '@/components/admin/videos/VideoShareLinkModal.vue'
+import VideoDeleteModal from '@/components/admin/videos/VideoDeleteModal.vue'
 
 const importOpen = ref(false)
 const videos = ref(listVideos())
 
 const configOpen = ref(false)
 const configVideo = ref(null)
+
+const formOpen = ref(false)
+const editingVideo = ref(null)
+
+const shareOpen = ref(false)
+const shareVideo = ref(null)
+
+const deleteOpen = ref(false)
+const deleteVideo = ref(null)
 
 function refreshVideos() {
   videos.value = listVideos()
@@ -17,6 +29,31 @@ function refreshVideos() {
 function openConfig(video) {
   configVideo.value = video
   configOpen.value = true
+}
+
+function openCreate() {
+  editingVideo.value = null
+  formOpen.value = true
+}
+
+function openEdit(video) {
+  editingVideo.value = video
+  formOpen.value = true
+}
+
+function openShare(video) {
+  shareVideo.value = video
+  shareOpen.value = true
+}
+
+function openDelete(video) {
+  deleteVideo.value = video
+  deleteOpen.value = true
+}
+
+function togglePublished(video) {
+  setVideoPublished(video.id, !video.published)
+  refreshVideos()
 }
 </script>
 
@@ -49,7 +86,7 @@ function openConfig(video) {
           批量导入题目
         </button>
 
-        <button type="button" class="btn btn--primary">
+        <button type="button" class="btn btn--primary" @click="openCreate">
           <svg
             class="btn__icon"
             viewBox="0 0 24 24"
@@ -98,7 +135,7 @@ function openConfig(video) {
               <h2 class="video-cell__title">{{ video.title }}</h2>
               <div class="video-cell__meta">
                 <span class="badge badge--category">{{ video.category }}</span>
-                <span class="video-cell__speaker">{{ video.speaker }}</span>
+                <span class="video-cell__speaker">{{ video.speakerLabel }}</span>
               </div>
             </div>
           </div>
@@ -112,19 +149,22 @@ function openConfig(video) {
 
         <!-- 状态 -->
         <div class="col col--status">
-          <span class="status" :class="{ 'status--off': !video.published }">
-            <span class="status__dot"></span>
-            {{ video.published ? '已上架' : '已下架' }}
-          </span>
-          <span
-            class="switch"
-            :class="{ 'switch--on': video.published }"
+          <button
+            type="button"
+            class="status-toggle"
             role="switch"
             :aria-checked="video.published"
-            :aria-label="video.published ? '已上架' : '已下架'"
+            :aria-label="video.published ? '已上架，点击下架' : '已下架，点击上架'"
+            @click="togglePublished(video)"
           >
-            <span class="switch__knob"></span>
-          </span>
+            <span class="status" :class="{ 'status--off': !video.published }">
+              <span class="status__dot"></span>
+              {{ video.published ? '已上架' : '已下架' }}
+            </span>
+            <span class="switch" :class="{ 'switch--on': video.published }">
+              <span class="switch__knob"></span>
+            </span>
+          </button>
         </div>
 
         <!-- 答题 -->
@@ -141,9 +181,11 @@ function openConfig(video) {
         <!-- 操作 -->
         <div class="col col--ops">
           <button type="button" class="link-btn" @click="openConfig(video)">题目配置</button>
-          <button type="button" class="link-btn">编辑</button>
-          <button type="button" class="link-btn">生成视频链接</button>
-          <button type="button" class="link-btn link-btn--danger">删除</button>
+          <button type="button" class="link-btn" @click="openEdit(video)">编辑</button>
+          <button type="button" class="link-btn" @click="openShare(video)">生成视频链接</button>
+          <button type="button" class="link-btn link-btn--danger" @click="openDelete(video)">
+            删除
+          </button>
         </div>
       </div>
     </div>
@@ -159,6 +201,26 @@ function openConfig(video) {
       :video="configVideo"
       @close="configOpen = false"
       @changed="refreshVideos"
+    />
+
+    <VideoFormModal
+      :open="formOpen"
+      :video="editingVideo"
+      @close="formOpen = false"
+      @saved="refreshVideos"
+    />
+
+    <VideoShareLinkModal
+      :open="shareOpen"
+      :video="shareVideo"
+      @close="shareOpen = false"
+    />
+
+    <VideoDeleteModal
+      :open="deleteOpen"
+      :video="deleteVideo"
+      @close="deleteOpen = false"
+      @deleted="refreshVideos"
     />
   </section>
 </template>
@@ -421,6 +483,26 @@ function openConfig(video) {
 }
 
 /* ===== 状态 ===== */
+.status-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--r-full);
+}
+
+.status-toggle:focus-visible {
+  outline: 2px solid var(--brand-primary-hover);
+  outline-offset: 4px;
+}
+
+.status-toggle:hover .switch:not(.switch--on) {
+  background: #cfdcd4;
+}
+
 .status {
   display: inline-flex;
   align-items: center;
@@ -453,7 +535,9 @@ function openConfig(video) {
   flex-shrink: 0;
   width: 40px;
   height: 22px;
+  padding: 0;
   background: #dfe6e1;
+  border: none;
   border-radius: var(--r-full);
   transition: background var(--t-fast);
 }

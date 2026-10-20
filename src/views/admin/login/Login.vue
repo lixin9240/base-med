@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
+import LoginBrandPanel from '@/components/admin/login/LoginBrandPanel.vue'
+import '@/styles/tokens.css'
 
 const router = useRouter()
 
@@ -40,29 +42,9 @@ function togglePassword() {
 </script>
 
 <template>
-  <div class="login-page">
+  <div class="login-page admin-layout">
     <!-- 左侧品牌展示区 -->
-    <aside class="brand-panel">
-      <div class="brand-content">
-        <div class="brand-logo">
-          <!-- 内联 SVG 医疗十字 logo，后续可替换为设计稿图片 -->
-          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="64" height="64" rx="14" fill="#ffffff22" />
-            <path
-              d="M32 16v32M16 32h32"
-              stroke="#fff"
-              stroke-width="5"
-              stroke-linecap="round"
-            />
-          </svg>
-        </div>
-        <h1 class="brand-title">Base-Med</h1>
-        <h2 class="brand-subtitle">医疗管理系统</h2>
-        <p class="brand-slogan">智慧医疗 · 高效管理 · 安全可靠</p>
-      </div>
-      <div class="brand-decoration" aria-hidden="true"></div>
-      <div class="brand-footer">© 2026 Base-Med. All Rights Reserved.</div>
-    </aside>
+    <LoginBrandPanel />
 
     <!-- 右侧登录表单区 -->
     <main class="form-panel">
@@ -121,7 +103,9 @@ function togglePassword() {
               <input type="checkbox" v-model="form.remember" :disabled="loading" />
               <span>记住密码</span>
             </label>
-            <a href="#" class="forgot-link">忘记密码？</a>
+            <RouterLink class="forgot-link" :to="{ name: 'admin-forget-password' }">
+              忘记密码？
+            </RouterLink>
           </div>
 
           <!-- 错误提示 -->
@@ -147,71 +131,7 @@ function togglePassword() {
 .login-page {
   display: flex;
   min-height: 100vh;
-  background: #f3faf6;
-}
-
-/* ===== 左侧品牌区 ===== */
-.brand-panel {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 48px;
-  background: linear-gradient(135deg, #081c15 0%, #1b4332 55%, #2d6a4f 100%);
-  color: #fff;
-  overflow: hidden;
-}
-
-.brand-content {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-}
-
-.brand-logo svg {
-  width: 72px;
-  height: 72px;
-  margin-bottom: 24px;
-}
-
-.brand-title {
-  font-size: 40px;
-  font-weight: 700;
-  margin: 0 0 4px;
-  letter-spacing: 2px;
-}
-
-.brand-subtitle {
-  font-size: 22px;
-  font-weight: 500;
-  margin: 0 0 16px;
-  opacity: 0.95;
-}
-
-.brand-slogan {
-  font-size: 15px;
-  margin: 0;
-  opacity: 0.8;
-}
-
-/* 装饰性圆形 */
-.brand-decoration {
-  position: absolute;
-  top: -100px;
-  right: -100px;
-  width: 320px;
-  height: 320px;
-  border-radius: 50%;
-  background: #ffffff15;
-}
-
-.brand-footer {
-  position: absolute;
-  bottom: 24px;
-  font-size: 12px;
-  opacity: 0.6;
+  background: var(--bg-page-gradient);
 }
 
 /* ===== 右侧表单区 ===== */
@@ -222,7 +142,7 @@ function togglePassword() {
   justify-content: center;
   align-items: center;
   padding: 48px;
-  background: #f7fcf9;
+  background: transparent;
 }
 
 .form-wrapper {
@@ -236,14 +156,14 @@ function togglePassword() {
 
 .form-title {
   font-size: 26px;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   margin: 0 0 8px;
-  color: #0f1f17;
+  color: var(--text-primary);
 }
 
 .form-desc {
   font-size: 14px;
-  color: #5c6f65;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -255,8 +175,8 @@ function togglePassword() {
 .form-label {
   display: block;
   font-size: 14px;
-  font-weight: 500;
-  color: #3f5648;
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
   margin-bottom: 8px;
 }
 
@@ -268,21 +188,25 @@ function togglePassword() {
   width: 100%;
   padding: 12px 40px 12px 14px;
   font-size: 15px;
-  border: 1px solid rgb(27 67 50 / 0.14);
-  border-radius: 8px;
-  background: #fff;
-  color: #0f1f17;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg-surface-solid);
+  color: var(--text-primary);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 
 .form-input:focus {
   outline: none;
-  border-color: #2d6a4f;
-  box-shadow: 0 0 0 3px rgb(45 106 79 / 0.14);
+  border-color: var(--brand-primary-hover);
+  box-shadow: 0 0 0 3px var(--brand-tint);
+}
+
+.form-input::placeholder {
+  color: var(--text-disabled);
 }
 
 .form-input:disabled {
-  background: #e8f5ee;
+  background: var(--bg-muted);
   cursor: not-allowed;
 }
 
@@ -302,7 +226,7 @@ function togglePassword() {
 }
 
 .toggle-pwd:hover {
-  background: #e8f5ee;
+  background: var(--bg-muted);
 }
 
 /* ===== 选项行 ===== */
@@ -318,24 +242,24 @@ function togglePassword() {
   align-items: center;
   gap: 6px;
   font-size: 14px;
-  color: #3f5648;
+  color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
 }
 
 .remember input[type="checkbox"] {
-  accent-color: #2d6a4f;
+  accent-color: var(--brand-primary-hover);
   cursor: pointer;
 }
 
 .forgot-link {
   font-size: 14px;
-  color: #1b4332;
+  color: var(--brand-primary);
   text-decoration: none;
 }
 
 .forgot-link:hover {
-  color: #2d6a4f;
+  color: var(--brand-primary-hover);
   text-decoration: underline;
 }
 
@@ -344,10 +268,10 @@ function togglePassword() {
   margin-bottom: 12px;
   padding: 8px 12px;
   font-size: 13px;
-  color: #9b1c31;
-  background: #ffe5e9;
+  color: var(--danger-text);
+  background: var(--danger-bg);
   border: 1px solid rgb(155 28 49 / 0.25);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
 }
 
 /* ===== 登录按钮 ===== */
@@ -355,20 +279,25 @@ function togglePassword() {
   width: 100%;
   padding: 12px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: var(--fw-semibold);
   color: #fff;
-  background: linear-gradient(165deg, #2d6a4f 0%, #1b4332 55%, #081c15 100%);
-  box-shadow: 0 10px 28px rgb(27 67 50 / 0.28);
+  background: linear-gradient(
+    165deg,
+    var(--brand-primary-hover) 0%,
+    var(--brand-primary) 55%,
+    var(--brand-primary-active) 100%
+  );
+  box-shadow: 0 10px 28px var(--brand-glow);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--r-md);
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+  transition: background var(--t-normal), transform var(--t-fast), box-shadow var(--t-normal);
   letter-spacing: 4px;
 }
 
 .login-btn:hover:not(:disabled) {
-  background: linear-gradient(165deg, #1b4332 0%, #081c15 100%);
-  box-shadow: 0 14px 32px rgb(27 67 50 / 0.32);
+  background: linear-gradient(165deg, var(--brand-primary) 0%, var(--brand-primary-active) 100%);
+  box-shadow: 0 14px 32px var(--brand-glow);
 }
 
 .login-btn:active:not(:disabled) {
@@ -376,7 +305,7 @@ function togglePassword() {
 }
 
 .login-btn:disabled {
-  background: #52b788;
+  background: var(--accent-teal);
   box-shadow: none;
   cursor: not-allowed;
 }
@@ -387,27 +316,9 @@ function togglePassword() {
     flex-direction: column;
   }
 
-  .brand-panel {
-    flex: none;
-    padding: 48px 24px 32px;
-  }
-
-  .brand-title {
-    font-size: 28px;
-  }
-
-  .brand-subtitle {
-    font-size: 18px;
-  }
-
   .form-panel {
     flex: 1;
     padding: 32px 24px 48px;
-  }
-
-  .brand-footer {
-    position: static;
-    margin-top: 24px;
   }
 }
 </style>
