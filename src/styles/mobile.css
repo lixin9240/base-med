@@ -116,23 +116,3 @@
   display: flex;
   justify-content: center;
 }
-
-.mobile-layout .toast-host {
-  position: fixed;
-  top: var(--sp-5);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 4000;
-  pointer-events: none;
-  max-width: min(90vw, 420px);
-}
-
-.mobile-layout .toast {
-  padding: 10px 16px;
-  border-radius: var(--r-full);
-  background: var(--bg-surface-solid);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg);
-  font-size: var(--fs-sm);
-  color: var(--text-primary);
-}
