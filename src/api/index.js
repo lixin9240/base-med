@@ -1,6 +1,10 @@
 export { request, get, post, put, del } from './http'
 export { adminLogin, adminProfile, adminLogout } from './auth'
-export { listAdminVideoQuestions } from './question'
+export {
+  createAdminVideoQuestion,
+  listAdminVideoQuestions,
+  updateAdminVideoQuestion,
+} from './question'
 export {
   createAdminVideo,
   getAdminVideoDetail,

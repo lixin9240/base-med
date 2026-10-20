@@ -3,12 +3,10 @@ import { ref, watch } from 'vue'
 import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
 import { TEMPLATE_PATH } from '@/utils/video/questionImport'
 import { exportQuestionGroup } from '@/utils/video/questionExport'
-import { listAdminVideoQuestions } from '@/api'
-import {
-  REQUIRED_PER_STAGE,
-  removeVideoQuestion,
-  saveVideoQuestion,
-} from '@/store/video/video'
+import { questionToApiPayload } from '@/utils/video/questionDraft'
+import { toast } from '@/utils/toast'
+import { createAdminVideoQuestion, listAdminVideoQuestions, updateAdminVideoQuestion } from '@/api'
+import { REQUIRED_PER_STAGE, removeVideoQuestion } from '@/store/video/video'
 import QuestionEditorModal from './QuestionEditorModal.vue'
 import QuestionImportModal from './QuestionImportModal.vue'
 
@@ -35,6 +33,7 @@ const counts = ref({ pre: 0, post: 0 })
 const questions = ref([])
 const deletingId = ref('')
 const exporting = ref(false)
+const saving = ref(false)
 const loading = ref(false)
 const loadError = ref('')
 
@@ -138,18 +137,34 @@ function openEdit(question) {
   editorOpen.value = true
 }
 
-function onSave(payload) {
-  if (!props.video) return
+async function onSave(payload) {
+  if (!props.video || saving.value) return
 
-  const question = editingQuestion.value
-    ? { ...payload, id: editingQuestion.value.id }
-    : payload
+  const apiPayload = {
+    video_id: props.video.id,
+    stage: STAGE_TO_API[activeStage.value],
+    ...questionToApiPayload(payload),
+  }
+  if (editingQuestion.value) {
+    apiPayload.question_id = editingQuestion.value.questionId
+  }
 
-  saveVideoQuestion(props.video.id, activeStage.value, question)
-  editorOpen.value = false
-  editingQuestion.value = null
-  load()
-  emit('changed')
+  saving.value = true
+  try {
+    if (editingQuestion.value) {
+      await updateAdminVideoQuestion(apiPayload)
+    } else {
+      await createAdminVideoQuestion(apiPayload)
+    }
+    editorOpen.value = false
+    editingQuestion.value = null
+    load()
+    emit('changed')
+  } catch (error) {
+    toast(error?.message || '保存失败，请重试')
+  } finally {
+    saving.value = false
+  }
 }
 
 function askDelete(question) {
@@ -191,7 +206,12 @@ async function onExport() {
 <template>
   <Transition name="drawer">
     <div v-if="open" class="drawer-mask" @click.self="$emit('close')">
-      <aside class="drawer" role="dialog" aria-modal="true" :aria-label="`题目配置：${video?.title ?? ''}`">
+      <aside
+        class="drawer"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="`题目配置：${video?.title ?? ''}`"
+      >
         <header class="drawer__head">
           <div class="drawer__intro">
             <h2 class="drawer__title">{{ video?.title }}</h2>
@@ -223,7 +243,10 @@ async function onExport() {
             @click="activeStage = stage.value"
           >
             {{ stage.label }}
-            <span class="stage-tab__count" :class="`stage-tab__count--${countTone(counts[stage.value])}`">
+            <span
+              class="stage-tab__count"
+              :class="`stage-tab__count--${countTone(counts[stage.value])}`"
+            >
               {{ counts[stage.value] }}/{{ REQUIRED_PER_STAGE }}
             </span>
           </button>
@@ -231,14 +254,33 @@ async function onExport() {
 
         <div class="drawer__actions">
           <button type="button" class="btn btn--primary" @click="openCreate">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
               <path d="M12 5v14M5 12h14" />
             </svg>
             新增题目
           </button>
 
-          <a class="btn btn--secondary" :href="TEMPLATE_PATH" download="科普视频题目_批量导入模板.xlsx">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <a
+            class="btn btn--secondary"
+            :href="TEMPLATE_PATH"
+            download="科普视频题目_批量导入模板.xlsx"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5" />
               <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
             </svg>
@@ -246,7 +288,15 @@ async function onExport() {
           </a>
 
           <button type="button" class="btn btn--secondary" @click="importOpen = true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5" />
               <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
             </svg>
@@ -259,7 +309,15 @@ async function onExport() {
             :disabled="!questions.length || exporting"
             @click="onExport"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
               <path d="M14 3v5h5" />
               <path d="M12 11v6m0 0 2.5-2.5M12 17l-2.5-2.5" />
@@ -283,7 +341,11 @@ async function onExport() {
                 <span class="q-card__order">第 {{ question.order }} 题</span>
                 <div class="q-card__actions">
                   <button type="button" class="link-btn" @click="openEdit(question)">编辑</button>
-                  <button type="button" class="link-btn link-btn--danger" @click="askDelete(question)">
+                  <button
+                    type="button"
+                    class="link-btn link-btn--danger"
+                    @click="askDelete(question)"
+                  >
                     删除
                   </button>
                 </div>
@@ -304,13 +366,15 @@ async function onExport() {
                 </li>
               </ul>
 
-              <p v-if="question.analysis" class="q-card__analysis">
-                解析：{{ question.analysis }}
-              </p>
+              <p v-if="question.analysis" class="q-card__analysis">解析：{{ question.analysis }}</p>
 
               <div v-if="deletingId === question.id" class="q-card__confirm">
                 <span>确定删除这道题吗？</span>
-                <button type="button" class="link-btn link-btn--danger" @click="confirmDelete(question)">
+                <button
+                  type="button"
+                  class="link-btn link-btn--danger"
+                  @click="confirmDelete(question)"
+                >
                   确认删除
                 </button>
                 <button type="button" class="link-btn" @click="cancelDelete">取消</button>
@@ -338,7 +402,14 @@ async function onExport() {
               建议配 {{ REQUIRED_PER_STAGE }} 道题，也可以用 Excel 批量导入。
             </p>
             <button type="button" class="btn btn--primary" @click="openCreate">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
                 <path d="M12 5v14M5 12h14" />
               </svg>
               新增题目
@@ -354,6 +425,7 @@ async function onExport() {
     :mode="editingQuestion ? 'edit' : 'create'"
     :stage="activeStage"
     :question="editingQuestion"
+    :saving="saving"
     @close="editorOpen = false"
     @save="onSave"
   />

@@ -21,7 +21,12 @@ function defaultOptions(type) {
 function answerToIndexes(answer, optionCount) {
   const list = Array.isArray(answer) ? answer : [answer]
   return list
-    .map((letter) => String(letter ?? '').toUpperCase().charCodeAt(0) - 65)
+    .map(
+      (letter) =>
+        String(letter ?? '')
+          .toUpperCase()
+          .charCodeAt(0) - 65,
+    )
     .filter((index) => Number.isInteger(index) && index >= 0 && index < optionCount)
 }
 
@@ -53,9 +58,7 @@ export function questionToDraft(question) {
 export function draftToQuestion(draft) {
   const type = draft.type
   const options =
-    type === 'judge'
-      ? ['正确', '错误']
-      : draft.options.map((option) => String(option ?? '').trim())
+    type === 'judge' ? ['正确', '错误'] : draft.options.map((option) => String(option ?? '').trim())
   const letters = [...draft.correct]
     .sort((a, b) => a - b)
     .map((index) => String.fromCharCode(65 + index))
@@ -66,6 +69,42 @@ export function draftToQuestion(draft) {
     options,
     answer: type === 'multiple' ? letters : (letters[0] ?? ''),
     analysis: String(draft.analysis ?? '').trim(),
+  }
+}
+
+/**
+ * 把本地题目结构（draftToQuestion 的产物）转成接口 2.3.2 / 2.3.3 请求体的题目字段。
+ * options 字符串数组 → [{ key, content }]；answer 字母 / 字母数组 → correct_answer 字符串。
+ */
+export function questionToApiPayload(question) {
+  const type = question?.type ?? 'single'
+  const options = (question?.options ?? []).map((content, index) => ({
+    key: String.fromCharCode(65 + index),
+    content,
+  }))
+
+  let correctAnswer
+  if (type === 'multiple') {
+    correctAnswer = (Array.isArray(question.answer) ? question.answer : [question.answer])
+      .filter((item) => item != null && item !== '')
+      .sort()
+      .join(',')
+  } else if (type === 'judge') {
+    const index =
+      String(question.answer ?? '')
+        .toUpperCase()
+        .charCodeAt(0) - 65
+    correctAnswer = options[index]?.content ?? question.answer ?? ''
+  } else {
+    correctAnswer = question.answer ?? ''
+  }
+
+  return {
+    type,
+    stem: question?.stem ?? '',
+    options,
+    correct_answer: correctAnswer,
+    analysis: question?.analysis ?? '',
   }
 }
 
