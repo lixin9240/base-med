@@ -9,6 +9,7 @@ const KEYS = {
   courses: 'pv.courses',
   questions: 'pv.questions',
   records: 'pv.records',
+  disabledUsers: 'pv.users.disabled',
   learners: 'pv.learners',
   progress: 'pv.progress',
   identity: 'pv.identity',
@@ -55,11 +56,53 @@ export function getCourse(id) {
   return read(KEYS.courses, []).find((c) => c.id === id) ?? null
 }
 
+export function listCourses() {
+  return read(KEYS.courses, [])
+}
+
+/**
+ * 新增或更新课程（管理端保存视频时同步给用户端）。
+ */
+export function saveCourse(course) {
+  if (!course?.id) throw new Error('课程缺少 id')
+  const courses = read(KEYS.courses, [])
+  const index = courses.findIndex((c) => c.id === course.id)
+  if (index === -1) courses.push(course)
+  else courses[index] = { ...courses[index], ...course }
+  write(KEYS.courses, courses)
+  return courses[index === -1 ? courses.length - 1 : index]
+}
+
+export function removeCourse(id) {
+  write(
+    KEYS.courses,
+    read(KEYS.courses, []).filter((c) => c.id !== id),
+  )
+}
+
 export function listQuestions(courseId, stage) {
   let list = read(KEYS.questions, [])
   if (courseId) list = list.filter((q) => q.courseId === courseId)
   if (stage) list = list.filter((q) => q.stage === stage)
   return list.sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+}
+
+export function findCourseByTitle(title) {
+  const target = String(title ?? '').trim()
+  if (!target) return null
+  return read(KEYS.courses, []).find((c) => String(c.title ?? '').trim() === target) ?? null
+}
+
+/**
+ * 整组替换某课程某阶段的题目（导入时使用）。
+ */
+export function replaceQuestions(courseId, stage, questions) {
+  const all = read(KEYS.questions, [])
+  const next = all
+    .filter((q) => !(q.courseId === courseId && q.stage === stage))
+    .concat(questions)
+  write(KEYS.questions, next)
+  return questions.length
 }
 
 export function getProgress(userId, courseId) {
@@ -94,8 +137,23 @@ export function saveRecord(record) {
   return record
 }
 
+export function listRecords() {
+  return read(KEYS.records, [])
+    .slice()
+    .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0))
+}
+
 export function getRecord(id) {
   return read(KEYS.records, []).find((r) => r.id === id) ?? null
+}
+
+/** 被禁用登录的用户 id 列表 */
+export function listDisabledUsers() {
+  return read(KEYS.disabledUsers, [])
+}
+
+export function saveDisabledUsers(ids) {
+  return write(KEYS.disabledUsers, [...ids])
 }
 
 function nextUserSeq(year) {
