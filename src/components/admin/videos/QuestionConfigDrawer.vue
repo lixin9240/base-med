@@ -3,9 +3,9 @@ import { ref, watch } from 'vue'
 import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
 import { TEMPLATE_PATH } from '@/utils/video/questionImport'
 import { exportQuestionGroup } from '@/utils/video/questionExport'
+import { listAdminVideoQuestions } from '@/api'
 import {
   REQUIRED_PER_STAGE,
-  listVideoQuestions,
   removeVideoQuestion,
   saveVideoQuestion,
 } from '@/store/video/video'
@@ -35,6 +35,8 @@ const counts = ref({ pre: 0, post: 0 })
 const questions = ref([])
 const deletingId = ref('')
 const exporting = ref(false)
+const loading = ref(false)
+const loadError = ref('')
 
 const editorOpen = ref(false)
 const editingQuestion = ref(null)
@@ -55,18 +57,63 @@ watch(activeStage, () => {
   load()
 })
 
-function load() {
+const STAGE_TO_API = { pre: 'pretest', post: 'posttest' }
+
+function mapAnswer(correctAnswer, type, options) {
+  const raw = String(correctAnswer ?? '')
+  if (type === 'multiple') {
+    return raw
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  if (type === 'judge') {
+    const index = options.findIndex((option) => option.content === raw)
+    return index >= 0 ? optionLetter(index) : raw
+  }
+  return raw
+}
+
+function toQuestion(item) {
+  const options = Array.isArray(item.options) ? item.options : []
+  return {
+    id: String(item.question_id ?? item.id),
+    questionId: item.question_id,
+    order: Number(item.sort_order) || 0,
+    type: item.type,
+    stem: item.stem,
+    options: options.map((option) => option.content),
+    answer: mapAnswer(item.correct_answer, item.type, options),
+    analysis: item.analysis || '',
+  }
+}
+
+async function load() {
   if (!props.video) {
     counts.value = { pre: 0, post: 0 }
     questions.value = []
+    loading.value = false
+    loadError.value = ''
     return
   }
 
-  counts.value = {
-    pre: listVideoQuestions(props.video.id, 'pre').length,
-    post: listVideoQuestions(props.video.id, 'post').length,
+  loading.value = true
+  loadError.value = ''
+  try {
+    const [preRes, postRes] = await Promise.all([
+      listAdminVideoQuestions({ videoId: props.video.id, stage: STAGE_TO_API.pre }),
+      listAdminVideoQuestions({ videoId: props.video.id, stage: STAGE_TO_API.post }),
+    ])
+    counts.value = { pre: preRes.total, post: postRes.total }
+    const current = activeStage.value === 'pre' ? preRes : postRes
+    questions.value = current.list.map(toQuestion)
+  } catch (error) {
+    counts.value = { pre: 0, post: 0 }
+    questions.value = []
+    loadError.value = error?.message || '题目加载失败'
+  } finally {
+    loading.value = false
   }
-  questions.value = listVideoQuestions(props.video.id, activeStage.value)
 }
 
 function countTone(count) {
@@ -224,7 +271,12 @@ async function onExport() {
         <hr class="drawer__divider" />
 
         <div class="drawer__body">
-          <template v-if="questions.length">
+          <div v-if="loading" class="drawer-loading">正在加载题目…</div>
+          <div v-else-if="loadError" class="drawer-loading drawer-loading--error">
+            <span>{{ loadError }}</span>
+            <button type="button" class="link-btn" @click="load">重试</button>
+          </div>
+          <template v-else-if="questions.length">
             <article v-for="question in questions" :key="question.id" class="q-card">
               <div class="q-card__head">
                 <span class="q-card__type">{{ QUESTION_TYPE_LABEL[question.type] }}</span>
@@ -531,6 +583,21 @@ async function onExport() {
   min-height: 0;
   padding: var(--sp-4) var(--sp-6) var(--sp-6);
   overflow-y: auto;
+}
+
+.drawer-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 140px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.drawer-loading--error {
+  flex-direction: column;
+  color: var(--danger-text);
 }
 
 .q-card {
