@@ -35,19 +35,25 @@ function back() {
   position: sticky;
   top: 0;
   z-index: 20;
-  height: 48px;
+  /* 顶部安全区：刘海屏 / 灵动岛上方的留白 */
+  padding-top: max(0px, env(safe-area-inset-top, 0px));
+  min-height: calc(48px + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-2);
-  padding: 0 var(--sp-2);
+  padding-left: var(--sp-2);
+  padding-right: var(--sp-2);
   background: var(--bg-surface);
+  /* 老安卓不支持 backdrop-filter 时降级为纯色背景 */
+  background-color: var(--bg-surface-solid);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
 
 .pnav--brand {
-  background: var(--brand-primary);
+  background-color: var(--brand-primary);
   border-bottom-color: transparent;
 }
 
@@ -62,6 +68,8 @@ function back() {
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;
+  /* 触屏按钮扩大可点击区域到 48px 安全标准 */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .pnav__icon-btn:hover {
@@ -90,6 +98,8 @@ function back() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* 系统字体下避免顶栏标题被截断 */
+  line-height: 1.2;
 }
 
 .pnav--brand .pnav__title {
@@ -105,5 +115,11 @@ function back() {
 
 .pnav__spacer {
   width: 40px;
+}
+
+@supports not ((-webkit-backdrop-filter: initial) or (backdrop-filter: initial)) {
+  .pnav {
+    background: var(--bg-surface-solid);
+  }
 }
 </style>

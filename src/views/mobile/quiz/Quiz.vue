@@ -160,15 +160,20 @@ function onSubmit(answers) {
 <style scoped>
 .qp {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-page);
   padding-bottom: var(--sp-8);
   margin: calc(-1 * var(--sp-4));
+  margin-top: calc(-1 * var(--sp-4));
+  margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
+  margin-right: calc(-1 * max(var(--sp-4), env(safe-area-inset-right, 0px)));
 }
 
 .qp__progress {
   font-size: var(--fs-xs);
   color: var(--text-secondary);
   padding-right: var(--sp-2);
+  white-space: nowrap;
 }
 
 .qp__head {
@@ -180,6 +185,7 @@ function onSubmit(answers) {
   border-radius: var(--r-lg);
   font-size: var(--fs-xs);
   line-height: 1.6;
+  word-break: break-word;
 }
 
 .qp__head b {

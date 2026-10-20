@@ -168,9 +168,11 @@ function submit() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--sp-2);
   margin-bottom: var(--sp-2);
   font-size: var(--fs-sm);
   color: var(--text-secondary);
+  flex-wrap: wrap;
 }
 
 .quiz__progress-top b {
@@ -181,6 +183,7 @@ function submit() {
 .quiz__type {
   font-size: var(--fs-xs);
   color: var(--text-disabled);
+  white-space: nowrap;
 }
 
 .quiz__bar {
@@ -205,14 +208,20 @@ function submit() {
 }
 
 .qdot {
-  width: 28px;
-  height: 28px;
+  /* 28px 容易误触（手指目标 < 32px），用稍大的可视尺寸 */
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--bg-surface);
   color: var(--text-disabled);
   font-size: var(--fs-xs);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .qdot.is-answered {
@@ -247,6 +256,7 @@ function submit() {
   font-weight: var(--fw-semibold);
   line-height: 1.65;
   margin: 0 0 var(--sp-4);
+  word-break: break-word;
 }
 
 .quiz__options {
@@ -267,6 +277,7 @@ function submit() {
   background: var(--bg-surface);
   text-align: left;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .opt.is-selected {
@@ -294,8 +305,10 @@ function submit() {
 
 .opt__text {
   flex: 1;
+  min-width: 0;
   font-size: var(--fs-base);
   line-height: 1.55;
+  word-break: break-word;
 }
 
 .opt__mark {
@@ -303,6 +316,7 @@ function submit() {
   display: flex;
   justify-content: center;
   color: var(--brand-primary);
+  flex-shrink: 0;
 }
 
 .quiz__judge {
@@ -311,8 +325,10 @@ function submit() {
 }
 
 .jopt {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   min-height: 84px;
+  padding: var(--sp-3) var(--sp-2);
   border: 1.5px solid var(--border);
   border-radius: var(--r-lg);
   background: var(--bg-surface);
@@ -322,11 +338,33 @@ function submit() {
   justify-content: center;
   gap: var(--sp-2);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .jopt.is-selected {
   border-color: var(--brand-primary);
   background: var(--brand-soft);
+}
+
+.jopt__text {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  word-break: break-word;
+  text-align: center;
+}
+
+@media (max-width: 340px) {
+  .quiz__card {
+    padding: var(--sp-4) var(--sp-3);
+  }
+  .opt {
+    padding: var(--sp-3);
+    gap: var(--sp-2);
+  }
+  .opt__letter {
+    width: 22px;
+    height: 22px;
+  }
 }
 
 .quiz__hint {
@@ -346,5 +384,7 @@ function submit() {
 
 .quiz__btn {
   flex: 1;
+  /* 保证按钮文字在 iOS Safari 不会垂直居中漂移 */
+  min-width: 0;
 }
 </style>

@@ -136,9 +136,13 @@ function isPicked(item, optIndex) {
 <style scoped>
 .result {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-page);
-  padding-bottom: var(--sp-10);
+  padding-bottom: calc(var(--sp-10) + env(safe-area-inset-bottom, 0px));
   margin: calc(-1 * var(--sp-4));
+  margin-top: calc(-1 * var(--sp-4));
+  margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
+  margin-right: calc(-1 * max(var(--sp-4), env(safe-area-inset-right, 0px)));
 }
 
 .hero {
@@ -205,6 +209,23 @@ function isPicked(item, optIndex) {
   font-size: 46px;
   font-weight: var(--fw-bold);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 340px) {
+  .hero {
+    margin: var(--sp-3);
+    padding: var(--sp-5) var(--sp-3);
+  }
+  .hero__num {
+    font-size: 36px;
+  }
+  .review {
+    margin: 0 var(--sp-3);
+  }
+  .actions {
+    margin: var(--sp-5) var(--sp-3) 0;
+  }
 }
 
 .hero__total {

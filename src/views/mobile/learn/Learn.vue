@@ -196,7 +196,7 @@ function goQuiz() {
       </section>
 
       <section v-if="course.articleBody" class="article">
-        <h2 class="article__title">文字要点</h2>
+        <h2 class="article__title">视频要点</h2>
         <div class="article__body" v-html="articleHtml" />
       </section>
 
@@ -221,19 +221,30 @@ function goQuiz() {
 <style scoped>
 .learn {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-page);
-  padding-bottom: 150px;
+  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
   margin: calc(-1 * var(--sp-4));
+  margin-top: calc(-1 * var(--sp-4));
+  margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
+  margin-right: calc(-1 * max(var(--sp-4), env(safe-area-inset-right, 0px)));
 }
 
 .player {
   position: relative;
   background: #111827;
+  /* 锁比例的视频，保留控制条可见 */
+  max-height: 70vh;
+  max-height: 70dvh;
+  overflow: hidden;
 }
 
 .player__el {
+  display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
+  max-height: 70vh;
+  max-height: 70dvh;
   object-fit: contain;
   background: #111827;
 }
@@ -341,10 +352,23 @@ function goQuiz() {
   bottom: 0;
   width: 100%;
   max-width: var(--mobile-max);
-  padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom));
-  background: var(--bg-surface);
+  /* 左右安全区：layout 为 max-width 容器，居中后水平方向有外溢，
+     用 padding 抵消让 footer 内容跟着视口左右缩进 */
+  padding: var(--sp-3) max(var(--sp-4), env(safe-area-inset-left, 0px))
+    calc(var(--sp-3) + env(safe-area-inset-bottom, 0px))
+    max(var(--sp-4), env(safe-area-inset-right, 0px));
+  background: var(--bg-surface-solid);
+  /* 不用 --bg-surface 半透明，避免背后视频穿透 */
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   z-index: 30;
+}
+
+@supports not ((-webkit-backdrop-filter: initial) or (backdrop-filter: initial)) {
+  .learn__footer {
+    background: var(--bg-surface-solid);
+  }
 }
 
 .learn__bar-head {

@@ -109,10 +109,17 @@ function openCourse(course) {
 
 <style scoped>
 .home {
+  /* 顶部消去 main padding，避免首屏跳动到顶栏背后 */
+  margin: calc(-1 * var(--sp-4));
+  margin-top: calc(-1 * var(--sp-4));
+  /* 用 layout 透传的安全区在左右各留出余量 */
+  margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
+  margin-right: calc(-1 * max(var(--sp-4), env(safe-area-inset-right, 0px)));
+  margin-bottom: calc(-1 * var(--sp-4) - env(safe-area-inset-bottom, 0px));
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--bg-page);
   padding-bottom: var(--sp-8);
-  margin: calc(-1 * var(--sp-4));
 }
 
 .home__bar {
@@ -141,6 +148,9 @@ function openCourse(course) {
 .home__bar-title {
   font-size: var(--fs-md);
   font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home__hero {
@@ -151,6 +161,8 @@ function openCourse(course) {
   margin: 0;
   font-size: var(--fs-lg);
   font-weight: var(--fw-bold);
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .home__hero p {
@@ -185,7 +197,15 @@ function openCourse(course) {
   border-radius: var(--r-lg);
   overflow: hidden;
   flex-shrink: 0;
+  flex-grow: 0;
   background: var(--brand-tint);
+}
+
+@media (max-width: 340px) {
+  .vcard__thumb {
+    width: 88px;
+    height: 60px;
+  }
 }
 
 .vcard__thumb img {
