@@ -5,6 +5,7 @@ import QuestionImportModal from '@/components/admin/videos/QuestionImportModal.v
 import QuestionConfigDrawer from '@/components/admin/videos/QuestionConfigDrawer.vue'
 import VideoFormModal from '@/components/admin/videos/VideoFormModal.vue'
 import VideoShareLinkModal from '@/components/admin/videos/VideoShareLinkModal.vue'
+import VideoDeleteModal from '@/components/admin/videos/VideoDeleteModal.vue'
 
 const importOpen = ref(false)
 const videos = ref(listVideos())
@@ -17,6 +18,9 @@ const editingVideo = ref(null)
 
 const shareOpen = ref(false)
 const shareVideo = ref(null)
+
+const deleteOpen = ref(false)
+const deleteVideo = ref(null)
 
 function refreshVideos() {
   videos.value = listVideos()
@@ -40,6 +44,11 @@ function openEdit(video) {
 function openShare(video) {
   shareVideo.value = video
   shareOpen.value = true
+}
+
+function openDelete(video) {
+  deleteVideo.value = video
+  deleteOpen.value = true
 }
 
 function togglePublished(video) {
@@ -174,7 +183,9 @@ function togglePublished(video) {
           <button type="button" class="link-btn" @click="openConfig(video)">题目配置</button>
           <button type="button" class="link-btn" @click="openEdit(video)">编辑</button>
           <button type="button" class="link-btn" @click="openShare(video)">生成视频链接</button>
-          <button type="button" class="link-btn link-btn--danger">删除</button>
+          <button type="button" class="link-btn link-btn--danger" @click="openDelete(video)">
+            删除
+          </button>
         </div>
       </div>
     </div>
@@ -203,6 +214,13 @@ function togglePublished(video) {
       :open="shareOpen"
       :video="shareVideo"
       @close="shareOpen = false"
+    />
+
+    <VideoDeleteModal
+      :open="deleteOpen"
+      :video="deleteVideo"
+      @close="deleteOpen = false"
+      @deleted="refreshVideos"
     />
   </section>
 </template>
