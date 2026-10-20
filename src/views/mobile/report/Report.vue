@@ -264,18 +264,9 @@ function isPicked(item, optIndex) {
 .rv {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-left-width: 3px;
   border-radius: var(--r-lg);
   padding: var(--sp-4);
   margin-bottom: var(--sp-3);
-}
-
-.rv--ok {
-  border-left-color: var(--success);
-}
-
-.rv--bad {
-  border-left-color: var(--danger);
 }
 
 .rv__head {
