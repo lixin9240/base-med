@@ -17,24 +17,12 @@ use Illuminate\Support\Facades\DB;
 class VideoService
 {
     /**
-     * 用户端首页视频列表（含学习状态）
+     * 用户端首页视频列表（免登录展示全部上架视频，点击视频时才签发 dr_id）
      *
      * @return array<int, array<string, mixed>>
      */
-    public function list(string $drId): array
+    public function list(): array
     {
-        $visit = $this->resolveVisit($drId);
-
-        $doneVideoIds = ExamRecord::query()
-            ->where('user_id', $visit->id)
-            ->pluck('video_id')
-            ->all();
-
-        $preVideoIds = ExamPretest::query()
-            ->where('user_id', $visit->id)
-            ->pluck('video_id')
-            ->all();
-
         return Video::query()
             ->with('category:id,name')
             ->where('status', 1)
@@ -48,7 +36,6 @@ class VideoService
                 'speaker' => $video->speaker,
                 'brief_intro' => $video->brief_intro,
                 'cover_url' => $video->cover_url ?? '',
-                'exam_status' => $this->resolveExamStatus($video->id, $doneVideoIds, $preVideoIds),
             ])
             ->values()
             ->all();
@@ -63,6 +50,7 @@ class VideoService
     {
         $visit = $this->resolveVisit($drId);
         $video = $this->onShelfVideo($videoId);
+        $this->assertVisitVideo($visit, $video->id);
 
         $pretestSubmitted = ExamPretest::query()
             ->where('user_id', $visit->id)
@@ -139,6 +127,7 @@ class VideoService
     {
         $visit = $this->resolveVisit($drId);
         $video = $this->onShelfVideo($videoId);
+        $this->assertVisitVideo($visit, $video->id);
 
         $required = $this->watchRequiredPercent();
 
@@ -152,7 +141,7 @@ class VideoService
             $duration = (int) $video->duration;
 
             if ($duration <= 0 && $clientDuration !== null && $clientDuration > 0) {
-                // 服务端无视频时长时（如填写链接未回填时长），暂采用前端上报的时长计算
+                // 服务端无视频时长时（如填写链接未回填），暂采用前端上报的时长计算
                 $duration = $clientDuration;
             }
 
@@ -201,6 +190,16 @@ class VideoService
         }
 
         return $visit;
+    }
+
+    /**
+     * 校验匿名编号与视频匹配（dr_id 为点击某条视频时签发，仅对该视频有效）
+     */
+    public function assertVisitVideo(VisitRecord $visit, int $videoId): void
+    {
+        if ($visit->video_id === null || (int) $visit->video_id !== (int) $videoId) {
+            throw new BusinessException(ResponseCode::PARAM_ERROR, '匿名编号与视频不匹配');
+        }
     }
 
     /**
@@ -266,25 +265,6 @@ class VideoService
             ->value('config_value');
 
         return $value !== null ? (int) $value : 90;
-    }
-
-    /**
-     * 学习状态：已完成（已交后测）> 前测已完成 > 未开始
-     *
-     * @param  array<int, int>  $doneVideoIds
-     * @param  array<int, int>  $preVideoIds
-     */
-    private function resolveExamStatus(int $videoId, array $doneVideoIds, array $preVideoIds): string
-    {
-        if (in_array($videoId, $doneVideoIds, true)) {
-            return 'done';
-        }
-
-        if (in_array($videoId, $preVideoIds, true)) {
-            return 'pre';
-        }
-
-        return 'none';
     }
 
     /**

@@ -31,6 +31,7 @@ class ExamService
     {
         $visit = $this->videoService->resolveVisit($drId);
         $this->videoService->onShelfVideo($videoId);
+        $this->videoService->assertVisitVideo($visit, $videoId);
 
         $questions = $this->videoService->questionSet($videoId, 'pretest');
 
@@ -69,6 +70,7 @@ class ExamService
     {
         $visit = $this->videoService->resolveVisit($drId);
         $video = $this->videoService->onShelfVideo($videoId);
+        $this->videoService->assertVisitVideo($visit, $video->id);
 
         $this->assertWatchProgressUnlocked($visit->id, $video->id);
 
@@ -162,6 +164,7 @@ class ExamService
         }
 
         $visit = $this->videoService->resolveVisit($drId);
+        $this->videoService->assertVisitVideo($visit, (int) $videoId);
 
         $record = ExamRecord::query()
             ->where('user_id', $visit->id)

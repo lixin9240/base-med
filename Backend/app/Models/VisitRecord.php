@@ -13,6 +13,7 @@ class VisitRecord extends Model
     protected $fillable = [
         'dr_id',
         'share_link_id',
+        'video_id',
         'entered_at',
         'created_at',
     ];

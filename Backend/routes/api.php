@@ -144,10 +144,10 @@ Route::prefix('admin/category')->middleware('auth:admin')->group(function () {
 */
 
 Route::prefix('public')->group(function () {
-    // 3.1 获取匿名 DR 编号（点击链接进入时生成访问记录）
+    // 3.1 获取匿名 DR 编号（点击视频进入时生成访问记录，免登录）
     Route::get(uri: '/dr/create', action: [DrController::class, 'create']);
 
-    // 3.2 用户端首页视频列表
+    // 3.2 用户端首页视频列表（免登录、无需 dr_id）
     Route::get(uri: '/video/list', action: [VideoController::class, 'list']);
 
     // 3.3 视频详情（观看视频页）

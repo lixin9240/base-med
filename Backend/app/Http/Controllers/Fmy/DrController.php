@@ -15,12 +15,12 @@ class DrController extends Controller
     }
 
     /**
-     * 获取匿名 DR 编号（3.1）
+     * 获取匿名 DR 编号（3.1，点击视频进入时生成访问记录）
      */
     public function create(DrCreateRequest $request): JsonResponse
     {
         $data = $this->drService->create(
-            (string) $request->validated('token')
+            (int) $request->validated('video_id')
         );
 
         return $this->success($data);
