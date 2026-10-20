@@ -371,7 +371,7 @@
 { "task_id": 1, "task_no": "imp_20261019_001", "status": 1 }
 ```
 
-> 说明：上传后创建导入任务（import_task），先异步校验（状态 0待校验 → 1校验中），校验完成进入「2待确认」；校验结果与错误报告通过 2.10.2 查询，确认无误后调用 2.10.3 执行导入，真正写入 question 与 video_question。
+> 说明：上传后创建导入任务（import_task），先异步校验（状态 0待校验 → 1校验中），校验完成进入「2待确认」；校验结果与错误报告通过 2.9.2 查询，确认无误后调用 2.9.3 执行导入，真正写入 question 与 video_question。
 
 ### 2.3.6 导出本组（抽屉「导出本组」按钮）
 - 路径：`/api/admin/video-question/export`
@@ -819,68 +819,9 @@
 
 > 说明：软删除；存在关联视频（video.category_id）时不允许删除。
 
-## 2.8 LX-课程管理模块（topic 课程表，承载课程—内容—题目三级关联）
+## 2.8 LX-题库管理模块（question 题目表）
 
-### 2.8.1 课程列表
-- 路径：`GET /api/admin/topic/list`
-- Method：GET
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| page | int | 否 | 默认 1 |
-| page_size | int | 否 | 默认 20 |
-| name | string | 否 | 课程名称搜索 |
-
-返回：
-
-```json
-{
-    "list": [
-        {
-            "id": 1,
-            "name": "基础急救",
-            "cover_url": "",
-            "intro": "课程简介",
-            "sort_order": 1,
-            "status": 1,
-            "video_count": 4,
-            "created_at": "2026-10-19 10:00:00"
-        }
-    ],
-    "total": 1
-}
-```
-
-### 2.8.2 新增课程
-- 路径：`POST /api/admin/topic/create`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| name | string | 是 | 课程名称，最多 64 字 |
-| cover_url | string | 否 | 课程封面图 URL |
-| intro | string | 否 | 课程简介，最多 500 字 |
-| sort_order | int | 否 | 排序号 |
-| status | tinyint | 否 | 0禁用 1启用，默认 1 |
-
-### 2.8.3 编辑课程
-- 路径：`POST /api/admin/topic/update`
-- Method：POST
-- 参数同新增，**增加 id（int，必填）**。
-
-### 2.8.4 删除课程
-- 路径：`POST /api/admin/topic/delete`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 |
-| ---- | ---- | ---- |
-| id | int | 是 |
-
-> 说明：软删除；课程下存在关联视频（video.topic_id）时不允许删除。
-
-## 2.9 LX-题库管理模块（question 题目表）
-
-### 2.9.1 题目列表
+### 2.8.1 题目列表
 - 路径：`GET /api/admin/question/list`
 - Method：GET
 
@@ -911,12 +852,12 @@
 }
 ```
 
-### 2.9.2 编辑题目
+### 2.8.2 编辑题目
 - 路径：`POST /api/admin/question/update`
 - Method：POST
 - 参数同 2.3.2（题目字段），**增加 id（bigint，必填）**；另支持题库扩展字段 `image_url`（配图URL）/`difficulty`（难度1-3）/`knowledge_point`（知识点标签）；不影响已有 video_question 绑定关系。
 
-### 2.9.3 删除题目
+### 2.8.3 删除题目
 - 路径：`POST /api/admin/question/delete`
 - Method：POST
 
@@ -926,9 +867,9 @@
 
 > 说明：软删除；被 video_question 引用（仍绑定在视频上）时前置校验不通过，需先通过 2.3.5 从相关视频移除后才可删除。
 
-## 2.10 GYZ-批量导入任务模块
+## 2.9 GYZ-批量导入任务模块
 
-### 2.10.1 任务列表
+### 2.9.1 任务列表
 - 路径：`GET /api/admin/import/task-list`
 - Method：GET
 
@@ -968,7 +909,7 @@
 | 4 | 已完成 |
 | 5 | 失败 |
 
-### 2.10.2 任务详情（校验结果与错误报告）
+### 2.9.2 任务详情（校验结果与错误报告）
 - 路径：`GET /api/admin/import/task-detail`
 - Method：GET
 
@@ -976,7 +917,7 @@
 | ---- | ---- | ---- |
 | task_id | bigint | 是 |
 
-返回：任务基础字段（同 2.10.1 列表项）+ 错误报告：
+返回：任务基础字段（同 2.9.1 列表项）+ 错误报告：
 
 ```json
 {
@@ -995,7 +936,7 @@
 }
 ```
 
-### 2.10.3 确认导入
+### 2.9.3 确认导入
 - 路径：`POST /api/admin/import/confirm`
 - Method：POST
 
@@ -1007,9 +948,9 @@
 
 > 说明：执行后任务进入「3 导入中」，写入 question 与 video_question（G4：Excel 一次导入课程+视频+图文+前测3+后测3），完成转为「4 已完成」，异常转为「5 失败」；仅有效行（valid_rows）入库。
 
-## 2.11 GYZ-操作日志模块（operation_log，后台留痕）
+## 2.10 GYZ-操作日志模块（operation_log，后台留痕）
 
-### 2.11.1 操作日志列表
+### 2.10.1 操作日志列表
 - 路径：`GET /api/admin/operation-log/list`
 - Method：GET
 
@@ -1305,15 +1246,14 @@
 | 管理员登录 | 2.1 | `admin_user` |
 | 视频管理（列表/详情/增删改/上架切换） | 2.2.1~2.2.6 | `video`、`category`、`video_question`、`exam_record` |
 | 视频上传/转码 | 2.2.7、2.2.8 | `video`（oss_upload_id、transcode_status、cover_url 等） |
-| 批量导入 | 2.3.5、2.10 | `import_task`、`question`、`video_question` |
+| 批量导入 | 2.3.5、2.9 | `import_task`、`question`、`video_question` |
 | 题目配置（抽屉/新增题目弹窗） | 2.3 | `question`、`video_question` |
 | 访问链接管理 | 2.4 | `video_share_link`、`visit_record` |
 | 答题记录管理 | 2.5 | `exam_record`、`exam_answer`、`question` |
 | 数据统计 | 2.6 | `exam_record`、`exam_answer`、`video`、`system_config` |
 | 分类管理 | 2.7 | `category`、`video` |
-| 课程管理 | 2.8 | `topic`、`video` |
-| 题库管理 | 2.9 | `question`、`video_question` |
-| 操作日志 | 2.11 | `operation_log` |
+| 题库管理 | 2.8 | `question`、`video_question` |
+| 操作日志 | 2.10 | `operation_log` |
 | 用户端入口 | 3.1 | `video_share_link`（token校验）、`visit_record`（签发dr_id） |
 | 用户端视频/题目 | 3.2、3.3、3.5 | `video`、`category`、`video_question`、`question` |
 | 学前/学后答题 | 3.4、3.6、3.7 | `exam_record`、`exam_answer`、`question` |
