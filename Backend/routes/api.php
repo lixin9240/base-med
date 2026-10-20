@@ -3,7 +3,6 @@
 
 use App\Http\Controllers\Lx\ExamRecordController;
 use App\Http\Controllers\Lx\QuestionController;
-use App\Http\Controllers\Lx\ShareLinkController;
 use App\Http\Controllers\Lx\TopicController;
 
 use App\Http\Controllers\Wjc\Admin\AuthController;
@@ -46,19 +45,6 @@ Route::prefix('admin/question')->group(function () {
     Route::get(uri: '/list', action: [QuestionController::class, 'list']);
     Route::post(uri: '/update', action: [QuestionController::class, 'update']);
     Route::post(uri: '/delete', action: [QuestionController::class, 'delete']);
-});
-
-/*
-|--------------------------------------------------------------------------
-| LX-访问链接管理模块
-|--------------------------------------------------------------------------
-*/
-Route::prefix('admin/share-link')->group(function () {
-    Route::post(uri: '/create', action: [ShareLinkController::class, 'create']);
-    Route::get(uri: '/list', action: [ShareLinkController::class, 'list']);
-    Route::post(uri: '/update-status', action: [ShareLinkController::class, 'updateStatus']);
-    Route::post(uri: '/delete', action: [ShareLinkController::class, 'delete']);
-    Route::get(uri: '/visit-record-list', action: [ShareLinkController::class, 'visitRecordList']);
 });
 
 Route::get('/user', function (Request $request) {
