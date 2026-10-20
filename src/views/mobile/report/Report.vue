@@ -1,36 +1,79 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
-import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
-import { PASS_PERCENT, getRecord } from '@/store'
+import { QUESTION_TYPE_LABEL } from '@/utils/question'
+import { resolveDrId } from '@/store/mobile/session'
+import { getExamResult } from '@/api/public'
 
 const route = useRoute()
 const router = useRouter()
 const record = ref(null)
+const error = ref('')
 
-onMounted(() => {
-  record.value = getRecord(String(route.query.recordId || ''))
-})
-
-const postDetails = computed(() => {
-  if (!record.value) return []
-  const all = record.value.detail || []
-  const total = record.value.postTotal || 0
-  return total ? all.slice(all.length - total) : all
-})
-
-function isRight(item, optIndex) {
-  const letter = optionLetter(optIndex)
-  if (item.type === 'multiple') return Array.isArray(item.answer) && item.answer.includes(letter)
-  return item.answer === letter
+function mapDetailItem(item) {
+  return {
+    questionId: item.question_id,
+    type: item.type,
+    stem: item.stem,
+    options: item.options || [],
+    answer: item.correct_answer,
+    userAnswer: item.post_user_answer,
+    correct: item.post_is_correct === 1 || item.post_is_correct === true,
+    analysis: item.analysis || '',
+  }
 }
 
-function isPicked(item, optIndex) {
-  const letter = optionLetter(optIndex)
-  if (item.type === 'multiple') return Array.isArray(item.userAnswer) && item.userAnswer.includes(letter)
-  return item.userAnswer === letter
+onMounted(async () => {
+  const videoId = String(route.query.videoId || '')
+  const examRecordId = String(route.query.examRecordId || '')
+  if (!videoId && !examRecordId) {
+    router.replace('/mobile/home')
+    return
+  }
+  try {
+    const drId = await resolveDrId()
+    const data = await getExamResult({
+      dr_id: drId,
+      ...(examRecordId ? { exam_record_id: examRecordId } : { video_id: videoId }),
+    })
+    record.value = {
+      examRecordId: data.exam_record_id,
+      videoId: data.video_id,
+      courseTitle: data.video_title,
+      passed: data.result_status === 'pass',
+      passPercent: Number(data.pass_accuracy) || 0,
+      percent: data.accuracy_rate,
+      preCorrect: data.pre?.correct ?? 0,
+      preTotal: data.pre?.total ?? 0,
+      postCorrect: data.post?.correct ?? 0,
+      postTotal: data.post?.total ?? 0,
+      detail: (data.question_detail || []).map(mapDetailItem),
+    }
+  } catch (e) {
+    error.value = e?.message || '加载失败'
+  }
+})
+
+function optionToken(type, opt) {
+  return type === 'judge' ? opt.content : opt.key
+}
+
+function isRight(item, opt) {
+  const token = optionToken(item.type, opt)
+  if (item.type === 'multiple') {
+    return String(item.answer || '').split(',').map((s) => s.trim()).includes(token)
+  }
+  return item.answer === token
+}
+
+function isPicked(item, opt) {
+  const token = optionToken(item.type, opt)
+  if (item.type === 'multiple') {
+    return String(item.userAnswer || '').split(',').map((s) => s.trim()).includes(token)
+  }
+  return item.userAnswer === token
 }
 </script>
 
@@ -38,7 +81,19 @@ function isPicked(item, optIndex) {
   <div class="result">
     <PageNav title="答题结果" />
 
-    <template v-if="record">
+    <div v-if="error" class="empty">
+      <div class="empty__icon">
+        <AppIcon name="alert" :size="44" />
+      </div>
+      <p class="empty__text">{{ error }}</p>
+      <div class="empty__actions">
+        <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
+          返回视频列表
+        </button>
+      </div>
+    </div>
+
+    <template v-else-if="record">
       <section class="hero" :class="record.passed ? 'hero--pass' : 'hero--fail'">
         <div class="hero__icon">
           <AppIcon :name="record.passed ? 'checkCircle' : 'refresh'" :size="30" />
@@ -46,7 +101,7 @@ function isPicked(item, optIndex) {
         <h1 class="hero__title">{{ record.passed ? '答得不错！' : '再复习一下？' }}</h1>
         <p class="hero__sub">
           《{{ record.courseTitle }}》·
-          {{ record.passed ? `达到 ${PASS_PERCENT}% 通过线` : `答对 ${PASS_PERCENT}% 以上才算通过` }}
+          {{ record.passed ? `达到 ${record.passPercent}% 通过线` : `答对 ${record.passPercent}% 以上才算通过` }}
         </p>
         <div class="hero__score">
           <span class="hero__num">{{ record.postCorrect }}</span>
@@ -62,12 +117,7 @@ function isPicked(item, optIndex) {
 
       <section class="review">
         <h2 class="review__head">逐题解析</h2>
-        <article
-          v-for="(item, index) in postDetails"
-          :key="item.questionId || index"
-          class="rv"
-          :class="item.correct ? 'rv--ok' : 'rv--bad'"
-        >
+        <article v-for="(item, index) in record.detail" :key="item.questionId || index" class="rv">
           <div class="rv__head">
             <span class="rv__no">{{ index + 1 }}</span>
             <span class="badge" :class="item.correct ? 'badge--success' : 'badge--danger'">
@@ -82,12 +132,12 @@ function isPicked(item, optIndex) {
               v-for="(opt, i) in item.options"
               :key="i"
               class="rop"
-              :class="{ 'is-right': isRight(item, i), 'is-wrong': isPicked(item, i) && !isRight(item, i) }"
+              :class="{ 'is-right': isRight(item, opt), 'is-wrong': isPicked(item, opt) && !isRight(item, opt) }"
             >
-              <span class="rop__letter">{{ optionLetter(i) }}</span>
-              <span class="rop__text">{{ opt }}</span>
-              <span v-if="isRight(item, i)" class="rop__tag">正确答案</span>
-              <span v-else-if="isPicked(item, i)" class="rop__tag rop__tag--wrong">您的选择</span>
+              <span class="rop__letter">{{ opt.key }}</span>
+              <span class="rop__text">{{ opt.content }}</span>
+              <span v-if="isRight(item, opt)" class="rop__tag">正确答案</span>
+              <span v-else-if="isPicked(item, opt)" class="rop__tag rop__tag--wrong">您的选择</span>
             </li>
           </ul>
           <p v-if="item.analysis" class="rv__analysis">
@@ -100,7 +150,7 @@ function isPicked(item, optIndex) {
         <button
           type="button"
           class="btn btn--primary btn--lg btn--block"
-          @click="router.replace({ name: 'mobile-quiz', query: { courseId: record.courseId, stage: 'post' } })"
+          @click="router.replace({ name: 'mobile-quiz', query: { videoId: record.videoId, stage: 'post' } })"
         >
           再答一次
         </button>
@@ -108,7 +158,7 @@ function isPicked(item, optIndex) {
           <button
             type="button"
             class="btn btn--secondary btn--md"
-            @click="router.replace({ name: 'mobile-learn', query: { courseId: record.courseId } })"
+            @click="router.replace({ name: 'mobile-learn', query: { videoId: record.videoId } })"
           >
             重看视频
           </button>

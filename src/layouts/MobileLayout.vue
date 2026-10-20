@@ -1,15 +1,8 @@
 <script setup>
-import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import ToastHost from '@/components/mobile/ToastHost.vue'
-import { ensureLearner, ensureStoreSeed } from '@/store'
 import '@/styles/tokens.css'
 import '@/styles/mobile.css'
-
-onMounted(() => {
-  ensureStoreSeed()
-  ensureLearner()
-})
 </script>
 
 <template>

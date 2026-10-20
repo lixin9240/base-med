@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import AppIcon from '@/components/mobile/AppIcon.vue'
-import { QUESTION_TYPE_LABEL, hasAnswer, optionLetter } from '@/utils/question'
+import { QUESTION_TYPE_LABEL, hasAnswer } from '@/utils/question'
 import { toast } from '@/utils/toast'
 
 const props = defineProps({
@@ -23,24 +23,29 @@ watch(
   { deep: true, immediate: true },
 )
 
-function isSelected(optIndex) {
-  const val = answers.value[index.value]
-  const letter = optionLetter(optIndex)
-  if (Array.isArray(val)) return val.includes(letter)
-  return val === letter
+// 选项对应的答案值：判断题用 content（正确/错误），单选/多选用 key（A/B/C）
+function optionValue(question, opt) {
+  return question.type === 'judge' ? opt.content : opt.key
 }
 
-function pick(optIndex) {
-  const letter = optionLetter(optIndex)
+function isSelected(opt) {
+  const val = answers.value[index.value]
+  const value = optionValue(current.value, opt)
+  if (Array.isArray(val)) return val.includes(value)
+  return val === value
+}
+
+function pick(opt) {
+  const value = optionValue(current.value, opt)
   if (current.value.type === 'multiple') {
     const list = Array.isArray(answers.value[index.value]) ? [...answers.value[index.value]] : []
-    const pos = list.indexOf(letter)
+    const pos = list.indexOf(value)
     if (pos >= 0) list.splice(pos, 1)
-    else list.push(letter)
+    else list.push(value)
     list.sort()
     answers.value[index.value] = list
   } else {
-    answers.value[index.value] = letter
+    answers.value[index.value] = value
   }
 }
 
@@ -109,13 +114,13 @@ function submit() {
           :key="i"
           type="button"
           class="opt"
-          :class="{ 'is-selected': isSelected(i) }"
-          @click="pick(i)"
+          :class="{ 'is-selected': isSelected(opt) }"
+          @click="pick(opt)"
         >
-          <span class="opt__letter">{{ optionLetter(i) }}</span>
-          <span class="opt__text">{{ opt }}</span>
+          <span class="opt__letter">{{ opt.key }}</span>
+          <span class="opt__text">{{ opt.content }}</span>
           <span class="opt__mark">
-            <AppIcon v-if="isSelected(i)" name="check" :size="16" />
+            <AppIcon v-if="isSelected(opt)" name="check" :size="16" />
           </span>
         </button>
       </div>
@@ -125,13 +130,13 @@ function submit() {
           :key="i"
           type="button"
           class="jopt"
-          :class="{ 'is-selected': isSelected(i) }"
-          @click="pick(i)"
+          :class="{ 'is-selected': isSelected(opt) }"
+          @click="pick(opt)"
         >
           <span class="jopt__icon">
             <AppIcon :name="i === 0 ? 'checkCircle' : 'xCircle'" :size="24" />
           </span>
-          <span class="jopt__text">{{ opt }}</span>
+          <span class="jopt__text">{{ opt.content }}</span>
         </button>
       </div>
       <p class="quiz__hint">

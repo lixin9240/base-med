@@ -5,30 +5,21 @@ import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
 import { toast } from '@/utils/toast'
-import { gradeQuiz } from '@/utils/question'
-import {
-  PASS_PERCENT,
-  WATCH_PERCENT,
-  ensureLearner,
-  getCourse,
-  getProgress,
-  listQuestions,
-  newId,
-  saveProgress,
-  saveRecord,
-} from '@/store'
+import { WATCH_PERCENT, getProgress } from '@/store'
+import { resolveDrId } from '@/store/mobile/session'
+import { getPublicVideoDetail, listPublicQuestions, submitPreExam } from '@/api/public'
 
 const route = useRoute()
 const router = useRouter()
-const courseId = String(route.query.courseId || '')
+const videoId = String(route.query.videoId || '')
 const stage = String(route.query.stage) === 'post' ? 'post' : 'pre'
 
 const course = ref(null)
-const learner = ref(null)
+const drId = ref('')
 const questions = ref([])
 const ready = ref(false)
+const error = ref('')
 const answeredCount = ref(0)
-const startedAt = ref(Date.now())
 const submitting = ref(false)
 
 const isPre = computed(() => stage === 'pre')
@@ -48,88 +39,84 @@ function categoryTone(category) {
   return 'mint'
 }
 
-onMounted(() => {
-  learner.value = ensureLearner()
-  course.value = getCourse(courseId)
-  if (!courseId || !course.value) {
-    router.replace('/mobile/home')
-    return
-  }
+onMounted(async () => {
+  try {
+    if (!videoId) {
+      router.replace('/mobile/home')
+      return
+    }
+    drId.value = await resolveDrId()
+    const detail = await getPublicVideoDetail(drId.value, videoId)
+    course.value = {
+      id: detail.id,
+      title: detail.title,
+      category: detail.category_name,
+      cover: detail.cover_url,
+      videoUrl: detail.video_url,
+      examState: detail.exam_state,
+    }
+    questions.value = await listPublicQuestions(videoId)
 
-  questions.value = listQuestions(courseId, stage)
-  if (!questions.value.length) {
+    if (!questions.value.length) {
+      ready.value = true
+      if (!isPre.value) router.replace({ name: 'mobile-learn', query: { videoId } })
+      return
+    }
+
+    if (!isPre.value) {
+      if (!course.value.examState?.pre_submitted) {
+        toast('请先完成学前答题')
+        router.replace({ name: 'mobile-quiz', query: { videoId, stage: 'pre' } })
+        return
+      }
+      if (course.value.videoUrl) {
+        const progress = getProgress(drId.value, videoId)
+        if ((progress.watchedPercent || 0) < WATCH_PERCENT) {
+          toast('请先完整观看视频再来答题')
+          router.replace({ name: 'mobile-learn', query: { videoId } })
+          return
+        }
+      }
+    }
+
     ready.value = true
-    if (!isPre.value) router.replace({ name: 'mobile-learn', query: { courseId } })
-    return
+  } catch (e) {
+    error.value = e?.message || '加载失败'
   }
-
-  const progress = getProgress(learner.value.userId, courseId)
-  if (!isPre.value) {
-    const preList = listQuestions(courseId, 'pre')
-    if (preList.length && !progress.preDone) {
-      toast('请先完成学前答题')
-      router.replace({ name: 'mobile-quiz', query: { courseId, stage: 'pre' } })
-      return
-    }
-    if (course.value.videoUrl && (progress.watchedPercent || 0) < WATCH_PERCENT) {
-      toast('请先完整观看视频再来答题')
-      router.replace({ name: 'mobile-learn', query: { courseId } })
-      return
-    }
-    if (progress.postDone) toast('这组题您答过了，可以再答一次')
-  }
-
-  startedAt.value = Date.now()
-  ready.value = true
 })
 
-function onSubmit(answers) {
+function toApiAnswer(question, answer) {
+  if (question.type === 'multiple') {
+    return Array.isArray(answer) ? [...answer].sort().join(',') : ''
+  }
+  return answer ?? ''
+}
+
+async function onSubmit(answers) {
   if (submitting.value) return
   submitting.value = true
-  const result = gradeQuiz(questions.value, answers, PASS_PERCENT)
-  const userId = learner.value.userId
-  const progress = getProgress(userId, courseId)
+  try {
+    if (isPre.value) {
+      await submitPreExam({
+        dr_id: drId.value,
+        video_id: Number(videoId),
+        answers: questions.value.map((q, i) => ({
+          question_id: Number(q.question_id),
+          user_answer: toApiAnswer(q, answers[i]),
+        })),
+      })
+      toast('前测完成')
+      router.replace({ name: 'mobile-learn', query: { videoId } })
+      return
+    }
 
-  if (isPre.value) {
-    saveProgress(userId, courseId, {
-      ...progress,
-      preDone: true,
-      prePercent: result.percent,
-      preCorrect: result.correct,
-      preTotal: result.total,
-      preDetail: result.detail,
-    })
-    toast(`前测完成，答对 ${result.correct}/${result.total} 题`)
-    router.replace({ name: 'mobile-learn', query: { courseId } })
-    return
+    // TODO: 接口文档未定义「提交看完答题」（submit-post），后端就绪后在此调用并携带 exam_record_id 跳结果页
+    router.replace({ name: 'mobile-report', query: { videoId } })
+  } catch (e) {
+    toast(e?.message || '提交失败')
+  } finally {
+    submitting.value = false
   }
-
-  const record = {
-    id: newId('r_'),
-    userId,
-    courseId,
-    courseTitle: course.value.title,
-    preCorrect: progress.preCorrect || 0,
-    preTotal: progress.preTotal || 0,
-    prePercent: progress.prePercent || 0,
-    postCorrect: result.correct,
-    postTotal: result.total,
-    percent: result.percent,
-    passed: result.passed,
-    detail: [...(progress.preDetail || []), ...result.detail],
-    startedAt: startedAt.value,
-    completedAt: Date.now(),
-  }
-  saveRecord(record)
-  saveProgress(userId, courseId, {
-    ...progress,
-    postDone: true,
-    attempts: (progress.attempts || 0) + 1,
-    bestPercent: Math.max(progress.bestPercent || 0, result.percent),
-    passed: result.passed || progress.passed,
-    lastRecordId: record.id,
-  })
-  router.replace({ name: 'mobile-report', query: { recordId: record.id } })
 }
 </script>
 
@@ -141,40 +128,54 @@ function onSubmit(answers) {
       </template>
     </PageNav>
 
-    <div v-if="course" class="qp__cover">
-      <img v-if="course.cover" :src="course.cover" :alt="course.title" />
-      <span v-else class="vcard__thumb-ph qp__cover-ph" :class="`vcard__thumb-ph--${categoryTone(course.category)}`">
-        <AppIcon :name="categoryIcon(course.category)" :size="30" />
-      </span>
-    </div>
-
-    <div v-if="course" class="qp__head" :class="isPre ? 'qp__head--pre' : 'qp__head--post'">
-      <AppIcon :name="isPre ? 'info' : 'shield'" :size="17" class="qp__head-icon" />
-      <div>
-        <b>{{ isPre ? '先答 3 道题，看看您的基础认知' : '再看 3 道题，检验一下有没有记住' }}</b>
-        <span>《{{ course.title }}》· 提交后可以看到每道题的对错与解析</span>
-      </div>
-    </div>
-
-    <QuizPanel
-      v-if="questions.length"
-      :questions="questions"
-      :stage-label="stageTitle"
-      @submit="onSubmit"
-      @change="answeredCount = $event"
-    />
-
-    <div v-else-if="ready" class="empty">
+    <div v-if="error" class="empty">
       <div class="empty__icon">
-        <AppIcon name="inbox" :size="44" />
+        <AppIcon name="alert" :size="44" />
       </div>
-      <p class="empty__text">这条视频还没有配置{{ stageTitle }}题目</p>
+      <p class="empty__text">{{ error }}</p>
       <div class="empty__actions">
         <button type="button" class="btn btn--primary btn--md" @click="router.replace('/mobile/home')">
           返回视频列表
         </button>
       </div>
     </div>
+
+    <template v-else>
+      <div v-if="course" class="qp__cover">
+        <img v-if="course.cover" :src="course.cover" :alt="course.title" />
+        <span v-else class="vcard__thumb-ph qp__cover-ph" :class="`vcard__thumb-ph--${categoryTone(course.category)}`">
+          <AppIcon :name="categoryIcon(course.category)" :size="30" />
+        </span>
+      </div>
+
+      <div v-if="course" class="qp__head" :class="isPre ? 'qp__head--pre' : 'qp__head--post'">
+        <AppIcon :name="isPre ? 'info' : 'shield'" :size="17" class="qp__head-icon" />
+        <div>
+          <b>{{ isPre ? '先答 3 道题，看看您的基础认知' : '再看 3 道题，检验一下有没有记住' }}</b>
+          <span>《{{ course.title }}》· 提交后可以看到每道题的对错与解析</span>
+        </div>
+      </div>
+
+      <QuizPanel
+        v-if="questions.length"
+        :questions="questions"
+        :stage-label="stageTitle"
+        @submit="onSubmit"
+        @change="answeredCount = $event"
+      />
+
+      <div v-else-if="ready" class="empty">
+        <div class="empty__icon">
+          <AppIcon name="inbox" :size="44" />
+        </div>
+        <p class="empty__text">这条视频还没有配置{{ stageTitle }}题目</p>
+        <div class="empty__actions">
+          <button type="button" class="btn btn--primary btn--md" @click="router.replace('/mobile/home')">
+            返回视频列表
+          </button>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
