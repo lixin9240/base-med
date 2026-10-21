@@ -5,7 +5,7 @@ import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
 import { toast } from '@/utils/toast'
-import { currentDrId } from '@/store/mobile/session'
+import { currentDrId, isSkipWatch } from '@/store/mobile/session'
 import { getPublicVideoDetail, listPublicQuestions, submitPostExam, submitPreExam } from '@/api/public'
 
 const route = useRoute()
@@ -69,7 +69,7 @@ onMounted(async () => {
         router.replace({ name: 'mobile-quiz', query: { videoId, stage: 'pre' } })
         return
       }
-      if (course.value.videoUrl && course.value.watchProgress?.is_unlocked !== 1) {
+      if (course.value.videoUrl && !isSkipWatch(videoId) && course.value.watchProgress?.is_unlocked !== 1) {
         toast('请先完整观看视频再来答题')
         router.replace({ name: 'mobile-learn', query: { videoId } })
         return
