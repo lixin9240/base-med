@@ -1,6 +1,12 @@
 export { request, requestBlob, get, post, put, del } from './http'
 export { adminLogin, adminProfile, adminLogout } from './auth'
 export {
+  createAdminUser,
+  deleteAdminUser,
+  listAdminUsers,
+  updateAdminUser,
+} from './adminUser'
+export {
   confirmAdminImportTask,
   createAdminVideoQuestion,
   downloadQuestionTemplate,
