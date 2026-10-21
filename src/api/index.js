@@ -22,7 +22,7 @@ export {
   updateAdminVideoStatus,
 } from './video'
 export { listAdminCategories } from './category'
-export { getAdminRecordDetail, listAdminRecords } from './record'
+export { exportAdminRecords, getAdminRecordDetail, listAdminRecords } from './record'
 export {
   createPublicDr,
   getExamResult,
