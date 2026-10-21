@@ -22,6 +22,7 @@ const required = ref(90) // 解锁门槛
 const canQuiz = ref(false) // 是否已解锁后测
 const badRate = ref(false)
 const noVideoMode = ref(false)
+const loading = ref(true)
 
 let maxTime = 0 // 最大观看位置（秒）
 let reportTimer = null
@@ -74,6 +75,8 @@ onMounted(async () => {
     document.addEventListener('visibilitychange', onVisibility)
   } catch (e) {
     error.value = e?.message || '加载失败'
+  } finally {
+    loading.value = false
   }
 })
 
@@ -192,6 +195,11 @@ function goQuiz() {
       </div>
     </div>
 
+    <div v-else-if="loading" class="empty">
+      <div class="loading-spinner" role="status" aria-label="加载中" />
+      <p class="empty__text">加载中…</p>
+    </div>
+
     <div v-else-if="!video" class="empty">
       <div class="empty__icon">
         <AppIcon name="alert" :size="44" />
@@ -280,6 +288,23 @@ function goQuiz() {
   margin-top: calc(-1 * var(--sp-4));
   margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
   margin-right: calc(-1 * max(var(--sp-4), env(safe-area-inset-right, 0px)));
+}
+
+/* 加载中的旋转缓冲圈 */
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto var(--sp-3);
+  border: 3px solid var(--border);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .player {
