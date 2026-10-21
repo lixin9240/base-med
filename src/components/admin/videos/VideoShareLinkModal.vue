@@ -1,11 +1,6 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
-import {
-  createAdminShareLink,
-  deleteAdminShareLink,
-  listAdminShareLinks,
-  updateAdminShareLinkStatus,
-} from '@/api'
+import { generateAdminShareLink, getAdminShareLinkDetail, revokeAdminShareLink } from '@/api'
 import { SHARE_TTL_OPTIONS } from '@/utils/video/constants'
 import { formatDateTime, isShareExpired } from '@/utils/video/share'
 
@@ -37,29 +32,25 @@ let loadSeq = 0
 
 const videoId = computed(() => props.video?.apiId ?? props.video?.id ?? null)
 const hasLink = computed(() => Boolean(link.value))
-const permanent = computed(() => link.value?.expire_type === 'permanent')
 const disabled = computed(() => link.value?.status === 0)
-const expired = computed(
-  () => hasLink.value && !permanent.value && isShareExpired(link.value, now.value),
-)
-/** 失效或过期都会让用户端入口不可用 */
+const expired = computed(() => hasLink.value && isShareExpired(link.value, now.value))
+/** 撤回或过期都会让用户端入口不可用 */
 const unavailable = computed(() => hasLink.value && (disabled.value || expired.value))
 const statusText = computed(() => {
   if (loading.value) return '链接加载中…'
   if (!hasLink.value) return '尚未生成'
-  if (disabled.value) return '链接已失效'
-  if (permanent.value) return '链接已生成'
+  if (disabled.value) return '链接已撤回'
   return expired.value ? '链接已过期' : '链接已生成'
 })
 const createdText = computed(() =>
   link.value?.createdAt ? formatDateTime(link.value.createdAt) : '',
 )
 const expiresText = computed(() => {
-  if (!hasLink.value || permanent.value || !link.value.expiresAt) return ''
+  if (!hasLink.value || !link.value.expiresAt) return ''
   return formatDateTime(link.value.expiresAt)
 })
 const remainingText = computed(() => {
-  if (!hasLink.value || disabled.value || permanent.value || expired.value) return ''
+  if (!hasLink.value || disabled.value || expired.value) return ''
   const remain = link.value.expiresAt - now.value
   const hours = Math.ceil(remain / (60 * 60 * 1000))
   if (hours <= 24) return `剩余 ${hours} 小时`
@@ -69,10 +60,7 @@ const generateLabel = computed(() => {
   if (generating.value) return '生成中…'
   return hasLink.value ? '重新生成' : '生成链接'
 })
-const toggleLabel = computed(() => {
-  if (updating.value) return disabled.value ? '启用中…' : '失效中…'
-  return disabled.value ? '启用链接' : '失效链接'
-})
+const retractLabel = computed(() => (updating.value ? '撤回中…' : '撤回链接'))
 
 watch(
   () => props.open,
@@ -103,11 +91,16 @@ function decorateLink(item) {
   }
 }
 
-/** 已有链接的时效选中项尽量和接口返回的到期时间对齐 */
+/** 已有链接的时效选中项尽量和接口返回的 expire_type（如 7d）对齐 */
 function syncTtl(item) {
-  if (!item.createdAt || !item.expiresAt) return
-  const days = Math.round((item.expiresAt - item.createdAt) / DAY_MS)
-  if (SHARE_TTL_OPTIONS.some((option) => option.days === days)) {
+  const matched = /^(\d+)d$/.exec(String(item.expire_type ?? ''))
+  const days =
+    matched !== null
+      ? Number(matched[1])
+      : item.createdAt && item.expiresAt
+        ? Math.round((item.expiresAt - item.createdAt) / DAY_MS)
+        : null
+  if (days !== null && SHARE_TTL_OPTIONS.some((option) => option.days === days)) {
     ttlDays.value = days
   }
 }
@@ -141,8 +134,7 @@ function stop() {
 }
 
 /**
- * 打开弹窗时读取该视频最新的一条链接：
- * 优先取启用中的，没有则取最新一条已失效的，便于直接重新启用。
+ * 打开弹窗时读取该视频当前生效的链接（无则返回 null）。
  * 生成属于写操作，交给用户主动点击。
  */
 async function loadLink() {
@@ -151,14 +143,10 @@ async function loadLink() {
   const seq = ++loadSeq
   loading.value = true
   try {
-    const data = await listAdminShareLinks({ videoId: videoId.value, pageSize: 20 })
+    const data = await getAdminShareLinkDetail({ videoId: videoId.value })
     if (seq !== loadSeq || !props.open) return
 
-    const pickLatest = (items) =>
-      items.reduce((best, item) => (!best || Number(item.id) > Number(best.id) ? item : best), null)
-    const active = data.list.filter((item) => Number(item.status) === 1)
-    const latest = pickLatest(active.length ? active : data.list)
-    link.value = latest ? decorateLink(latest) : null
+    link.value = data ? decorateLink(data) : null
     if (link.value) syncTtl(link.value)
   } catch (error) {
     if (seq === loadSeq && props.open) {
@@ -176,32 +164,22 @@ async function generate() {
     return
   }
 
-  const previous = link.value
   generating.value = true
   copied.value = false
   errorMessage.value = ''
 
   try {
-    // 后端只提供 permanent / 7d / 30d / custom，这里把弹窗的 1/3/5/7 天统一按 custom 提交
-    const data = await createAdminShareLink({
-      video_id: videoId.value,
-      expire_type: 'custom',
-      expire_at: formatDateTime(Date.now() + ttlDays.value * DAY_MS),
+    // 后端只支持 1 / 3 / 5 / 7 天；生成新链接时会自动失效该视频的旧链接
+    const data = await generateAdminShareLink({
+      videoId: videoId.value,
+      expireDays: ttlDays.value,
     })
     link.value = decorateLink({
       ...data,
       created_at: data.created_at ?? formatDateTime(Date.now()),
     })
     now.value = Date.now()
-
-    // 同一视频只保留一条可用链接：新链接生成成功后，旧链接立即失效
-    if (previous?.id && previous.id !== data.id) {
-      try {
-        await deleteAdminShareLink({ id: previous.id })
-      } catch {
-        errorMessage.value = '新链接已生成，但旧链接删除失败，请稍后重试'
-      }
-    }
+    syncTtl(link.value)
   } catch (error) {
     errorMessage.value = error?.message || '链接生成失败，请稍后重试'
   } finally {
@@ -239,20 +217,18 @@ async function copyLink() {
   }
 }
 
-/** 2.4.3 启用/失效链接；失效后用户端提示「链接已失效」，访问计数与答题数据保留 */
-async function toggleStatus() {
-  if (!link.value?.id || updating.value) return
+/** 2.3 撤回链接：立即失效，用户无法再通过它访问；访问计数与答题数据保留 */
+async function retract() {
+  if (!videoId.value || !link.value?.id || updating.value) return
 
-  const nextStatus = disabled.value ? 1 : 0
   updating.value = true
   errorMessage.value = ''
   try {
-    await updateAdminShareLinkStatus({ id: link.value.id, status: nextStatus })
-    link.value = { ...link.value, status: nextStatus }
+    await revokeAdminShareLink({ videoId: videoId.value })
+    link.value = { ...link.value, status: 0 }
     copied.value = false
   } catch (error) {
-    errorMessage.value =
-      error?.message || (nextStatus === 1 ? '启用失败，请稍后重试' : '失效失败，请稍后重试')
+    errorMessage.value = error?.message || '撤回失败，请稍后重试'
   } finally {
     updating.value = false
   }
@@ -355,13 +331,12 @@ function preview() {
             class="share-card__hint"
             :class="{ 'share-card__hint--expired': unavailable }"
           >
-            <template v-if="disabled"
-              >链接已失效，用户端点击会提示「链接已失效」；可重新启用或生成新链接。</template
-            >
+            <template v-if="disabled">
+              链接已撤回，用户端点击会提示「链接已失效」；如需继续分享请重新生成。
+            </template>
             <template v-else-if="expired">
               链接已过期，用户端入口已自动隐藏，请重新生成。
             </template>
-            <template v-else-if="permanent"> 链接永久有效，用户端入口不会自动隐藏。 </template>
             <template v-else>
               {{ expiresText }} 到期（{{
                 remainingText
@@ -381,13 +356,13 @@ function preview() {
 
         <div class="share-modal__actions">
           <button
-            v-if="hasLink"
+            v-if="hasLink && !unavailable"
             type="button"
             class="btn btn--ghost"
             :disabled="updating || generating"
-            @click="toggleStatus"
+            @click="retract"
           >
-            {{ toggleLabel }}
+            {{ retractLabel }}
           </button>
           <button
             type="button"

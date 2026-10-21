@@ -170,7 +170,7 @@ async function openEdit(video) {
 }
 
 function openShare(video) {
-  // 分享链接接口（2.4）需要真实视频 id，直接用列表接口返回的行
+  // 分享链接接口（2.12）需要真实视频 id，直接用列表接口返回的行
   shareVideo.value = video
   shareOpen.value = true
 }

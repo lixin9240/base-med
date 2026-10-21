@@ -122,8 +122,19 @@ async function loadVideoOptions() {
   if (loadingVideos.value || videoOptions.value.length) return
   loadingVideos.value = true
   try {
-    const result = await listAdminVideos({ page: 1, pageSize: 1000 })
-    videoOptions.value = result.list
+    // 后端 page_size 上限 100（VideoListRequest），逐页取全量供下拉选择
+    const pageSize = 100
+    const collected = []
+    let page = 1
+    let total = 0
+    do {
+      const result = await listAdminVideos({ page, pageSize })
+      collected.push(...result.list)
+      total = result.total
+      page += 1
+      if (!result.list.length) break
+    } while (collected.length < total)
+    videoOptions.value = collected
   } catch (error) {
     toast(error?.message || '视频列表加载失败')
   } finally {
