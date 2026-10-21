@@ -1,4 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { getAdminToken } from '@/store/admin/auth'
+
+const WHITE_LIST = ['/admin/login', '/admin/forget-password']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -77,6 +80,30 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+router.beforeEach((to) => {
+  const token = getAdminToken()
+
+  // 管理端公开页：已登录直接跳首页
+  if (WHITE_LIST.includes(to.path)) {
+    if (token && to.path === '/admin/login') {
+      return { path: '/admin/videos' }
+    }
+    return true
+  }
+
+  // 管理端非公开页：无 token 跳登录，带 redirect
+  if (to.path.startsWith('/admin')) {
+    if (!token) {
+      return {
+        path: '/admin/login',
+        query: to.fullPath !== '/admin/login' ? { redirect: to.fullPath } : {},
+      }
+    }
+  }
+
+  return true
 })
 
 export default router
