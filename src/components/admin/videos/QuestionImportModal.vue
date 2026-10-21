@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { STAGE_TO_API } from '@/utils/video/constants'
 import { downloadBlob } from '@/utils/download'
 import { toast } from '@/utils/toast'
 import {
@@ -20,26 +19,20 @@ const props = defineProps({
     type: Object,
     default: null,
   },
-  stage: {
-    type: String,
-    default: '',
-  },
 })
 
 const emit = defineEmits(['close', 'imported'])
 
-const STAGE_LABEL = { pre: '前测', post: '后测' }
 const POLL_INTERVAL = 1500
 const POLL_TIMEOUT = 90_000
 
 const isScoped = computed(() => Boolean(props.video))
 const modalTitle = computed(() => (isScoped.value ? '导入本组题目' : '批量导入题目'))
 
-// 未从抽屉进入时没有 video/stage，需要自行选择（接口要求 video_id + stage）
+// 未从抽屉进入时没有 video，需要自行选择（接口要求 video_id）
 const videoOptions = ref([])
 const loadingVideos = ref(false)
 const selectedVideoId = ref('')
-const selectedStage = ref('pre')
 
 const scopeVideo = computed(() => {
   if (props.video) return props.video
@@ -47,12 +40,10 @@ const scopeVideo = computed(() => {
     videoOptions.value.find((item) => String(item.id) === String(selectedVideoId.value)) ?? null
   )
 })
-const scopeStage = computed(() => props.stage || selectedStage.value)
 
 const scopeHint = computed(() => {
   if (!scopeVideo.value) return ''
-  const stageLabel = STAGE_LABEL[scopeStage.value] ?? ''
-  return `当前只导入「${scopeVideo.value.title}${stageLabel ? ` · ${stageLabel}` : ''}」的题目。`
+  return `当前只导入「${scopeVideo.value.title}」的题目。`
 })
 
 const fileInput = ref(null)
@@ -101,7 +92,7 @@ watch(
   },
 )
 
-watch([selectedVideoId, selectedStage], () => {
+watch(selectedVideoId, () => {
   if (!isScoped.value && phase.value !== 'idle') reset()
 })
 
@@ -229,7 +220,6 @@ async function handleFile(file) {
     const created = await importAdminVideoQuestions({
       // 从抽屉进入时 scopeVideo 是本地记录，真实 video_id 在 apiId 上
       videoId: scopeVideo.value.apiId ?? scopeVideo.value.id,
-      stage: STAGE_TO_API[scopeStage.value],
       file,
     })
     taskId.value = created.task_id
@@ -246,9 +236,7 @@ async function onDownloadTemplate() {
   if (downloadingTemplate.value) return
   downloadingTemplate.value = true
   try {
-    const blob = await downloadQuestionTemplate({
-      stage: STAGE_TO_API[scopeStage.value],
-    })
+    const blob = await downloadQuestionTemplate()
     downloadBlob(blob, '科普视频题目_批量导入模板.xlsx')
   } catch (error) {
     toast(error?.message || '模板下载失败，请重试')
@@ -309,8 +297,7 @@ async function confirmImport() {
           </div>
 
           <p class="import-step__desc">
-            模板对应<strong class="import-step__strong">{{ STAGE_LABEL[scopeStage] ?? '' }}</strong
-            >题目，按列填写题干、选项与正确答案即可。
+            模板中的题目前后测共用，按列填写题干、选项与正确答案即可。
           </p>
 
           <button
@@ -353,13 +340,6 @@ async function confirmImport() {
                 <option v-for="item in videoOptions" :key="item.id" :value="item.id">
                   {{ item.title }}
                 </option>
-              </select>
-            </label>
-            <label class="scope-field">
-              <span class="scope-field__label">题目用途</span>
-              <select v-model="selectedStage" class="scope-field__select" :disabled="busy">
-                <option value="pre">前测</option>
-                <option value="post">后测</option>
               </select>
             </label>
           </div>

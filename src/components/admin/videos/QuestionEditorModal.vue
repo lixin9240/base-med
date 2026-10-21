@@ -21,10 +21,6 @@ const props = defineProps({
     type: String,
     default: 'create',
   },
-  stage: {
-    type: String,
-    default: 'pre',
-  },
   question: {
     type: Object,
     default: null,
@@ -38,7 +34,6 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save'])
 
 const TYPES = ['single', 'multiple', 'judge']
-const STAGE_LABEL = { pre: '前测', post: '后测' }
 
 const draft = ref(createQuestionDraft())
 const errors = ref({})
@@ -111,7 +106,6 @@ function save() {
     <div class="editor" role="dialog" aria-modal="true" aria-labelledby="editor-title">
       <header class="editor__head">
         <h2 id="editor-title" class="editor__title">{{ title }}</h2>
-        <span class="editor__stage">{{ STAGE_LABEL[stage] }}</span>
         <button type="button" class="editor__close" aria-label="关闭" @click="$emit('close')">
           <svg
             viewBox="0 0 24 24"
@@ -299,14 +293,6 @@ function save() {
   font-size: var(--fs-xl);
   font-weight: var(--fw-semibold);
   color: var(--text-primary);
-}
-
-.editor__stage {
-  padding: 2px 10px;
-  font-size: var(--fs-xs);
-  color: var(--brand-primary-hover);
-  background: var(--brand-tint);
-  border-radius: var(--r-full);
 }
 
 .editor__close {

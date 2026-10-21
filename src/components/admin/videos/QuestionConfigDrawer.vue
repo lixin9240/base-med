@@ -1,7 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
-import { STAGE_TO_API } from '@/utils/video/constants'
 import { questionToApiPayload } from '@/utils/video/questionDraft'
 import { downloadBlob, safeFileName } from '@/utils/download'
 import { toast } from '@/utils/toast'
@@ -13,7 +12,7 @@ import {
   removeAdminVideoQuestion,
   updateAdminVideoQuestion,
 } from '@/api'
-import { REQUIRED_PER_STAGE } from '@/store/video/video'
+import { REQUIRED_QUESTION_COUNT } from '@/store/video/video'
 import QuestionEditorModal from './QuestionEditorModal.vue'
 import QuestionImportModal from './QuestionImportModal.vue'
 
@@ -30,16 +29,9 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'changed'])
 
-const STAGES = [
-  { value: 'pre', label: '前测题目' },
-  { value: 'post', label: '后测题目' },
-]
-
 /** 题目接口（2.3.x）使用后端视频 id；列表页会以 apiId 传入，本地记录 id 不能直接当 video_id */
 const videoId = computed(() => props.video?.apiId ?? props.video?.id ?? '')
 
-const activeStage = ref('pre')
-const counts = ref({ pre: 0, post: 0 })
 const questions = ref([])
 const deletingId = ref('')
 const deleting = ref(false)
@@ -57,18 +49,10 @@ watch(
   () => [props.open, videoId.value],
   ([open]) => {
     if (!open) return
-    activeStage.value = 'pre'
     deletingId.value = ''
     load()
   },
 )
-
-watch(activeStage, () => {
-  deletingId.value = ''
-  load()
-})
-
-const STAGE_NAME = { pre: '前测', post: '后测' }
 
 function mapAnswer(correctAnswer, type, options) {
   const raw = String(correctAnswer ?? '')
@@ -101,7 +85,6 @@ function toQuestion(item) {
 
 async function load() {
   if (!props.video) {
-    counts.value = { pre: 0, post: 0 }
     questions.value = []
     loading.value = false
     loadError.value = ''
@@ -111,15 +94,9 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const [preRes, postRes] = await Promise.all([
-      listAdminVideoQuestions({ videoId: videoId.value, stage: STAGE_TO_API.pre }),
-      listAdminVideoQuestions({ videoId: videoId.value, stage: STAGE_TO_API.post }),
-    ])
-    counts.value = { pre: preRes.total, post: postRes.total }
-    const current = activeStage.value === 'pre' ? preRes : postRes
-    questions.value = current.list.map(toQuestion)
+    const data = await listAdminVideoQuestions({ videoId: videoId.value })
+    questions.value = data.list.map(toQuestion)
   } catch (error) {
-    counts.value = { pre: 0, post: 0 }
     questions.value = []
     loadError.value = error?.message || '题目加载失败'
   } finally {
@@ -128,7 +105,7 @@ async function load() {
 }
 
 function countTone(count) {
-  if (count >= REQUIRED_PER_STAGE) return 'success'
+  if (count >= REQUIRED_QUESTION_COUNT) return 'success'
   return count > 0 ? 'warning' : 'danger'
 }
 
@@ -154,7 +131,6 @@ async function onSave(payload) {
 
   const apiPayload = {
     video_id: videoId.value,
-    stage: STAGE_TO_API[activeStage.value],
     ...questionToApiPayload(payload),
   }
   if (editingQuestion.value) {
@@ -194,7 +170,6 @@ async function confirmDelete(question) {
   try {
     await removeAdminVideoQuestion({
       video_id: videoId.value,
-      stage: STAGE_TO_API[activeStage.value],
       question_id: question.questionId ?? question.id,
     })
     deletingId.value = ''
@@ -217,9 +192,7 @@ async function onDownloadTemplate() {
 
   downloadingTemplate.value = true
   try {
-    const blob = await downloadQuestionTemplate({
-      stage: STAGE_TO_API[activeStage.value],
-    })
+    const blob = await downloadQuestionTemplate()
     downloadBlob(blob, '科普视频题目_批量导入模板.xlsx')
   } catch (error) {
     toast(error?.message || '模板下载失败，请重试')
@@ -233,11 +206,8 @@ async function onExport() {
 
   exporting.value = true
   try {
-    const blob = await exportAdminVideoQuestions({
-      videoId: videoId.value,
-      stage: STAGE_TO_API[activeStage.value],
-    })
-    const name = `${safeFileName(props.video.title)}_${STAGE_NAME[activeStage.value] ?? ''}_题目.xlsx`
+    const blob = await exportAdminVideoQuestions({ videoId: videoId.value })
+    const name = `${safeFileName(props.video.title)}_题目.xlsx`
     downloadBlob(blob, name)
   } catch (error) {
     toast(error?.message || '导出失败，请重试')
@@ -259,7 +229,12 @@ async function onExport() {
         <header class="drawer__head">
           <div class="drawer__intro">
             <h2 class="drawer__title">{{ video?.title }}</h2>
-            <p class="drawer__sub">配置前测 / 后测题库</p>
+            <p class="drawer__sub">
+              配置题目
+              <span class="drawer__count" :class="`drawer__count--${countTone(questions.length)}`">
+                {{ questions.length }}/{{ REQUIRED_QUESTION_COUNT }}
+              </span>
+            </p>
           </div>
           <button type="button" class="drawer__close" aria-label="关闭" @click="$emit('close')">
             <svg
@@ -274,27 +249,6 @@ async function onExport() {
             </svg>
           </button>
         </header>
-
-        <div class="drawer__tabs" role="tablist" aria-label="题目阶段">
-          <button
-            v-for="stage in STAGES"
-            :key="stage.value"
-            type="button"
-            role="tab"
-            class="stage-tab"
-            :class="{ 'stage-tab--active': activeStage === stage.value }"
-            :aria-selected="activeStage === stage.value"
-            @click="activeStage = stage.value"
-          >
-            {{ stage.label }}
-            <span
-              class="stage-tab__count"
-              :class="`stage-tab__count--${countTone(counts[stage.value])}`"
-            >
-              {{ counts[stage.value] }}/{{ REQUIRED_PER_STAGE }}
-            </span>
-          </button>
-        </div>
 
         <div class="drawer__actions">
           <button type="button" class="btn btn--primary" @click="openCreate">
@@ -380,10 +334,10 @@ async function onExport() {
             <button type="button" class="link-btn" @click="load">重试</button>
           </div>
           <template v-else-if="questions.length">
-            <article v-for="question in questions" :key="question.id" class="q-card">
+            <article v-for="(question, index) in questions" :key="question.id" class="q-card">
               <div class="q-card__head">
                 <span class="q-card__type">{{ QUESTION_TYPE_LABEL[question.type] }}</span>
-                <span class="q-card__order">第 {{ question.order }} 题</span>
+                <span class="q-card__order">第 {{ index + 1 }} 题</span>
                 <div class="q-card__actions">
                   <button type="button" class="link-btn" @click="openEdit(question)">编辑</button>
                   <button
@@ -443,11 +397,9 @@ async function onExport() {
               <path d="m10 14 4 4 7-8M10 26l4 4 7-8M10 38l4 4 7-8" />
               <path d="M28 14h10M28 26h10M28 38h10" />
             </svg>
-            <p class="drawer-empty__text">
-              还没有{{ activeStage === 'pre' ? '前测' : '后测' }}题目。
-            </p>
+            <p class="drawer-empty__text">还没有题目。</p>
             <p class="drawer-empty__hint">
-              建议配 {{ REQUIRED_PER_STAGE }} 道题，也可以用 Excel 批量导入。
+              建议配 {{ REQUIRED_QUESTION_COUNT }} 道题（前后测共用），也可以用 Excel 批量导入。
             </p>
             <button type="button" class="btn btn--primary" @click="openCreate">
               <svg
@@ -471,7 +423,6 @@ async function onExport() {
   <QuestionEditorModal
     :open="editorOpen"
     :mode="editingQuestion ? 'edit' : 'create'"
-    :stage="activeStage"
     :question="editingQuestion"
     :saving="saving"
     @close="editorOpen = false"
@@ -481,7 +432,6 @@ async function onExport() {
   <QuestionImportModal
     :open="importOpen"
     :video="video"
-    :stage="activeStage"
     @close="importOpen = false"
     @imported="onImported"
   />
@@ -568,60 +518,27 @@ async function onExport() {
   height: 20px;
 }
 
-/* ===== 阶段 tab ===== */
-.drawer__tabs {
-  display: flex;
-  gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-6) var(--sp-3);
-}
-
-.stage-tab {
+/* ===== 题目数 ===== */
+.drawer__count {
   display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  height: 40px;
-  padding: 0 var(--sp-4);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--text-secondary);
-  background: var(--bg-surface-solid);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  cursor: pointer;
-  transition:
-    color var(--t-fast),
-    background var(--t-fast),
-    border-color var(--t-fast);
-}
-
-.stage-tab:hover {
-  border-color: var(--brand-primary-hover);
-}
-
-.stage-tab--active {
-  color: var(--brand-primary-hover);
-  background: var(--brand-tint);
-  border-color: var(--brand-primary-hover);
-}
-
-.stage-tab__count {
-  padding: 2px 8px;
+  margin-left: var(--sp-2);
+  padding: 1px 8px;
   font-size: var(--fs-xs);
   font-weight: var(--fw-semibold);
   border-radius: var(--r-full);
 }
 
-.stage-tab__count--success {
+.drawer__count--success {
   color: var(--success-text);
   background: var(--success-bg);
 }
 
-.stage-tab__count--warning {
+.drawer__count--warning {
   color: var(--warning-text);
   background: var(--warning-bg);
 }
 
-.stage-tab__count--danger {
+.drawer__count--danger {
   color: var(--danger-text);
   background: var(--danger-bg);
 }
@@ -909,7 +826,6 @@ async function onExport() {
   }
 
   .drawer__head,
-  .drawer__tabs,
   .drawer__actions,
   .drawer__body {
     padding-left: var(--sp-4);

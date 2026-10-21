@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { deleteAdminVideo } from '@/api'
-import { listVideoQuestions, removeVideo } from '@/store/video/video'
+import { removeVideo } from '@/store/video/video'
 
 const props = defineProps({
   open: {
@@ -19,13 +19,8 @@ const emit = defineEmits(['close', 'deleted'])
 const deleting = ref(false)
 const errorMessage = ref('')
 
-const questionCount = computed(() => {
-  if (!props.video) return 0
-  return (
-    listVideoQuestions(props.video.id, 'pre').length +
-    listVideoQuestions(props.video.id, 'post').length
-  )
-})
+// 题目数由列表接口（2.2.1）的 question_count 提供，前后测共用一套
+const questionCount = computed(() => Number(props.video?.questionCount) || 0)
 
 const description = computed(() => {
   const title = props.video?.title || '这条视频'
@@ -80,12 +75,7 @@ async function confirmDelete() {
 
       <footer class="delete-modal__foot">
         <button type="button" class="btn btn--secondary" @click="emit('close')">取消</button>
-        <button
-          type="button"
-          class="btn btn--danger"
-          :disabled="deleting"
-          @click="confirmDelete"
-        >
+        <button type="button" class="btn btn--danger" :disabled="deleting" @click="confirmDelete">
           {{ deleting ? '删除中…' : '删除' }}
         </button>
       </footer>
