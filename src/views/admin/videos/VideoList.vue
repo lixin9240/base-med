@@ -44,7 +44,7 @@ const shareVideo = ref(null)
 const deleteOpen = ref(false)
 const deleteVideo = ref(null)
 
-/** 题目配置 / 生成链接 / 删除弹窗仍按标题匹配本地记录（本地题目、分享数据）；找不到时用接口行兜底 */
+/** 题目配置 / 删除弹窗仍按标题匹配本地记录（本地题目数据）；找不到时用接口行兜底 */
 function resolveLocalVideo(video) {
   return findVideoByTitle(video.title) ?? video
 }
@@ -168,7 +168,8 @@ async function openEdit(video) {
 }
 
 function openShare(video) {
-  shareVideo.value = resolveLocalVideo(video)
+  // 分享链接接口（2.4）需要真实视频 id，直接用列表接口返回的行
+  shareVideo.value = video
   shareOpen.value = true
 }
 
@@ -365,11 +366,7 @@ async function togglePublished(video) {
       </button>
     </div>
 
-    <QuestionImportModal
-      :open="importOpen"
-      @close="importOpen = false"
-      @imported="refreshVideos"
-    />
+    <QuestionImportModal :open="importOpen" @close="importOpen = false" @imported="refreshVideos" />
 
     <QuestionConfigDrawer
       :open="configOpen"
@@ -386,11 +383,7 @@ async function togglePublished(video) {
       @saved="refreshVideos"
     />
 
-    <VideoShareLinkModal
-      :open="shareOpen"
-      :video="shareVideo"
-      @close="shareOpen = false"
-    />
+    <VideoShareLinkModal :open="shareOpen" :video="shareVideo" @close="shareOpen = false" />
 
     <VideoDeleteModal
       :open="deleteOpen"
