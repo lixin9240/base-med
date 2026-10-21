@@ -998,7 +998,7 @@
 | page | int | 否 | 默认 1 |
 | page_size | int | 否 | 默认 20 |
 | module | string | 否 | video/question/exam/category/share/admin_user/topic |
-| action | string | 否 | create/update/delete/import/export/generate_link |
+| action | string | 否 | create/update/delete/import/export/generate_link/revoke |
 | admin_id | bigint | 否 | 操作人筛选 |
 
 返回：
@@ -1021,6 +1021,57 @@
     "total": 1
 }
 ```
+
+## 2.12 GYZ-链接模块（公众号分享链接，video_share_link）
+
+对应路由 `admin/share-link`，均需 `auth:admin`（Bearer token）。链接用于发布到公众号，用户无需登录即可观看视频并答题；时效仅支持 1/3/5/7 天，重新生成会自动失效旧链接。
+
+### 2.12.1 生成 / 重新生成链接
+- 路径：`POST /api/admin/share-link/generate`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| video_id | bigint | 是 | 视频 ID |
+| expire_days | int | 是 | 链接时效（天），仅支持 1/3/5/7 |
+
+返回：
+
+```json
+{
+    "id": 1,
+    "video_id": 2,
+    "url": "https://wjc1127.oss-cn-chengdu.aliyuncs.com/mobile/learn?video_id=2&share=xxxx",
+    "token": "xxxx",
+    "expire_type": "1d",
+    "expire_at": "2026-10-22 09:10:30",
+    "visit_count": 0,
+    "status": 1,
+    "created_at": "2026-10-21 09:10:30"
+}
+```
+
+> 说明：重新生成时，该视频已有生效链接会被自动置为失效（status=0）。
+
+### 2.12.2 获取生效链接详情
+- 路径：`GET /api/admin/share-link/detail`
+- Method：GET
+
+| 参数 | 类型 | 是否必须 |
+| ---- | ---- | ---- |
+| video_id | bigint | 是 |
+
+返回：与 2.12.1 相同的链接结构；无生效链接（未生成、已撤回或已过期）时返回 `data` 为 `null`。
+
+### 2.12.3 撤回生效链接
+- 路径：`POST /api/admin/share-link/revoke`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 |
+| ---- | ---- | ---- |
+| video_id | bigint | 是 |
+
+> 说明：将当前生效链接置为失效（status=0），用户端入口随即隐藏。返回 `{ "success": true }`。
 
 ---
 
@@ -1349,6 +1400,7 @@
 | 题库管理 | 2.8 | `question`、`video_question` |
 | 课程管理 | 2.9 | `topic`、`video` |
 | 操作日志 | 2.11 | `operation_log` |
+| 链接模块（公众号分享链接） | 2.12 | `video_share_link`、`video` |
 | 用户端入口 | 3.1 | `visit_record`（点击视频时绑定video_id并签发dr_id）、`video` |
 | 用户端视频/题目 | 3.2、3.3、3.6 | `video`、`category`、`video_question`、`question` |
 | 观看进度 | 3.4 | `video_progress`（进度上报、90%门槛计算） |

@@ -17,6 +17,7 @@ use App\Http\Controllers\Gyz\ImportTaskController;
 use App\Http\Controllers\Gyz\VideoController as GyzVideoController;
 use App\Http\Controllers\Gyz\OperationLogController;
 use App\Http\Controllers\Gyz\StatisticsController;
+use App\Http\Controllers\Gyz\VideoShareLinkController;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -269,4 +270,21 @@ Route::prefix('admin/import')->middleware('auth:admin')->group(function () {
 Route::prefix('admin/operation-log')->middleware('auth:admin')->group(function () {
     // 2.9.1 操作日志列表
     Route::get(uri: '/list', action: [OperationLogController::class, 'list']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| GYZ-链接模块（公众号分享链接，2.12）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/share-link')->middleware('auth:admin')->group(function () {
+    // 2.12.1 生成 / 重新生成视频分享链接
+    Route::post(uri: '/generate', action: [VideoShareLinkController::class, 'generate']);
+
+    // 2.12.2 获取当前生效链接详情
+    Route::get(uri: '/detail', action: [VideoShareLinkController::class, 'detail']);
+
+    // 2.12.3 撤回生效链接
+    Route::post(uri: '/revoke', action: [VideoShareLinkController::class, 'revoke']);
 });
