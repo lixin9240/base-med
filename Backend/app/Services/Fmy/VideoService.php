@@ -89,10 +89,10 @@ class VideoService
                 'exam_record_id' => $examRecord?->id,
             ],
             'watch_progress' => [
-                'watched_seconds' => (int) ($progress->watched_seconds ?? 0),
-                'progress_percent' => (int) ($progress->progress_percent ?? 0),
+                'watched_seconds' => (float) ($progress->watched_seconds ?? 0),
+                'progress_percent' => (float) ($progress->progress_percent ?? 0),
                 'watch_required_percent' => $required,
-                'is_unlocked' => ($this->isBrokenVideo($video) || ($progress && (int) $progress->progress_percent >= $required)) ? 1 : 0,
+                'is_unlocked' => ($this->isBrokenVideo($video) || ($progress && (float) $progress->progress_percent >= $required)) ? 1 : 0,
             ],
         ];
     }
@@ -123,7 +123,7 @@ class VideoService
      *
      * @return array<string, mixed>
      */
-    public function progress(string $drId, int $videoId, int $watchedSeconds, ?int $clientDuration): array
+    public function progress(string $drId, int $videoId, float $watchedSeconds, ?int $clientDuration): array
     {
         $visit = $this->resolveVisit($drId);
         $video = $this->onShelfVideo($videoId);
@@ -145,7 +145,7 @@ class VideoService
                 $duration = $clientDuration;
             }
 
-            $watched = max((int) ($row->watched_seconds ?? 0), $watchedSeconds);
+            $watched = max((float) ($row->watched_seconds ?? 0), $watchedSeconds);
             $percent = $this->calcPercent($watched, $duration);
 
             $attributes = [
@@ -170,9 +170,9 @@ class VideoService
         });
 
         return [
-            'watched_seconds' => (int) $progress->watched_seconds,
+            'watched_seconds' => (float) $progress->watched_seconds,
             'duration' => (int) $progress->duration,
-            'progress_percent' => (int) $progress->progress_percent,
+            'progress_percent' => (float) $progress->progress_percent,
             'watch_required_percent' => $required,
             'is_unlocked' => (int) $progress->is_unlocked,
         ];
@@ -281,14 +281,14 @@ class VideoService
     }
 
     /**
-     * 计算观看进度百分比（观看时长超过总时长时按 100% 计）
+     * 计算观看进度百分比（精确到 0.1%，观看时长超过总时长时按 100% 计）
      */
-    private function calcPercent(int $watchedSeconds, int $duration): int
+    private function calcPercent(float $watchedSeconds, int $duration): float
     {
         if ($duration <= 0) {
-            return 0;
+            return 0.0;
         }
 
-        return (int) round(min($watchedSeconds, $duration) / $duration * 100);
+        return round(min($watchedSeconds, $duration) / $duration * 100, 1);
     }
 }

@@ -12,7 +12,7 @@ class VideoProgressRequest extends FormRequest
         return [
             'dr_id' => ['required', 'string', 'max:32', Rule::exists('visit_record', 'dr_id')],
             'video_id' => ['required', 'integer', Rule::exists('video', 'id')],
-            'watched_seconds' => ['required', 'integer', 'min:0', 'max:86400'],
+            'watched_seconds' => ['required', 'numeric', 'min:0', 'max:86400'],
             'duration' => ['nullable', 'integer', 'min:0', 'max:86400'],
         ];
     }
@@ -26,7 +26,7 @@ class VideoProgressRequest extends FormRequest
             'video_id.integer' => '视频ID必须为整数',
             'video_id.exists' => '视频不存在',
             'watched_seconds.required' => '已观看时长不能为空',
-            'watched_seconds.integer' => '已观看时长必须为整数',
+            'watched_seconds.numeric' => '已观看时长必须是数字',
             'watched_seconds.min' => '已观看时长不能小于0',
             'watched_seconds.max' => '已观看时长超出合法范围',
             'duration.integer' => '视频时长必须为整数',
