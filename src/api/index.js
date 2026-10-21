@@ -14,5 +14,6 @@ export {
   getPublicVideoDetail,
   listPublicQuestions,
   listPublicVideos,
+  submitPostExam,
   submitPreExam,
 } from './public'

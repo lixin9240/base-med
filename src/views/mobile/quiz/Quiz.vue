@@ -7,7 +7,7 @@ import QuizPanel from '@/components/mobile/QuizPanel.vue'
 import { toast } from '@/utils/toast'
 import { WATCH_PERCENT, getProgress } from '@/store'
 import { resolveDrId } from '@/store/mobile/session'
-import { getPublicVideoDetail, listPublicQuestions, submitPreExam } from '@/api/public'
+import { getPublicVideoDetail, listPublicQuestions, submitPostExam, submitPreExam } from '@/api/public'
 
 const route = useRoute()
 const router = useRouter()
@@ -99,9 +99,9 @@ async function onSubmit(answers) {
     if (isPre.value) {
       await submitPreExam({
         dr_id: drId.value,
-        video_id: Number(videoId),
+        video_id: videoId,
         answers: questions.value.map((q, i) => ({
-          question_id: Number(q.question_id),
+          question_id: q.question_id,
           user_answer: toApiAnswer(q, answers[i]),
         })),
       })
@@ -110,8 +110,15 @@ async function onSubmit(answers) {
       return
     }
 
-    // TODO: 接口文档未定义「提交看完答题」（submit-post），后端就绪后在此调用并携带 exam_record_id 跳结果页
-    router.replace({ name: 'mobile-report', query: { videoId } })
+    const data = await submitPostExam({
+      dr_id: drId.value,
+      video_id: videoId,
+      answers: questions.value.map((q, i) => ({
+        question_id: q.question_id,
+        user_answer: toApiAnswer(q, answers[i]),
+      })),
+    })
+    router.replace({ name: 'mobile-report', query: { examRecordId: data.exam_record_id, videoId: data.video_id } })
   } catch (e) {
     toast(e?.message || '提交失败')
   } finally {
