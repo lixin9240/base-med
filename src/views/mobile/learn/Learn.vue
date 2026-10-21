@@ -15,7 +15,7 @@ const videoId = String(route.query.videoId || '')
 const video = ref(null)
 const error = ref('')
 const videoEl = ref(null)
-const watched = ref(0) // 观看进度百分比（服务端）
+const watched = ref(0) // 观看进度百分比
 const required = ref(90) // 解锁门槛
 const canQuiz = ref(false) // 是否已解锁后测
 const badRate = ref(false)
@@ -81,7 +81,7 @@ async function reportProgress() {
       dr_id: drId,
       video_id: videoId,
       watched_seconds: Math.floor(maxTime || el.currentTime || 0),
-      duration: el.duration || undefined,
+      duration: Math.round(el.duration) || undefined,
     })
     if (res) {
       watched.value = res.progress_percent ?? watched.value
