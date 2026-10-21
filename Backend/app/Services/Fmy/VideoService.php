@@ -92,7 +92,7 @@ class VideoService
                 'watched_seconds' => (int) ($progress->watched_seconds ?? 0),
                 'progress_percent' => (int) ($progress->progress_percent ?? 0),
                 'watch_required_percent' => $required,
-                'is_unlocked' => ($progress && (int) $progress->progress_percent >= $required) ? 1 : 0,
+                'is_unlocked' => ($this->isBrokenVideo($video) || ($progress && (int) $progress->progress_percent >= $required)) ? 1 : 0,
             ],
         ];
     }
@@ -153,7 +153,7 @@ class VideoService
                 'watched_seconds' => $watched,
                 'duration' => $duration,
                 'progress_percent' => $percent,
-                'is_unlocked' => $percent >= $required ? 1 : 0,
+                'is_unlocked' => ($this->isBrokenVideo($video) || $percent >= $required) ? 1 : 0,
                 'last_watched_at' => now(),
             ];
 
@@ -217,6 +217,19 @@ class VideoService
         }
 
         return $video;
+    }
+
+    /**
+     * 判断视频是否已损坏：转码失败（transcode_status=3）或 无可用视频源（video_url/oss_path 均空）。
+     * 损坏视频无法正常观看，传入的视频不再进行观看进度门槛校验。
+     */
+    public function isBrokenVideo(Video $video): bool
+    {
+        if ((int) $video->transcode_status === 3) {
+            return true;
+        }
+
+        return blank($video->video_url) && blank($video->oss_path);
     }
 
     /**
