@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { getAdminRecordDetail, listAdminRecords, listAdminVideos } from '@/api'
+import { exportAdminRecords, getAdminRecordDetail, listAdminRecords, listAdminVideos } from '@/api'
 import { QUESTION_TYPE_LABEL } from '@/utils/question'
 
 const PAGE_SIZE = 20
@@ -11,6 +11,7 @@ const total = ref(0)
 const page = ref(1)
 const loading = ref(false)
 const loadError = ref('')
+const exporting = ref(false)
 
 const filterVideo = ref('')
 const filterResult = ref('')
@@ -86,35 +87,23 @@ function goPage(next) {
   refreshRecords()
 }
 
-function csvCell(value) {
-  return `"${String(value ?? '').replace(/"/g, '""')}"`
-}
+/** 导出（2.5.3）：带上当前筛选条件，后端生成 xlsx 并返回签名下载地址，前端直接打开 */
+async function exportRecords() {
+  if (exporting.value) return
 
-function exportCsv() {
-  const head = ['时间', '视频', '编号', '前测', '看课答题', '正确率', '结果']
-  const lines = rows.value.map((r) =>
-    [
-      r.time,
-      r.courseTitle,
-      r.userId,
-      `${r.preCorrect}/${r.preTotal}`,
-      `${r.postCorrect}/${r.postTotal}`,
-      `${r.percent}%`,
-      r.passed ? '通过' : '未通过',
-    ]
-      .map(csvCell)
-      .join(','),
-  )
-  const csv = '﻿' + [head.map(csvCell).join(','), ...lines].join('\r\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  const d = new Date()
-  const p = (n) => String(n).padStart(2, '0')
-  a.href = url
-  a.download = `答题记录_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  exporting.value = true
+  loadError.value = ''
+  try {
+    const data = await exportAdminRecords({
+      videoId: filterVideo.value,
+      resultStatus: filterResult.value,
+    })
+    window.open(data.url, '_blank', 'noopener')
+  } catch (error) {
+    loadError.value = error?.message || '导出失败，请稍后重试'
+  } finally {
+    exporting.value = false
+  }
 }
 
 // ===== 查看作答（2.5.2）=====
@@ -203,7 +192,12 @@ function closeDetail() {
           <option value="fail">未通过</option>
         </select>
 
-        <button type="button" class="btn btn--secondary" @click="exportCsv">
+        <button
+          type="button"
+          class="btn btn--secondary"
+          :disabled="exporting"
+          @click="exportRecords"
+        >
           <svg
             class="btn__icon"
             viewBox="0 0 24 24"
@@ -217,7 +211,7 @@ function closeDetail() {
             <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5" />
             <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
           </svg>
-          导出
+          {{ exporting ? '导出中…' : '导出' }}
         </button>
       </div>
     </header>
