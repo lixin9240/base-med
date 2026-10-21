@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Wjc\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Wjc\Admin\AdminUserCreateRequest;
 use App\Http\Requests\Wjc\Admin\AdminUserDeleteRequest;
+use App\Http\Requests\Wjc\Admin\AdminUserFilterStatusRequest;
 use App\Http\Requests\Wjc\Admin\AdminUserListRequest;
+use App\Http\Requests\Wjc\Admin\AdminUserUpdateStatusRequest;
 use App\Http\Requests\Wjc\Admin\AdminUserUpdateRequest;
 use App\Services\Wjc\Admin\AdminUserService;
 use App\Support\Result;
@@ -34,6 +36,16 @@ class AdminUserController extends Controller
     }
 
     /**
+     * 按状态筛选用户列表（筛选按钮「禁用 / 正常」）
+     */
+    public function listByStatus(AdminUserFilterStatusRequest $request): JsonResponse
+    {
+        $data = $this->adminUserService->listByStatus($request->validated());
+
+        return $this->successPaginate($data);
+    }
+
+    /**
      * 新增管理员
      */
     public function create(AdminUserCreateRequest $request): JsonResponse
@@ -51,6 +63,16 @@ class AdminUserController extends Controller
         $this->adminUserService->update($request->validated());
 
         return Result::success('保存成功', ['success' => true]);
+    }
+
+    /**
+     * 启用/禁用用户（列表页「禁用登录 / 恢复登录」按钮）
+     */
+    public function updateStatus(AdminUserUpdateStatusRequest $request): JsonResponse
+    {
+        $this->adminUserService->updateStatus($request->validated());
+
+        return Result::success('操作成功', ['success' => true]);
     }
 
     /**

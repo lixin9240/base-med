@@ -65,6 +65,21 @@ class AdminUserService
     }
 
     /**
+     * 按状态筛选用户列表（2.2.6，筛选按钮「禁用 / 正常」）
+     *
+     * @param  array<string, mixed>  $params  已校验参数：status（必填）、page、page_size
+     * @return LengthAwarePaginator
+     */
+    public function listByStatus(array $params): LengthAwarePaginator
+    {
+        return $this->list([
+            'status' => (int) $params['status'],
+            'page' => $params['page'] ?? 1,
+            'page_size' => $params['page_size'] ?? 20,
+        ]);
+    }
+
+    /**
      * 新增管理员
      *
      * @param  array<string, mixed>  $data  已校验参数
@@ -154,6 +169,51 @@ class AdminUserService
 
         $this->operationLogService->record('admin_user', 'update', (int) $admin->id, [
             'username' => $admin->username,
+        ]);
+    }
+
+    /**
+     * 启用/禁用用户（列表页「禁用登录 / 恢复登录」按钮）
+     *
+     * 禁用后该用户立即无法登录（登录处已有状态校验），已签发 token
+     * 由 AdminUserProvider 在认证时校验 status 同步失效。
+     *
+     * @param  array<string, mixed>  $data  已校验参数：id、status
+     */
+    public function updateStatus(array $data): void
+    {
+        $admin = AdminUser::find($data['id']);
+
+        if (! $admin) {
+            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '用户不存在');
+        }
+
+        $newStatus = (int) $data['status'];
+
+        // 不能禁用当前登录账号自己
+        if ($newStatus === 0 && (int) $admin->id === (int) auth('admin')->id()) {
+            throw new BusinessException(ResponseCode::COMMON_FORBIDDEN, '不能禁用当前登录账号');
+        }
+
+        // 禁用超级管理员（role=super）时，系统至少保留一个可用的超级管理员
+        if ($newStatus === 0 && $admin->role === 'super') {
+            $remaining = AdminUser::query()
+                ->where('role', 'super')
+                ->where('status', 1)
+                ->where('id', '!=', (int) $admin->id)
+                ->count();
+
+            if ($remaining < 1) {
+                throw new BusinessException(ResponseCode::BUSINESS_ERROR, '系统至少保留一个可用的超级管理员');
+            }
+        }
+
+        $admin->status = $newStatus;
+        $admin->save();
+
+        $this->operationLogService->record('user', 'update', (int) $admin->id, [
+            'username' => $admin->username,
+            'status' => $newStatus,
         ]);
     }
 
