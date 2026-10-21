@@ -90,7 +90,7 @@ async function reportProgress() {
       dr_id: drId,
       video_id: videoId,
       watched_seconds: maxTime || el.currentTime || 0,
-      duration: el.duration || undefined,
+      duration: Math.round(el.duration) || undefined,
     })
     if (res) {
       watched.value = Math.max(watched.value, res.progress_percent ?? 0)
