@@ -45,8 +45,7 @@ class VideoService
         $paginator = Video::query()
             ->with('category:id,name')
             ->withCount([
-                'videoQuestions as pre_count' => fn ($query) => $query->where('stage', 'pretest'),
-                'videoQuestions as post_count' => fn ($query) => $query->where('stage', 'posttest'),
+                'videoQuestions as question_count',
                 'examRecords as answer_times',
             ])
             ->orderBy('sort_order')
@@ -63,21 +62,25 @@ class VideoService
                 ->groupBy('video_id')
                 ->pluck('avg_rate', 'video_id');
 
-        // 前后测建议题数取自 system_config（默认 3）
-        $preTotal = $this->configValue('pretest_count', 3);
-        $postTotal = $this->configValue('posttest_count', 3);
+        // 建议题数取自 system_config（默认 3），前后测共用一套
+        $questionTotal = $this->configValue('pretest_count', 3);
 
-        $list = $paginator->getCollection()->map(function (Video $video) use ($avgRates, $preTotal, $postTotal) {
+        $list = $paginator->getCollection()->map(function (Video $video) use ($avgRates, $questionTotal) {
+            $questionCount = (int) $video->question_count;
+
             return [
                 'id' => (int) $video->id,
                 'title' => $video->title,
                 'category_name' => $video->category->name ?? null,
                 'speaker' => $video->speaker,
                 'speaker_title' => $video->speaker_title,
-                'pre_count' => (int) $video->pre_count,
-                'pre_total' => $preTotal,
-                'post_count' => (int) $video->post_count,
-                'post_total' => $postTotal,
+                'question_count' => $questionCount,
+                'question_total' => $questionTotal,
+                // 兼容前端旧字段：前后测共用一套，pre/post 均取整套题数
+                'pre_count' => $questionCount,
+                'pre_total' => $questionTotal,
+                'post_count' => $questionCount,
+                'post_total' => $questionTotal,
                 'status' => (int) $video->status,
                 'transcode_status' => (int) $video->transcode_status,
                 'answer_times' => (int) $video->answer_times,

@@ -34,10 +34,10 @@ class ExamService
         $this->videoService->onShelfVideo($videoId);
         $this->videoService->assertVisitVideo($visit, $videoId);
 
-        $questions = $this->videoService->questionSet($videoId, 'pretest');
+        $questions = $this->videoService->questionSet($videoId);
 
         if ($questions->isEmpty()) {
-            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '该视频尚未配置学前题目');
+            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '该视频尚未配置题目');
         }
 
         $this->validateAnswers($questions, $answers);
@@ -84,15 +84,15 @@ class ExamService
             throw new BusinessException(ResponseCode::STATUS_NOT_OPERABLE, '请先完成学前答题');
         }
 
-        $postQuestions = $this->videoService->questionSet($videoId, 'posttest');
+        $postQuestions = $this->videoService->questionSet($videoId);
 
         if ($postQuestions->isEmpty()) {
-            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '该视频尚未配置看完题目');
+            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '该视频尚未配置题目');
         }
 
         $this->validateAnswers($postQuestions, $answers);
 
-        $preQuestions = $this->videoService->questionSet($videoId, 'pretest');
+        $preQuestions = $this->videoService->questionSet($videoId);
         $preAnswers = collect($pretest->answers ?? []);
 
         $record = DB::transaction(function () use ($visit, $video, $drId, $pretest, $preQuestions, $preAnswers, $postQuestions, $answers) {
