@@ -240,6 +240,7 @@ class VideoQuestionService
             'task_no' => $taskNo,
             'file_name' => $file->getClientOriginalName(),
             'file_path' => $filePath,
+            'video_id' => $data['video_id'],
             'total_rows' => $totalRows,
             'valid_rows' => 0,
             'error_rows' => 0,
