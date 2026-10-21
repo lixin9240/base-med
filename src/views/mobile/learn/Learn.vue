@@ -6,11 +6,13 @@ import PageNav from '@/components/mobile/PageNav.vue'
 import { formatArticleHtml } from '@/utils/article'
 import { toast } from '@/utils/toast'
 import { getPublicVideoDetail, reportVideoProgress } from '@/api/public'
-import { currentDrId, setSkipWatch } from '@/store/mobile/session'
+import { currentDrId, issueDrId, setSkipWatch } from '@/store/mobile/session'
 
 const route = useRoute()
 const router = useRouter()
 const videoId = String(route.query.videoId || '')
+// 分享链接入口（后端生成的 H5 链接形如 /mobile/learn?video_id=5&share=xxx）
+const shareVideoId = String(route.query.video_id || '')
 
 const video = ref(null)
 const error = ref('')
@@ -28,6 +30,13 @@ const articleHtml = computed(() => formatArticleHtml(video.value?.articleBody ||
 
 onMounted(async () => {
   try {
+    // 通过分享链接进入：先签发匿名编号，再跳转到对应视频的前测题页面
+    if (shareVideoId) {
+      await issueDrId(shareVideoId)
+      router.replace({ name: 'mobile-quiz', query: { videoId: shareVideoId, stage: 'pre' } })
+      return
+    }
+
     const drId = currentDrId()
     if (!drId || !videoId) {
       router.replace('/mobile/home')
