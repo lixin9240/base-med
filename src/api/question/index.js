@@ -1,8 +1,7 @@
 import { get, post, requestBlob } from '../http'
 
 // 题目配置模块接口（接口文档 2.3）
-// 说明：stage 取值为 pretest（前测）/ posttest（后测），
-//       与前端内部使用的 pre / post 不同，转换在组件层完成。
+// 说明：前后测共用一套题，接口不再区分 stage。
 
 const LIST_PATH = '/api/admin/video-question/list'
 const ADD_PATH = '/api/admin/video-question/add-question'
@@ -15,14 +14,12 @@ const TASK_DETAIL_PATH = '/api/admin/import/task-detail'
 const TASK_CONFIRM_PATH = '/api/admin/import/confirm'
 
 /**
- * 2.3.1 获取前/后测题目列表。
- * @param {{ videoId: number|string, stage: 'pretest' | 'posttest' }} params
+ * 2.3.1 获取题目列表（前后测共用一套）。
+ * @param {{ videoId: number|string }} params
  * @returns {Promise<{ list: Array, total: number }>} list 内字段保持后端命名（question_id、correct_answer、sort_order 等）
  */
-export async function listAdminVideoQuestions({ videoId, stage }) {
-  const body = await get(
-    `${LIST_PATH}?video_id=${encodeURIComponent(videoId)}&stage=${encodeURIComponent(stage)}`,
-  )
+export async function listAdminVideoQuestions({ videoId }) {
+  const body = await get(`${LIST_PATH}?video_id=${encodeURIComponent(videoId)}`)
 
   if (!body || typeof body !== 'object' || !('data' in body)) {
     throw new Error('题目列表加载失败：服务未返回标准数据')
@@ -35,7 +32,7 @@ export async function listAdminVideoQuestions({ videoId, stage }) {
   }
 }
 
-/** 2.3.2 新增题目。payload 用后端字段名（video_id、stage、type、stem、options、correct_answer、analysis）。返回 { id } */
+/** 2.3.2 新增题目。payload 用后端字段名（video_id、type、stem、options、correct_answer、analysis）。返回 { id } */
 export async function createAdminVideoQuestion(payload) {
   const body = await post(ADD_PATH, payload)
 
@@ -55,7 +52,7 @@ export async function updateAdminVideoQuestion(payload) {
   return body.data ?? null
 }
 
-/** 2.3.7 移除本组题目。payload = { video_id, stage, question_id }；软删除关联，不删题库 */
+/** 2.3.7 移除题目。payload = { video_id, question_id }；软删除关联，不删题库 */
 export async function removeAdminVideoQuestion(payload) {
   const body = await post(REMOVE_PATH, payload)
 
@@ -65,27 +62,23 @@ export async function removeAdminVideoQuestion(payload) {
   return body.data ?? null
 }
 
-/** 2.3.4 下载题目模板。stage = pretest | posttest；返回 Excel Blob */
-export function downloadQuestionTemplate({ stage }) {
-  const query = stage ? `?stage=${encodeURIComponent(stage)}` : ''
-  return requestBlob(`${TEMPLATE_PATH}${query}`)
+/** 2.3.4 下载题目模板。返回 Excel Blob */
+export function downloadQuestionTemplate() {
+  return requestBlob(TEMPLATE_PATH)
 }
 
-/** 2.3.6 导出本组题目。返回 Excel Blob */
-export function exportAdminVideoQuestions({ videoId, stage }) {
-  return requestBlob(
-    `${EXPORT_PATH}?video_id=${encodeURIComponent(videoId)}&stage=${encodeURIComponent(stage)}`,
-  )
+/** 2.3.6 导出题目。返回 Excel Blob */
+export function exportAdminVideoQuestions({ videoId }) {
+  return requestBlob(`${EXPORT_PATH}?video_id=${encodeURIComponent(videoId)}`)
 }
 
 /**
- * 2.3.5 导入本组题目（form-data 上传 Excel）。
+ * 2.3.5 导入题目（form-data 上传 Excel）。
  * 上传后创建异步校验任务，返回 { task_id, task_no, status }。
  */
-export async function importAdminVideoQuestions({ videoId, stage, file }) {
+export async function importAdminVideoQuestions({ videoId, file }) {
   const form = new FormData()
   form.append('video_id', videoId)
-  form.append('stage', stage)
   form.append('file', file)
 
   const body = await post(IMPORT_PATH, form)

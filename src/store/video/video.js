@@ -12,8 +12,8 @@ import {
 import { toCourse, videoSpeakerLabel } from '@/utils/video/videoForm'
 import { clearShareLink } from './shareLink'
 
-/** 每个视频每套题（前测 / 后测）建议的题目数量 */
-export const REQUIRED_PER_STAGE = 3
+/** 每个视频建议的题目数量（前后测共用一套） */
+export const REQUIRED_QUESTION_COUNT = 3
 
 /** 管理端视频记录的持久化 key */
 const VIDEOS_KEY = 'pv.adminVideos'
@@ -97,11 +97,13 @@ function findRecord(videoId) {
   return seedVideos().find((video) => String(video.id) === String(videoId)) ?? null
 }
 
-function countBadge(courseId, stage) {
-  const count = listCoreQuestions(courseId, stage).length
+function countBadge(courseId) {
+  // 前后测共用一套，mock 数据统一按 pre 组统计
+  const count = listCoreQuestions(courseId, 'pre').length
   return {
-    text: `${count}/${REQUIRED_PER_STAGE}`,
-    tone: count >= REQUIRED_PER_STAGE ? 'success' : count > 0 ? 'warning' : 'danger',
+    count,
+    text: `${count}/${REQUIRED_QUESTION_COUNT}`,
+    tone: count >= REQUIRED_QUESTION_COUNT ? 'success' : count > 0 ? 'warning' : 'danger',
   }
 }
 
@@ -138,16 +140,14 @@ export function listVideos() {
     .sort((a, b) => (Number(a.order) || 999) - (Number(b.order) || 999))
     .map((video) => {
       const courseId = resolveCourseId(video)
-      const pre = countBadge(courseId, 'pre')
-      const post = countBadge(courseId, 'post')
+      const badge = countBadge(courseId)
       return {
         ...video,
         courseId,
         speakerLabel: videoSpeakerLabel(video),
-        pre: pre.text,
-        preTone: pre.tone,
-        post: post.text,
-        postTone: post.tone,
+        questionCount: badge.count,
+        question: badge.text,
+        questionTone: badge.tone,
       }
     })
 }
@@ -257,9 +257,7 @@ export function saveVideoQuestion(videoId, stage, question) {
     if (index === -1) throw new Error('题目不存在')
 
     next = group.map((item, i) =>
-      i === index
-        ? { ...question, courseId, stage, id: item.id, order: item.order }
-        : item,
+      i === index ? { ...question, courseId, stage, id: item.id, order: item.order } : item,
     )
   } else {
     const maxOrder = group.reduce((max, item) => Math.max(max, Number(item.order) || 0), 0)
@@ -307,8 +305,7 @@ export function importVideoQuestions(groups) {
 
   for (const group of groups) {
     const video = findRecord(group.videoId)
-    const courseId =
-      group.courseId ?? (video ? resolveCourseId(video) : `admin_${group.videoId}`)
+    const courseId = group.courseId ?? (video ? resolveCourseId(video) : `admin_${group.videoId}`)
     const questions = group.questions.map((question) => ({
       ...question,
       courseId,

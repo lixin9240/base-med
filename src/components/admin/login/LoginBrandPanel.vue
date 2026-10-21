@@ -4,8 +4,18 @@
       <!-- 品牌标识 -->
       <div class="brand">
         <div class="brand-logo">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M12 5.5v13M5.5 12h13" stroke="#fff" stroke-width="3.2" stroke-linecap="round" />
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+          >
+            <path
+              d="M12 5.5v13M5.5 12h13"
+              stroke="#fff"
+              stroke-width="3.2"
+              stroke-linecap="round"
+            />
           </svg>
         </div>
         <div class="brand-text">
@@ -26,7 +36,15 @@
       <ul class="feature-list">
         <li class="feature-item">
           <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <rect x="2.5" y="6" width="13" height="12" rx="3" />
               <path d="M15.5 10.6l4.6-2.7a.8.8 0 0 1 1.2.7v6.8a.8.8 0 0 1-1.2.7l-4.6-2.7" />
             </svg>
@@ -38,19 +56,35 @@
         </li>
         <li class="feature-item">
           <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M2.8 6.4l1.6 1.6 2.8-3.1M2.8 13l1.6 1.6 2.8-3.1M2.8 19.6l1.6 1.6 2.8-3.1" />
               <path d="M11 6h10M11 12.6h10M11 19.2h10" />
             </svg>
           </div>
           <div class="feature-body">
             <h3 class="feature-title">题目配置</h3>
-            <p class="feature-desc">每条视频配前测 / 后测各 3 题，也可用 Excel 批量导入</p>
+            <p class="feature-desc">每条视频配 3 道题，前后测共用，也可用 Excel 批量导入</p>
           </div>
         </li>
         <li class="feature-item">
           <div class="feature-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M5 20V11M12 20V4M19 20v-6" />
             </svg>
           </div>
