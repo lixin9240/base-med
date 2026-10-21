@@ -356,8 +356,8 @@ class ImportTaskService
             $videoIdByTitle[$title] = (int) $video->id;
         }
 
-        // ③④ 题目 → question + video_question（按所属视频分组，排到本组末位）
-        foreach ([self::SHEET_PRETEST => 'pretest', self::SHEET_POSTTEST => 'posttest'] as $sheetName => $stage) {
+        // ③④ 题目 → question + video_question（前后测共用一套：前测/后测两个 sheet 统一归入同一套，排到本组末位）
+        foreach ([self::SHEET_PRETEST, self::SHEET_POSTTEST] as $sheetName) {
             $sortCounters = [];
 
             foreach ($this->sheetRows($sheets, $sheetName) as [$rowNo, $row]) {
@@ -376,7 +376,6 @@ class ImportTaskService
                 if (! isset($sortCounters[$videoId])) {
                     $sortCounters[$videoId] = (int) VideoQuestion::query()
                         ->where('video_id', $videoId)
-                        ->where('stage', $stage)
                         ->withTrashed()
                         ->max('sort_order');
                 }
@@ -385,7 +384,7 @@ class ImportTaskService
 
                 VideoQuestion::create([
                     'video_id' => $videoId,
-                    'stage' => $stage,
+                    'stage' => 'pretest',
                     'question_id' => (int) $question->id,
                     'sort_order' => $sortCounters[$videoId],
                 ]);

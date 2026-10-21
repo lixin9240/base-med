@@ -4,6 +4,7 @@ namespace App\Services\Gyz;
 
 use App\Enums\ResponseCode;
 use App\Exceptions\BusinessException;
+use App\Models\SystemConfig;
 use App\Models\Video;
 use App\Models\VideoShareLink;
 use Illuminate\Support\Facades\Auth;
@@ -155,12 +156,24 @@ class VideoShareLinkService
 
     /**
      * 拼装完整 H5 链接
+     *
+     * base 优先取 system_config.h5_base_url（后台可配置），
+     * 缺省回退 APP_URL，再回退当前请求 host，避免拼到 OSS 域名。
      */
     private function buildUrl(VideoShareLink $link): string
     {
-        $base = (string) config('filesystems.disks.oss.url', '');
+        $base = (string) SystemConfig::query()->where('config_key', 'h5_base_url')->value('config_value');
+        $base = rtrim($base, '/');
 
-        return rtrim($base, '/') . self::LEARN_PATH . '?video_id=' . $link->video_id . '&share=' . $link->token;
+        if ($base === '') {
+            $base = rtrim((string) config('app.url'), '/');
+        }
+
+        if ($base === '') {
+            $base = rtrim((string) request()->getSchemeAndHttpHost(), '/');
+        }
+
+        return $base . self::LEARN_PATH . '?video_id=' . $link->video_id . '&share=' . $link->token;
     }
 
     /**

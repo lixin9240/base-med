@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Wjc\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Wjc\Admin\VideoQuestionAddRequest;
-use App\Http\Requests\Wjc\Admin\VideoQuestionDownloadTemplateRequest;
 use App\Http\Requests\Wjc\Admin\VideoQuestionImportRequest;
 use App\Http\Requests\Wjc\Admin\VideoQuestionListRequest;
 use App\Http\Requests\Wjc\Admin\VideoQuestionRemoveRequest;
@@ -59,9 +58,9 @@ class VideoQuestionController extends Controller
     /**
      * 2.3.4 下载模板
      */
-    public function downloadTemplate(VideoQuestionDownloadTemplateRequest $request): StreamedResponse
+    public function downloadTemplate(): StreamedResponse
     {
-        return $this->videoQuestionService->downloadTemplate($request->validated('stage'));
+        return $this->videoQuestionService->downloadTemplate();
     }
 
     /**

@@ -45,8 +45,7 @@ class VideoService
         $paginator = Video::query()
             ->with('category:id,name')
             ->withCount([
-                'videoQuestions as pre_count' => fn ($query) => $query->where('stage', 'pretest'),
-                'videoQuestions as post_count' => fn ($query) => $query->where('stage', 'posttest'),
+                'videoQuestions as question_count',
                 'examRecords as answer_times',
             ])
             ->orderBy('sort_order')
@@ -63,21 +62,25 @@ class VideoService
                 ->groupBy('video_id')
                 ->pluck('avg_rate', 'video_id');
 
-        // 前后测建议题数取自 system_config（默认 3）
-        $preTotal = $this->configValue('pretest_count', 3);
-        $postTotal = $this->configValue('posttest_count', 3);
+        // 建议题数取自 system_config（默认 3），前后测共用一套
+        $questionTotal = $this->configValue('pretest_count', 3);
 
-        $list = $paginator->getCollection()->map(function (Video $video) use ($avgRates, $preTotal, $postTotal) {
+        $list = $paginator->getCollection()->map(function (Video $video) use ($avgRates, $questionTotal) {
+            $questionCount = (int) $video->question_count;
+
             return [
                 'id' => (int) $video->id,
                 'title' => $video->title,
                 'category_name' => $video->category->name ?? null,
                 'speaker' => $video->speaker,
                 'speaker_title' => $video->speaker_title,
-                'pre_count' => (int) $video->pre_count,
-                'pre_total' => $preTotal,
-                'post_count' => (int) $video->post_count,
-                'post_total' => $postTotal,
+                'question_count' => $questionCount,
+                'question_total' => $questionTotal,
+                // 兼容前端旧字段：前后测共用一套，pre/post 均取整套题数
+                'pre_count' => $questionCount,
+                'pre_total' => $questionTotal,
+                'post_count' => $questionCount,
+                'post_total' => $questionTotal,
                 'status' => (int) $video->status,
                 'transcode_status' => (int) $video->transcode_status,
                 'answer_times' => (int) $video->answer_times,
@@ -373,9 +376,7 @@ class VideoService
         $file = $data['file'];
 
         $dir = 'video/parts/' . $data['oss_upload_id'];
-        $disk = Storage::disk('public');
-
-        $disk->makeDirectory($dir);
+        $disk = Storage::disk('oss');
 
         $saved = $disk->put(
             $dir . '/part_' . $data['part_number'],
@@ -385,6 +386,39 @@ class VideoService
         if (! $saved) {
             throw new BusinessException(ResponseCode::FILE_UPLOAD_FAILED);
         }
+    }
+
+    /**
+     * 上传封面图片（存 OSS）
+     *
+     * @param  array<string, mixed>  $data  已校验参数：file（图片）
+     * @return array<string, mixed>  上传成功后的访问地址
+     */
+    public function uploadCover(array $data): array
+    {
+        /** @var \Illuminate\Http\UploadedFile $file */
+        $file = $data['file'];
+
+        $extension = $file->getClientOriginalExtension() ?: 'jpg';
+        $ossPath = 'cover/' . date('Y/m') . '/' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . strtolower($extension);
+
+        $disk = Storage::disk('oss');
+
+        $saved = $disk->put($ossPath, fopen($file->getRealPath(), 'rb'));
+
+        if (! $saved) {
+            throw new BusinessException(ResponseCode::FILE_UPLOAD_FAILED);
+        }
+
+        Log::channel('business')->info('上传封面图片', [
+            'admin_id' => (int) Auth::guard('admin')->id(),
+            'oss_path' => $ossPath,
+            'size' => $file->getSize(),
+        ]);
+
+        return [
+            'url' => $disk->url($ossPath),
+        ];
     }
 
     /**
@@ -405,7 +439,7 @@ class VideoService
 
         $uploadId = $data['oss_upload_id'];
         $partsDir = 'video/parts/' . $uploadId;
-        $disk = Storage::disk('public');
+        $disk = Storage::disk('oss');
 
         // 收集已上传分片，按分片序号排序
         if (! $disk->exists($partsDir)) {
@@ -421,20 +455,26 @@ class VideoService
             throw new BusinessException(ResponseCode::FILE_UPLOAD_FAILED, '上传分片不存在，请重新上传');
         }
 
-        // 合并分片到最终存储路径
+        // 合并分片到最终存储路径（OSS 无本地路径，先落盘临时文件再上传）
         $ossPath = $video->oss_path ?: 'video/' . date('Y/m') . '/' . $uploadId . '_' . $this->sanitizeFileName($video->title . '.mp4');
 
-        $disk->makeDirectory(dirname($ossPath));
-
-        $targetStream = fopen($disk->path($ossPath), 'wb');
+        $tmpPath = tempnam(sys_get_temp_dir(), 'video_merge_');
+        $targetStream = fopen($tmpPath, 'wb');
 
         foreach ($partFiles as $partFile) {
-            $partStream = fopen($disk->path($partFile), 'rb');
+            $partStream = $disk->readStream($partFile);
             stream_copy_to_stream($partStream, $targetStream);
             fclose($partStream);
         }
 
         fclose($targetStream);
+
+        $saved = $disk->put($ossPath, fopen($tmpPath, 'rb'));
+        @unlink($tmpPath);
+
+        if (! $saved) {
+            throw new BusinessException(ResponseCode::FILE_UPLOAD_FAILED);
+        }
 
         $fileSize = (int) $disk->size($ossPath);
 
@@ -444,7 +484,7 @@ class VideoService
         // 本地模拟：无真实转码服务，合并完成即视为转码完成；
         // 真实环境由转码服务异步回调更新 transcode_status，并回填时长与封面
         $video->update([
-            'video_url' => Storage::url($ossPath),
+            'video_url' => $disk->url($ossPath),
             'oss_path' => $ossPath,
             'file_size' => $fileSize,
             'transcode_status' => 2,
