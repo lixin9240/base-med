@@ -66,7 +66,7 @@ onMounted(async () => {
       watched.value = wp.progress_percent ?? 0
       required.value = wp.watch_required_percent ?? 90
       canQuiz.value = wp.is_unlocked === 1
-      if (canQuiz.value) maxTime = Number(wp.watched_seconds) || 0
+      maxTime = Number(wp.watched_seconds) || 0
       reportTimer = window.setInterval(reportProgress, 3000)
     }
     document.addEventListener('visibilitychange', onVisibility)
@@ -93,7 +93,7 @@ async function reportProgress() {
       duration: Math.round(el.duration) || undefined,
     })
     if (res) {
-      watched.value = res.progress_percent ?? watched.value
+      watched.value = Math.max(watched.value, res.progress_percent ?? 0)
       required.value = res.watch_required_percent ?? required.value
       if (res.is_unlocked === 1 && !canQuiz.value) {
         canQuiz.value = true
@@ -109,12 +109,24 @@ function onVisibility() {
   if (document.visibilityState === 'hidden') reportProgress()
 }
 
+function syncProgress() {
+  const el = videoEl.value
+  if (!el || !el.duration) return
+  const percent = Math.min(100, Math.round((maxTime / el.duration) * 100))
+  if (percent > watched.value) watched.value = percent
+  if (percent >= required.value && !canQuiz.value) {
+    canQuiz.value = true
+    toast('已看完，可以去答题了')
+  }
+}
+
 function onTimeUpdate() {
   const el = videoEl.value
   if (!el || !el.duration) return
   if (!el.paused && !el.seeking && Number(el.playbackRate) === 1 && document.visibilityState === 'visible') {
     if (el.currentTime > maxTime) maxTime = el.currentTime
   }
+  syncProgress()
 }
 
 function onSeeking() {
@@ -135,6 +147,7 @@ function onEnded() {
   const el = videoEl.value
   if (el?.duration) {
     maxTime = el.duration
+    syncProgress()
     reportProgress()
   }
 }
