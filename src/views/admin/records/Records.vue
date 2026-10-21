@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { listAdminRecords, listAdminVideos } from '@/api'
-import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
+import { getAdminRecordDetail, listAdminRecords, listAdminVideos } from '@/api'
+import { QUESTION_TYPE_LABEL } from '@/utils/question'
 
 const PAGE_SIZE = 20
 
@@ -14,7 +14,10 @@ const loadError = ref('')
 
 const filterVideo = ref('')
 const filterResult = ref('')
-const activeRecord = ref(null)
+const detailOpen = ref(false)
+const detailLoading = ref(false)
+const detailError = ref('')
+const detail = ref(null)
 
 /** 「全部视频」下拉选项：复用已接入的视频列表接口（文档 2.5.1 注明选项来自视频列表） */
 const videoOptions = ref([])
@@ -114,32 +117,64 @@ function exportCsv() {
   URL.revokeObjectURL(url)
 }
 
-// ===== 查看作答 =====
-const activePre = computed(() => {
-  const r = activeRecord.value
-  if (!r) return []
-  const all = r.detail || []
-  return r.postTotal ? all.slice(0, Math.max(0, all.length - r.postTotal)) : []
-})
-
-const activePost = computed(() => {
-  const r = activeRecord.value
-  if (!r) return []
-  const all = r.detail || []
-  return r.postTotal ? all.slice(all.length - r.postTotal) : all
-})
-
-function isRight(item, optIndex) {
-  const letter = optionLetter(optIndex)
-  if (item.type === 'multiple') return Array.isArray(item.answer) && item.answer.includes(letter)
-  return item.answer === letter
+// ===== 查看作答（2.5.2）=====
+/** 正确答案 / 用户选择：多选的 "A,B,C" 渲染为 "A、B、C"；未作答返回空串 */
+function formatAnswer(value) {
+  if (value === null || value === undefined || value === '') return ''
+  return String(value)
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join('、')
 }
 
-function isPicked(item, optIndex) {
-  const letter = optionLetter(optIndex)
-  if (item.type === 'multiple')
-    return Array.isArray(item.userAnswer) && item.userAnswer.includes(letter)
-  return item.userAnswer === letter
+function toAnswerItem(item) {
+  return {
+    questionId: item.question_id,
+    type: item.type,
+    stem: item.stem || '',
+    correct: Number(item.is_correct) === 1,
+    correctAnswer: formatAnswer(item.correct_answer),
+    userAnswer: formatAnswer(item.user_answer),
+  }
+}
+
+async function openDetail(row) {
+  detailOpen.value = true
+  detailLoading.value = true
+  detailError.value = ''
+  detail.value = null
+  try {
+    const data = await getAdminRecordDetail(row.id)
+    const list = Array.isArray(data.list) ? data.list : []
+    detail.value = {
+      videoTitle: data.video_title || '',
+      drId: data.dr_id || '',
+      submitAt: data.submit_at || '—',
+      passed: data.result_status === 'pass',
+      percent: Number(data.accuracy_rate) || 0,
+      pre: {
+        correct: Number(data.pre?.correct) || 0,
+        total: Number(data.pre?.total) || 0,
+      },
+      post: {
+        correct: Number(data.post?.correct) || 0,
+        total: Number(data.post?.total) || 0,
+      },
+      preItems: list.filter((item) => item.stage === 'pretest').map(toAnswerItem),
+      postItems: list.filter((item) => item.stage === 'posttest').map(toAnswerItem),
+    }
+  } catch (error) {
+    detailError.value = error?.message || '作答详情加载失败，请稍后重试'
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+function closeDetail() {
+  detailOpen.value = false
+  detail.value = null
+  detailError.value = ''
 }
 </script>
 
@@ -216,7 +251,7 @@ function isPicked(item, optIndex) {
           </span>
         </span>
         <span class="col col--ops">
-          <button type="button" class="link-btn" @click="activeRecord = record">查看作答</button>
+          <button type="button" class="link-btn" @click="openDetail(record)">查看作答</button>
         </span>
       </div>
 
@@ -262,29 +297,33 @@ function isPicked(item, optIndex) {
       <span class="records-page__total">共 {{ total }} 条</span>
     </footer>
 
-    <!-- 查看作答弹窗 -->
-    <div v-if="activeRecord" class="modal" @click.self="activeRecord = null">
+    <!-- 查看作答弹窗（2.5.2） -->
+    <div v-if="detailOpen" class="modal" @click.self="closeDetail">
       <div class="modal__panel" role="dialog" aria-modal="true" aria-label="作答详情">
         <header class="modal__head">
           <div class="modal__intro">
             <h2 class="modal__title">作答详情</h2>
             <p class="modal__meta">
-              {{ activeRecord.userId }} · 《{{ activeRecord.courseTitle }}》 ·
-              {{ activeRecord.time }}
+              <template v-if="detail">
+                {{ detail.drId }} · 《{{ detail.videoTitle }}》 · {{ detail.submitAt }}
+              </template>
+              <template v-else>正在加载作答详情…</template>
             </p>
           </div>
           <div class="modal__summary">
-            <span v-if="activeRecord.preTotal" class="modal__score">
-              前测 {{ activeRecord.preCorrect }}/{{ activeRecord.preTotal }}
-            </span>
-            <span class="modal__score">
-              看课答题 {{ activeRecord.postCorrect }}/{{ activeRecord.postTotal }}
-            </span>
-            <span class="badge" :class="activeRecord.passed ? 'badge--success' : 'badge--warning'">
-              <span class="badge__dot"></span>
-              {{ activeRecord.passed ? '通过' : '未通过' }} · {{ activeRecord.percent }}%
-            </span>
-            <button type="button" class="modal__close" aria-label="关闭" @click="activeRecord = null">
+            <template v-if="detail">
+              <span v-if="detail.pre.total" class="modal__score">
+                前测 {{ detail.pre.correct }}/{{ detail.pre.total }}
+              </span>
+              <span class="modal__score">
+                看课答题 {{ detail.post.correct }}/{{ detail.post.total }}
+              </span>
+              <span class="badge" :class="detail.passed ? 'badge--success' : 'badge--warning'">
+                <span class="badge__dot"></span>
+                {{ detail.passed ? '通过' : '未通过' }} · {{ detail.percent }}%
+              </span>
+            </template>
+            <button type="button" class="modal__close" aria-label="关闭" @click="closeDetail">
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
@@ -300,83 +339,69 @@ function isPicked(item, optIndex) {
         </header>
 
         <div class="modal__body">
-          <p v-if="!activePre.length && !activePost.length" class="records-empty">
-            作答详情接口（2.5.2）尚未接入，暂不支持查看逐题明细。
-          </p>
+          <p v-if="detailError" class="records-empty">{{ detailError }}</p>
+          <p v-else-if="detailLoading" class="records-empty">加载中…</p>
+          <template v-else-if="detail">
+            <section v-if="detail.preItems.length" class="stage">
+              <h3 class="stage__title">前测（看视频前）</h3>
+              <article
+                v-for="(item, index) in detail.preItems"
+                :key="item.questionId || index"
+                class="rv"
+                :class="item.correct ? 'rv--ok' : 'rv--bad'"
+              >
+                <div class="rv__head">
+                  <span class="rv__no">{{ index + 1 }}</span>
+                  <span class="badge" :class="item.correct ? 'badge--success' : 'badge--danger'">
+                    <span class="badge__dot"></span>
+                    {{ item.correct ? '答对' : '答错' }}
+                  </span>
+                  <span class="rv__type">{{ QUESTION_TYPE_LABEL[item.type] }}</span>
+                </div>
+                <p class="rv__stem">{{ item.stem }}</p>
+                <div class="rv__answers">
+                  <span class="rv__answer">
+                    正确答案：<b>{{ item.correctAnswer || '—' }}</b>
+                  </span>
+                  <span v-if="!item.correct" class="rv__answer rv__answer--wrong">
+                    用户选择：<b>{{ item.userAnswer || '未作答' }}</b>
+                  </span>
+                </div>
+              </article>
+            </section>
 
-          <section v-if="activePre.length" class="stage">
-            <h3 class="stage__title">前测（看视频前）</h3>
-            <article
-              v-for="(item, index) in activePre"
-              :key="item.questionId || index"
-              class="rv"
-              :class="item.correct ? 'rv--ok' : 'rv--bad'"
-            >
-              <div class="rv__head">
-                <span class="rv__no">{{ index + 1 }}</span>
-                <span class="badge" :class="item.correct ? 'badge--success' : 'badge--danger'">
-                  <span class="badge__dot"></span>
-                  {{ item.correct ? '答对' : '答错' }}
-                </span>
-                <span class="rv__type">{{ QUESTION_TYPE_LABEL[item.type] }}</span>
-              </div>
-              <p class="rv__stem">{{ item.stem }}</p>
-              <ul class="rv__opts">
-                <li
-                  v-for="(opt, i) in item.options"
-                  :key="i"
-                  class="rop"
-                  :class="{
-                    'is-right': isRight(item, i),
-                    'is-wrong': isPicked(item, i) && !isRight(item, i),
-                  }"
-                >
-                  <span class="rop__letter">{{ optionLetter(i) }}</span>
-                  <span class="rop__text">{{ opt }}</span>
-                  <span v-if="isRight(item, i)" class="rop__tag">正确答案</span>
-                  <span v-else-if="isPicked(item, i)" class="rop__tag rop__tag--wrong">学员选择</span>
-                </li>
-              </ul>
-              <p v-if="item.analysis" class="rv__analysis"><b>解析：</b>{{ item.analysis }}</p>
-            </article>
-          </section>
+            <section v-if="detail.postItems.length" class="stage">
+              <h3 class="stage__title">看课答题（看完视频后）</h3>
+              <article
+                v-for="(item, index) in detail.postItems"
+                :key="item.questionId || index"
+                class="rv"
+                :class="item.correct ? 'rv--ok' : 'rv--bad'"
+              >
+                <div class="rv__head">
+                  <span class="rv__no">{{ index + 1 }}</span>
+                  <span class="badge" :class="item.correct ? 'badge--success' : 'badge--danger'">
+                    <span class="badge__dot"></span>
+                    {{ item.correct ? '答对' : '答错' }}
+                  </span>
+                  <span class="rv__type">{{ QUESTION_TYPE_LABEL[item.type] }}</span>
+                </div>
+                <p class="rv__stem">{{ item.stem }}</p>
+                <div class="rv__answers">
+                  <span class="rv__answer">
+                    正确答案：<b>{{ item.correctAnswer || '—' }}</b>
+                  </span>
+                  <span v-if="!item.correct" class="rv__answer rv__answer--wrong">
+                    用户选择：<b>{{ item.userAnswer || '未作答' }}</b>
+                  </span>
+                </div>
+              </article>
+            </section>
 
-          <section v-if="activePost.length" class="stage">
-            <h3 class="stage__title">看课答题（看完视频后）</h3>
-            <article
-              v-for="(item, index) in activePost"
-              :key="item.questionId || index"
-              class="rv"
-              :class="item.correct ? 'rv--ok' : 'rv--bad'"
-            >
-              <div class="rv__head">
-                <span class="rv__no">{{ index + 1 }}</span>
-                <span class="badge" :class="item.correct ? 'badge--success' : 'badge--danger'">
-                  <span class="badge__dot"></span>
-                  {{ item.correct ? '答对' : '答错' }}
-                </span>
-                <span class="rv__type">{{ QUESTION_TYPE_LABEL[item.type] }}</span>
-              </div>
-              <p class="rv__stem">{{ item.stem }}</p>
-              <ul class="rv__opts">
-                <li
-                  v-for="(opt, i) in item.options"
-                  :key="i"
-                  class="rop"
-                  :class="{
-                    'is-right': isRight(item, i),
-                    'is-wrong': isPicked(item, i) && !isRight(item, i),
-                  }"
-                >
-                  <span class="rop__letter">{{ optionLetter(i) }}</span>
-                  <span class="rop__text">{{ opt }}</span>
-                  <span v-if="isRight(item, i)" class="rop__tag">正确答案</span>
-                  <span v-else-if="isPicked(item, i)" class="rop__tag rop__tag--wrong">学员选择</span>
-                </li>
-              </ul>
-              <p v-if="item.analysis" class="rv__analysis"><b>解析：</b>{{ item.analysis }}</p>
-            </article>
-          </section>
+            <p v-if="!detail.preItems.length && !detail.postItems.length" class="records-empty">
+              这条记录暂无逐题作答明细
+            </p>
+          </template>
         </div>
       </div>
     </div>
@@ -820,63 +845,24 @@ function isPicked(item, optIndex) {
   line-height: 1.65;
 }
 
-.rv__opts {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* ===== 答案区（2.5.2 接口只给正确答案/用户选择，不给选项列表）===== */
+.rv__answers {
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
 }
 
-.rop {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
+.rv__answer {
   padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-md);
-  background: var(--bg-page);
   font-size: var(--fs-sm);
   color: var(--text-secondary);
+  background: var(--bg-page);
+  border-radius: var(--r-md);
 }
 
-.rop.is-right {
-  background: var(--success-bg);
-  color: var(--success-text);
-}
-
-.rop.is-wrong {
-  background: var(--danger-bg);
+.rv__answer--wrong {
   color: var(--danger-text);
-}
-
-.rop__letter {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--bg-surface-solid);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: var(--fw-semibold);
-  flex-shrink: 0;
-}
-
-.rop__text {
-  flex: 1;
-}
-
-.rop__tag {
-  font-size: 11px;
-  font-weight: var(--fw-semibold);
-}
-
-.rv__analysis {
-  margin: var(--sp-3) 0 0;
-  font-size: var(--fs-xs);
-  color: var(--text-secondary);
-  line-height: 1.7;
+  background: var(--danger-bg);
 }
 
 /* ===== 窄屏横向滚动 ===== */

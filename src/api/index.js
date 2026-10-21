@@ -28,7 +28,7 @@ export {
   updateAdminShareLinkStatus,
 } from './video/shareLink'
 export { listAdminCategories } from './category'
-export { listAdminRecords } from './record'
+export { getAdminRecordDetail, listAdminRecords } from './record'
 export {
   createPublicDr,
   getExamResult,
