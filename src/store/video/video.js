@@ -1,4 +1,3 @@
-import { adminVideos } from '@/mock/admin'
 import {
   ensureStoreSeed as ensureCoreStoreSeed,
   findCourseByTitle as findCoreCourseByTitle,
@@ -40,31 +39,6 @@ function writeVideos(videos) {
   }
 }
 
-function normalizeSeedVideo(video, index) {
-  const course = findCoreCourseByTitle(video.title)
-  const [speakerName, speakerTitle] = String(video.speaker ?? '').split(' · ')
-
-  return {
-    id: video.id,
-    courseId: course?.id ?? `admin_${video.id}`,
-    title: video.title,
-    category: video.category,
-    speaker: course?.speaker || speakerName || '',
-    speakerTitle: course?.speakerTitle || speakerTitle || '',
-    speakerOrg: course?.speakerOrg || '',
-    intro: course?.intro || '',
-    videoUrl: course?.videoUrl || '',
-    cover: course?.cover || '',
-    articleBody: course?.articleBody || '',
-    published: Boolean(video.published),
-    order: course?.order ?? index + 1,
-    createdAt: course?.createdAt ?? Date.now(),
-    attempts: video.attempts ?? '0 次',
-    accuracy: video.accuracy ?? '',
-    accuracyTone: video.accuracyTone ?? '',
-  }
-}
-
 /** 题库版本升级后，把管理端新增/改过的视频课程补回 pv.courses */
 function ensureCourses(videos) {
   for (const video of videos) {
@@ -74,7 +48,7 @@ function ensureCourses(videos) {
 }
 
 /**
- * 首次使用 adminVideos mock 初始化 pv.adminVideos，之后以 localStorage 为准。
+ * 初始化管理端视频存储：有本地记录则用之，否则初始化为空。
  */
 function seedVideos() {
   ensureCoreStoreSeed()
@@ -84,9 +58,8 @@ function seedVideos() {
     return stored
   }
 
-  const seeded = adminVideos.map(normalizeSeedVideo)
-  writeVideos(seeded)
-  return seeded
+  writeVideos([])
+  return []
 }
 
 function resolveCourseId(video) {
@@ -98,7 +71,7 @@ function findRecord(videoId) {
 }
 
 function countBadge(courseId) {
-  // 前后测共用一套，mock 数据统一按 pre 组统计
+  // 前后测共用一套，统一按 pre 组统计
   const count = listCoreQuestions(courseId, 'pre').length
   return {
     count,

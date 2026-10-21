@@ -1,7 +1,5 @@
-import seed from '@/data/seed.json'
-
-export const STORE_VERSION = seed.storeVersion
-export const PASS_PERCENT = seed.passPercent ?? 60
+export const STORE_VERSION = '1'
+export const PASS_PERCENT = 60
 export const WATCH_PERCENT = 90
 
 const KEYS = {
@@ -39,8 +37,8 @@ function write(key, value) {
 export function ensureStoreSeed() {
   if (read(KEYS.version, '') === STORE_VERSION) return
   write(KEYS.version, STORE_VERSION)
-  write(KEYS.courses, seed.courses)
-  write(KEYS.questions, seed.questions)
+  write(KEYS.courses, [])
+  write(KEYS.questions, [])
   write(KEYS.records, [])
   write(KEYS.learners, [])
   write(KEYS.progress, {})
