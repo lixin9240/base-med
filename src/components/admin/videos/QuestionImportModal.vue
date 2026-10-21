@@ -216,7 +216,8 @@ async function handleFile(file) {
   phase.value = 'uploading'
   try {
     const created = await importAdminVideoQuestions({
-      videoId: scopeVideo.value.id,
+      // 从抽屉进入时 scopeVideo 是本地记录，真实 video_id 在 apiId 上
+      videoId: scopeVideo.value.apiId ?? scopeVideo.value.id,
       stage: STAGE_TO_API[scopeStage.value],
       file,
     })

@@ -142,7 +142,9 @@ onMounted(() => {
 })
 
 function openConfig(video) {
-  configVideo.value = resolveLocalVideo(video)
+  // apiId 是 2.2.1 接口行的真实视频 id，题目接口（2.3.x）必须用它；
+  // id 保留本地记录 id 供抽屉内其它本地逻辑使用
+  configVideo.value = { ...resolveLocalVideo(video), apiId: video.id }
   configOpen.value = true
 }
 

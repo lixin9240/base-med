@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
 import { STAGE_TO_API } from '@/utils/video/constants'
 import { questionToApiPayload } from '@/utils/video/questionDraft'
@@ -35,6 +35,9 @@ const STAGES = [
   { value: 'post', label: '后测题目' },
 ]
 
+/** 题目接口（2.3.x）使用后端视频 id；列表页会以 apiId 传入，本地记录 id 不能直接当 video_id */
+const videoId = computed(() => props.video?.apiId ?? props.video?.id ?? '')
+
 const activeStage = ref('pre')
 const counts = ref({ pre: 0, post: 0 })
 const questions = ref([])
@@ -51,7 +54,7 @@ const editingQuestion = ref(null)
 const importOpen = ref(false)
 
 watch(
-  () => [props.open, props.video?.id],
+  () => [props.open, videoId.value],
   ([open]) => {
     if (!open) return
     activeStage.value = 'pre'
@@ -109,8 +112,8 @@ async function load() {
   loadError.value = ''
   try {
     const [preRes, postRes] = await Promise.all([
-      listAdminVideoQuestions({ videoId: props.video.id, stage: STAGE_TO_API.pre }),
-      listAdminVideoQuestions({ videoId: props.video.id, stage: STAGE_TO_API.post }),
+      listAdminVideoQuestions({ videoId: videoId.value, stage: STAGE_TO_API.pre }),
+      listAdminVideoQuestions({ videoId: videoId.value, stage: STAGE_TO_API.post }),
     ])
     counts.value = { pre: preRes.total, post: postRes.total }
     const current = activeStage.value === 'pre' ? preRes : postRes
@@ -150,7 +153,7 @@ async function onSave(payload) {
   if (!props.video || saving.value) return
 
   const apiPayload = {
-    video_id: props.video.id,
+    video_id: videoId.value,
     stage: STAGE_TO_API[activeStage.value],
     ...questionToApiPayload(payload),
   }
@@ -190,7 +193,7 @@ async function confirmDelete(question) {
   deleting.value = true
   try {
     await removeAdminVideoQuestion({
-      video_id: props.video.id,
+      video_id: videoId.value,
       stage: STAGE_TO_API[activeStage.value],
       question_id: question.questionId ?? question.id,
     })
@@ -231,7 +234,7 @@ async function onExport() {
   exporting.value = true
   try {
     const blob = await exportAdminVideoQuestions({
-      videoId: props.video.id,
+      videoId: videoId.value,
       stage: STAGE_TO_API[activeStage.value],
     })
     const name = `${safeFileName(props.video.title)}_${STAGE_NAME[activeStage.value] ?? ''}_题目.xlsx`
