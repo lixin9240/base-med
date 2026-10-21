@@ -1,6 +1,7 @@
 <script setup>
 import { onBeforeUnmount, reactive, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
+import { forgotAdminPassword, resetAdminPassword } from '@/api'
 import LoginBrandPanel from '@/components/admin/login/LoginBrandPanel.vue'
 import '@/styles/tokens.css'
 
@@ -28,6 +29,7 @@ let countdownTimer = null
 let redirectTimer = null
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const CODE_RE = /^\d{6}$/
 
 function validateEmail() {
   if (!form.email.trim()) {
@@ -53,7 +55,8 @@ function startCountdown() {
   }, 1000)
 }
 
-function handleSendCode() {
+async function handleSendCode() {
+  if (sending.value || countdown.value > 0) return
   errorMsg.value = ''
   successMsg.value = ''
   if (!form.username.trim()) {
@@ -63,15 +66,21 @@ function handleSendCode() {
   if (!validateEmail()) return
 
   sending.value = true
-  // TODO: 调用后端发送邮箱验证码接口
-  setTimeout(() => {
-    sending.value = false
+  try {
+    const { expire_minutes: expireMinutes } = await forgotAdminPassword({
+      username: form.username.trim(),
+      email: form.email.trim(),
+    })
     startCountdown()
-    successMsg.value = '验证码已发送至邮箱，请注意查收'
-  }, 600)
+    successMsg.value = `验证码已发送，${expireMinutes || 10} 分钟内有效，请注意查收邮箱`
+  } catch (error) {
+    errorMsg.value = error?.message || '验证码发送失败，请稍后重试'
+  } finally {
+    sending.value = false
+  }
 }
 
-function handleSubmit() {
+async function handleSubmit() {
   errorMsg.value = ''
   successMsg.value = ''
 
@@ -80,8 +89,8 @@ function handleSubmit() {
     return
   }
   if (!validateEmail()) return
-  if (!form.code.trim()) {
-    errorMsg.value = '请输入验证码'
+  if (!CODE_RE.test(form.code.trim())) {
+    errorMsg.value = '请输入 6 位数字验证码'
     return
   }
   if (!form.password) {
@@ -92,20 +101,31 @@ function handleSubmit() {
     errorMsg.value = '密码长度不能少于 6 位'
     return
   }
+  if (form.password.length > 32) {
+    errorMsg.value = '密码长度不能超过 32 位'
+    return
+  }
   if (form.password !== form.confirmPassword) {
     errorMsg.value = '两次输入的密码不一致'
     return
   }
 
   submitting.value = true
-  // TODO: 调用后端重置密码接口
-  setTimeout(() => {
-    submitting.value = false
+  try {
+    await resetAdminPassword({
+      username: form.username.trim(),
+      code: form.code.trim(),
+      password: form.password,
+    })
     successMsg.value = '密码重置成功，即将返回登录页'
     redirectTimer = setTimeout(() => {
       router.push({ name: 'admin-login' })
     }, 1200)
-  }, 800)
+  } catch (error) {
+    errorMsg.value = error?.message || '密码重置失败，请稍后重试'
+  } finally {
+    submitting.value = false
+  }
 }
 
 function togglePassword(key) {
@@ -329,7 +349,9 @@ onBeforeUnmount(() => {
   border-radius: var(--r-md);
   background: var(--bg-surface-solid);
   color: var(--text-primary);
-  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+  transition:
+    border-color var(--t-fast),
+    box-shadow var(--t-fast);
 }
 
 .input-wrapper .form-input {
@@ -392,7 +414,9 @@ onBeforeUnmount(() => {
   border-radius: var(--r-md);
   cursor: pointer;
   white-space: nowrap;
-  transition: background var(--t-fast), color var(--t-fast);
+  transition:
+    background var(--t-fast),
+    color var(--t-fast);
 }
 
 .send-code-btn:hover:not(:disabled) {
@@ -444,7 +468,10 @@ onBeforeUnmount(() => {
   border: none;
   border-radius: var(--r-md);
   cursor: pointer;
-  transition: background var(--t-normal), transform var(--t-fast), box-shadow var(--t-normal);
+  transition:
+    background var(--t-normal),
+    transform var(--t-fast),
+    box-shadow var(--t-normal);
   letter-spacing: 2px;
 }
 

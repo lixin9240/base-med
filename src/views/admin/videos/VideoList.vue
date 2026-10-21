@@ -44,7 +44,7 @@ const shareVideo = ref(null)
 const deleteOpen = ref(false)
 const deleteVideo = ref(null)
 
-/** 题目配置 / 生成链接 / 删除仍读本地记录，按标题匹配同一条；找不到时用接口行兜底 */
+/** 题目配置 / 删除弹窗仍按标题匹配本地记录（本地题目数据）；找不到时用接口行兜底 */
 function resolveLocalVideo(video) {
   return findVideoByTitle(video.title) ?? video
 }
@@ -63,10 +63,9 @@ function rateTone(rate) {
 
 /** 把 2.2.1 接口返回的一条记录转成列表页展示需要的字段 */
 function toVideoRow(item) {
-  const preCount = Number(item.pre_count) || 0
-  const preTotal = Number(item.pre_total) || 0
-  const postCount = Number(item.post_count) || 0
-  const postTotal = Number(item.post_total) || 0
+  // 前后测共用一套题：优先取 question_count，兼容后端旧的 pre_count 字段
+  const questionCount = Number(item.question_count ?? item.pre_count) || 0
+  const questionTotal = Number(item.question_total ?? item.pre_total) || 0
   const rate = item.accuracy_rate
 
   return {
@@ -76,10 +75,9 @@ function toVideoRow(item) {
     speakerLabel: item.speaker
       ? [item.speaker, item.speaker_title].filter(Boolean).join(' · ')
       : '未指定',
-    pre: `${preCount}/${preTotal}`,
-    preTone: countTone(preCount, preTotal),
-    post: `${postCount}/${postTotal}`,
-    postTone: countTone(postCount, postTotal),
+    question: `${questionCount}/${questionTotal}`,
+    questionCount,
+    questionTone: countTone(questionCount, questionTotal),
     published: Number(item.status) === 1,
     attempts: `${Number(item.answer_times) || 0} 次`,
     accuracy: rate === null || rate === undefined ? '' : `${rate}%`,
@@ -142,7 +140,9 @@ onMounted(() => {
 })
 
 function openConfig(video) {
-  configVideo.value = resolveLocalVideo(video)
+  // apiId 是 2.2.1 接口行的真实视频 id，题目接口（2.3.x）必须用它；
+  // id 保留本地记录 id 供抽屉内其它本地逻辑使用
+  configVideo.value = { ...resolveLocalVideo(video), apiId: video.id }
   configOpen.value = true
 }
 
@@ -168,12 +168,18 @@ async function openEdit(video) {
 }
 
 function openShare(video) {
-  shareVideo.value = resolveLocalVideo(video)
+  // 分享链接接口（2.12）需要真实视频 id，直接用列表接口返回的行
+  shareVideo.value = video
   shareOpen.value = true
 }
 
 function openDelete(video) {
-  deleteVideo.value = resolveLocalVideo(video)
+  // apiId 是 2.2.1 接口行的真实视频 id，删除接口（2.2.6）必须用它；id 保留本地记录 id
+  deleteVideo.value = {
+    ...resolveLocalVideo(video),
+    apiId: video.id,
+    questionCount: video.questionCount,
+  }
   deleteOpen.value = true
 }
 
@@ -199,9 +205,7 @@ async function togglePublished(video) {
     <header class="video-page__head">
       <div class="video-page__intro">
         <h1 class="video-page__title">视频管理</h1>
-        <p class="video-page__desc">
-          用户端免登录，点开就能看。这里维护视频、文字要点和前后测题目。
-        </p>
+        <p class="video-page__desc">用户端免登录，点开就能看。这里维护视频、文字要点和题目。</p>
       </div>
 
       <div class="video-page__actions">
@@ -286,8 +290,9 @@ async function togglePublished(video) {
 
         <!-- 题目 -->
         <div class="col col--quiz">
-          <span class="badge" :class="`badge--${video.preTone}`">前测 {{ video.pre }}</span>
-          <span class="badge" :class="`badge--${video.postTone}`">后测 {{ video.post }}</span>
+          <span class="badge" :class="`badge--${video.questionTone}`">
+            题目 {{ video.question }}
+          </span>
         </div>
 
         <!-- 状态 -->
@@ -364,11 +369,7 @@ async function togglePublished(video) {
       </button>
     </div>
 
-    <QuestionImportModal
-      :open="importOpen"
-      @close="importOpen = false"
-      @imported="refreshVideos"
-    />
+    <QuestionImportModal :open="importOpen" @close="importOpen = false" @imported="refreshVideos" />
 
     <QuestionConfigDrawer
       :open="configOpen"
@@ -385,11 +386,7 @@ async function togglePublished(video) {
       @saved="refreshVideos"
     />
 
-    <VideoShareLinkModal
-      :open="shareOpen"
-      :video="shareVideo"
-      @close="shareOpen = false"
-    />
+    <VideoShareLinkModal :open="shareOpen" :video="shareVideo" @close="shareOpen = false" />
 
     <VideoDeleteModal
       :open="deleteOpen"

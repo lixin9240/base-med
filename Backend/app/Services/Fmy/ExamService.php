@@ -8,6 +8,7 @@ use App\Models\ExamAnswer;
 use App\Models\ExamPretest;
 use App\Models\ExamRecord;
 use App\Models\SystemConfig;
+use App\Models\Video;
 use App\Models\VideoProgress;
 use App\Models\VideoQuestion;
 use Illuminate\Support\Collection;
@@ -33,10 +34,10 @@ class ExamService
         $this->videoService->onShelfVideo($videoId);
         $this->videoService->assertVisitVideo($visit, $videoId);
 
-        $questions = $this->videoService->questionSet($videoId, 'pretest');
+        $questions = $this->videoService->questionSet($videoId);
 
         if ($questions->isEmpty()) {
-            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '该视频尚未配置学前题目');
+            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '该视频尚未配置题目');
         }
 
         $this->validateAnswers($questions, $answers);
@@ -72,7 +73,7 @@ class ExamService
         $video = $this->videoService->onShelfVideo($videoId);
         $this->videoService->assertVisitVideo($visit, $video->id);
 
-        $this->assertWatchProgressUnlocked($visit->id, $video->id);
+        $this->assertWatchProgressUnlocked($visit->id, $video);
 
         $pretest = ExamPretest::query()
             ->where('user_id', $visit->id)
@@ -83,15 +84,15 @@ class ExamService
             throw new BusinessException(ResponseCode::STATUS_NOT_OPERABLE, '请先完成学前答题');
         }
 
-        $postQuestions = $this->videoService->questionSet($videoId, 'posttest');
+        $postQuestions = $this->videoService->questionSet($videoId);
 
         if ($postQuestions->isEmpty()) {
-            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '该视频尚未配置看完题目');
+            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '该视频尚未配置题目');
         }
 
         $this->validateAnswers($postQuestions, $answers);
 
-        $preQuestions = $this->videoService->questionSet($videoId, 'pretest');
+        $preQuestions = $this->videoService->questionSet($videoId);
         $preAnswers = collect($pretest->answers ?? []);
 
         $record = DB::transaction(function () use ($visit, $video, $drId, $pretest, $preQuestions, $preAnswers, $postQuestions, $answers) {
@@ -181,15 +182,20 @@ class ExamService
     }
 
     /**
-     * 观看进度门槛校验：达到配置百分比（默认 90%）才能提交后测
+     * 观看进度门槛校验：达到配置百分比（默认 90%）才能提交后测。
+     * 视频损坏（转码失败或无视频源）时跳过该校验，直接放行。
      */
-    private function assertWatchProgressUnlocked(int $visitId, int $videoId): void
+    private function assertWatchProgressUnlocked(int $visitId, Video $video): void
     {
+        if ($this->videoService->isBrokenVideo($video)) {
+            return;
+        }
+
         $required = $this->videoService->watchRequiredPercent();
 
         $percent = (int) (VideoProgress::query()
             ->where('user_id', $visitId)
-            ->where('video_id', $videoId)
+            ->where('video_id', $video->id)
             ->value('progress_percent') ?? 0);
 
         if ($percent < $required) {

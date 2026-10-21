@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { listVideoQuestions, removeVideo } from '@/store/video/video'
+import { deleteAdminVideo } from '@/api'
+import { removeVideo } from '@/store/video/video'
 
 const props = defineProps({
   open: {
@@ -18,13 +19,8 @@ const emit = defineEmits(['close', 'deleted'])
 const deleting = ref(false)
 const errorMessage = ref('')
 
-const questionCount = computed(() => {
-  if (!props.video) return 0
-  return (
-    listVideoQuestions(props.video.id, 'pre').length +
-    listVideoQuestions(props.video.id, 'post').length
-  )
-})
+// 题目数由列表接口（2.2.1）的 question_count 提供，前后测共用一套
+const questionCount = computed(() => Number(props.video?.questionCount) || 0)
 
 const description = computed(() => {
   const title = props.video?.title || '这条视频'
@@ -43,14 +39,16 @@ watch(
   },
 )
 
-function confirmDelete() {
+async function confirmDelete() {
   if (!props.video || deleting.value) return
 
   deleting.value = true
   errorMessage.value = ''
   try {
-    const removed = removeVideo(props.video.id)
-    if (!removed) throw new Error('视频不存在或已被删除')
+    // 先走 2.2.6 软删除：已存在答题记录时后端前置校验不通过，本地记录不动
+    await deleteAdminVideo({ id: props.video.apiId ?? props.video.id })
+    // 后端删除成功后同步清理本地记录；无本地记录时不影响删除结果
+    removeVideo(props.video.id)
     emit('deleted', props.video.id)
     emit('close')
   } catch (error) {
@@ -77,12 +75,7 @@ function confirmDelete() {
 
       <footer class="delete-modal__foot">
         <button type="button" class="btn btn--secondary" @click="emit('close')">取消</button>
-        <button
-          type="button"
-          class="btn btn--danger"
-          :disabled="deleting"
-          @click="confirmDelete"
-        >
+        <button type="button" class="btn btn--danger" :disabled="deleting" @click="confirmDelete">
           {{ deleting ? '删除中…' : '删除' }}
         </button>
       </footer>

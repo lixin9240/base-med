@@ -12,6 +12,7 @@ class ImportTask extends Model
         'task_no',
         'file_name',
         'file_path',
+        'video_id',
         'total_rows',
         'valid_rows',
         'error_rows',

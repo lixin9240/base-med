@@ -39,14 +39,11 @@ class Result
      * @param ResponseCode $code 错误码枚举
      * @param string|null $msg 自定义错误消息，为空时使用错误码默认提示
      * @param mixed $data 返回数据
-     * @param int $httpStatus HTTP 状态码，默认 200（统一响应包约定）；
-     *                        数据库/系统异常由 Handler 传入 500
      */
     public static function error(
         ResponseCode $code,
         ?string $msg = null,
-        mixed $data = null,
-        int $httpStatus = 200
+        mixed $data = null
     ): JsonResponse {
         return response()->json([
             'code' => $code->value,
@@ -56,6 +53,6 @@ class Result
 
             // TraceId 链路追踪 ID
             'trace_id' => request()->attributes->get('trace_id'),
-        ], $httpStatus);
+        ], $code->httpStatus());
     }
 }

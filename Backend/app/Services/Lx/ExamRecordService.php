@@ -8,6 +8,9 @@ use App\Models\ExamAnswer;
 use App\Models\ExamRecord;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ExamRecordService
 {
@@ -113,10 +116,10 @@ class ExamRecordService
     }
 
     /**
-     * 导出答题记录（CSV 带 BOM）
+     * 导出答题记录为真正的 .xlsx 文件并上传阿里云 OSS
      *
      * @param  array<string, mixed>  $params
-     * @return array{filename: string, content: string}
+     * @return array{filename: string, url: string}
      */
     public function export(array $params): array
     {
@@ -136,9 +139,23 @@ class ExamRecordService
             ];
         })->values()->toArray();
 
+        $spreadsheet = new Spreadsheet();
+        $spreadsheet->getActiveSheet()->fromArray(array_merge([$headers], $rows), null, 'A1');
+
+        $filename = 'exam_records_' . now()->format('Ymd_His') . '.xlsx';
+
+        $tmpPath = $this->writeTempXlsx($spreadsheet);
+        $ossPath = 'exam-records/' . $filename;
+
+        try {
+            Storage::disk('oss')->put($ossPath, file_get_contents($tmpPath));
+        } finally {
+            @unlink($tmpPath);
+        }
+
         return [
-            'filename' => '答题记录_' . now()->format('Ymd_His') . '.csv',
-            'content' => $this->buildCsv($headers, $rows),
+            'filename' => $filename,
+            'url' => Storage::disk('oss')->temporaryUrl($ossPath, now()->addDays(7)),
         ];
     }
 
@@ -169,36 +186,14 @@ class ExamRecordService
     }
 
     /**
-     * 将表头与行数据拼装为 CSV 字符串（UTF-8 BOM，兼容 Excel）
+     * 将 Spreadsheet 写入临时文件并返回文件路径
      */
-    private function buildCsv(array $headers, array $rows): string
+    private function writeTempXlsx(Spreadsheet $spreadsheet): string
     {
-        $csv = "\xEF\xBB\xBF";
+        $tmpPath = tempnam(sys_get_temp_dir(), 'exam_records_');
 
-        $csv .= $this->csvLine($headers);
+        (new Xlsx($spreadsheet))->save($tmpPath);
 
-        foreach ($rows as $row) {
-            $csv .= $this->csvLine($row);
-        }
-
-        return $csv;
-    }
-
-    /**
-     * 拼装单行 CSV（对含双引号/逗号/换行的字段做转义）
-     */
-    private function csvLine(array $fields): string
-    {
-        $parts = array_map(function ($value) {
-            $value = (string) $value;
-
-            if (preg_match('/[",\r\n]/', $value)) {
-                $value = '"' . str_replace('"', '""', $value) . '"';
-            }
-
-            return $value;
-        }, $fields);
-
-        return implode(',', $parts) . "\r\n";
+        return $tmpPath;
     }
 }

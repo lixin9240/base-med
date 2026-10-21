@@ -8,6 +8,7 @@ use App\Http\Controllers\Lx\ExamRecordController;
 use App\Http\Controllers\Lx\QuestionController;
 use App\Http\Controllers\Lx\TopicController;
 
+use App\Http\Controllers\Wjc\Admin\AdminUserController;
 use App\Http\Controllers\Wjc\Admin\AuthController;
 use App\Http\Controllers\Wjc\Admin\CategoryController;
 use App\Http\Controllers\Wjc\Admin\VideoQuestionController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Gyz\ImportTaskController;
 use App\Http\Controllers\Gyz\VideoController as GyzVideoController;
 use App\Http\Controllers\Gyz\OperationLogController;
 use App\Http\Controllers\Gyz\StatisticsController;
+use App\Http\Controllers\Gyz\VideoShareLinkController;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -26,7 +28,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('admin/exam-record')->group(function () {
+Route::prefix('admin/exam-record')->middleware('auth:admin')->group(function () {
     Route::get(uri: '/list', action: [ExamRecordController::class, 'list']);
     Route::get(uri: '/detail', action: [ExamRecordController::class, 'detail']);
     Route::get(uri: '/export', action: [ExamRecordController::class, 'export']);
@@ -37,7 +39,7 @@ Route::prefix('admin/exam-record')->group(function () {
 | LX-课程管理模块
 |--------------------------------------------------------------------------
 */
-Route::prefix('admin/topic')->group(function () {
+Route::prefix('admin/topic')->middleware('auth:admin')->group(function () {
     Route::get(uri: '/list', action: [TopicController::class, 'list']);
     Route::post(uri: '/create', action: [TopicController::class, 'create']);
     Route::post(uri: '/update', action: [TopicController::class, 'update']);
@@ -49,7 +51,7 @@ Route::prefix('admin/topic')->group(function () {
 | LX-题库管理模块
 |--------------------------------------------------------------------------
 */
-Route::prefix('admin/question')->group(function () {
+Route::prefix('admin/question')->middleware('auth:admin')->group(function () {
     Route::get(uri: '/list', action: [QuestionController::class, 'list']);
     Route::post(uri: '/update', action: [QuestionController::class, 'update']);
     Route::post(uri: '/delete', action: [QuestionController::class, 'delete']);
@@ -83,6 +85,19 @@ Route::prefix('admin/auth')->group(function () {
         // 2.1.3 管理员登出
         Route::post('logout', [AuthController::class, 'logout']);
     });
+});
+
+/*
+|--------------------------------------------------------------------------
+| WJC-管理员用户管理模块
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/admin-user')->middleware('auth:admin')->group(function () {
+    Route::get(uri: '/list', action: [AdminUserController::class, 'list']);
+    Route::post(uri: '/create', action: [AdminUserController::class, 'create']);
+    Route::post(uri: '/update', action: [AdminUserController::class, 'update']);
+    Route::post(uri: '/delete', action: [AdminUserController::class, 'delete']);
 });
 
 /*
@@ -202,6 +217,9 @@ Route::prefix('admin/video')->middleware('auth:admin')->group(function () {
     // 2.2.7 初始化视频上传（本地上传，source_type=2）
     Route::post(uri: '/upload/init', action: [GyzVideoController::class, 'uploadInit']);
 
+    // 上传封面图片（本地上传，source_type=2）
+    Route::post(uri: '/upload/cover', action: [GyzVideoController::class, 'uploadCover']);
+
     // 本地模拟辅助：上传单个分片（OSS 直传时由前端 SDK 分片，可跳过）
     Route::post(uri: '/upload/chunk', action: [GyzVideoController::class, 'uploadChunk']);
 
@@ -255,4 +273,21 @@ Route::prefix('admin/import')->middleware('auth:admin')->group(function () {
 Route::prefix('admin/operation-log')->middleware('auth:admin')->group(function () {
     // 2.9.1 操作日志列表
     Route::get(uri: '/list', action: [OperationLogController::class, 'list']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| GYZ-链接模块（公众号分享链接，2.12）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/share-link')->middleware('auth:admin')->group(function () {
+    // 2.12.1 生成 / 重新生成视频分享链接
+    Route::post(uri: '/generate', action: [VideoShareLinkController::class, 'generate']);
+
+    // 2.12.2 获取当前生效链接详情
+    Route::get(uri: '/detail', action: [VideoShareLinkController::class, 'detail']);
+
+    // 2.12.3 撤回生效链接
+    Route::post(uri: '/revoke', action: [VideoShareLinkController::class, 'revoke']);
 });

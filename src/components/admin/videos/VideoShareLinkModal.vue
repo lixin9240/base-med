@@ -1,13 +1,10 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
+import { generateAdminShareLink, getAdminShareLinkDetail, revokeAdminShareLink } from '@/api'
 import { SHARE_TTL_OPTIONS } from '@/utils/video/constants'
 import { formatDateTime, isShareExpired } from '@/utils/video/share'
-import {
-  generateShareLink,
-  getShareLink,
-  isShareRevoked,
-  revokeShareLink,
-} from '@/store/video/shareLink'
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 const props = defineProps({
   open: {
@@ -26,24 +23,44 @@ const ttlDays = ref(SHARE_TTL_OPTIONS[0].days)
 const link = ref(null)
 const now = ref(Date.now())
 const copied = ref(false)
+const loading = ref(false)
+const generating = ref(false)
+const updating = ref(false)
 const errorMessage = ref('')
 let timer = null
+let loadSeq = 0
 
+const videoId = computed(() => props.video?.apiId ?? props.video?.id ?? null)
 const hasLink = computed(() => Boolean(link.value))
+const disabled = computed(() => link.value?.status === 0)
 const expired = computed(() => hasLink.value && isShareExpired(link.value, now.value))
+/** 撤回或过期都会让用户端入口不可用 */
+const unavailable = computed(() => hasLink.value && (disabled.value || expired.value))
 const statusText = computed(() => {
+  if (loading.value) return '链接加载中…'
   if (!hasLink.value) return '尚未生成'
+  if (disabled.value) return '链接已撤回'
   return expired.value ? '链接已过期' : '链接已生成'
 })
-const createdText = computed(() => (hasLink.value ? formatDateTime(link.value.createdAt) : ''))
-const expiresText = computed(() => (hasLink.value ? formatDateTime(link.value.expiresAt) : ''))
+const createdText = computed(() =>
+  link.value?.createdAt ? formatDateTime(link.value.createdAt) : '',
+)
+const expiresText = computed(() => {
+  if (!hasLink.value || !link.value.expiresAt) return ''
+  return formatDateTime(link.value.expiresAt)
+})
 const remainingText = computed(() => {
-  if (!hasLink.value || expired.value) return ''
+  if (!hasLink.value || disabled.value || expired.value) return ''
   const remain = link.value.expiresAt - now.value
   const hours = Math.ceil(remain / (60 * 60 * 1000))
   if (hours <= 24) return `剩余 ${hours} 小时`
-  return `剩余 ${Math.ceil(remain / (24 * 60 * 60 * 1000))} 天`
+  return `剩余 ${Math.ceil(remain / DAY_MS)} 天`
 })
+const generateLabel = computed(() => {
+  if (generating.value) return '生成中…'
+  return hasLink.value ? '重新生成' : '生成链接'
+})
+const retractLabel = computed(() => (updating.value ? '撤回中…' : '撤回链接'))
 
 watch(
   () => props.open,
@@ -56,43 +73,118 @@ watch(
 
 onUnmounted(stop)
 
+/** 后端时间形如 2026-10-26 10:00:00，统一转成毫秒时间戳 */
+function parseDateTime(value) {
+  if (value === null || value === undefined || value === '') return null
+  if (typeof value === 'number') return value
+  const time = new Date(String(value).replace(' ', 'T')).getTime()
+  return Number.isNaN(time) ? null : time
+}
+
+/** 补上弹窗展示需要的运行时字段 */
+function decorateLink(item) {
+  return {
+    ...item,
+    status: Number(item.status ?? 1) === 0 ? 0 : 1,
+    createdAt: parseDateTime(item.created_at) ?? Date.now(),
+    expiresAt: parseDateTime(item.expire_at),
+  }
+}
+
+/** 已有链接的时效选中项尽量和接口返回的 expire_type（如 7d）对齐 */
+function syncTtl(item) {
+  const matched = /^(\d+)d$/.exec(String(item.expire_type ?? ''))
+  const days =
+    matched !== null
+      ? Number(matched[1])
+      : item.createdAt && item.expiresAt
+        ? Math.round((item.expiresAt - item.createdAt) / DAY_MS)
+        : null
+  if (days !== null && SHARE_TTL_OPTIONS.some((option) => option.days === days)) {
+    ttlDays.value = days
+  }
+}
+
 function start() {
   if (!props.video) return
 
   copied.value = false
   errorMessage.value = ''
+  link.value = null
+  loading.value = false
+  generating.value = false
+  updating.value = false
+  ttlDays.value = SHARE_TTL_OPTIONS[0].days
   now.value = Date.now()
-
-  const existing = getShareLink(props.video.id)
-  if (existing) {
-    link.value = existing
-    ttlDays.value = existing.ttlDays
-  } else {
-    ttlDays.value = SHARE_TTL_OPTIONS[0].days
-    link.value = isShareRevoked(props.video.id)
-      ? null
-      : generateShareLink(props.video, ttlDays.value)
-  }
 
   stop()
   timer = window.setInterval(() => {
     now.value = Date.now()
   }, 30 * 1000)
+
+  loadLink()
 }
 
 function stop() {
+  loadSeq += 1
   if (timer) {
     window.clearInterval(timer)
     timer = null
   }
 }
 
-function regenerate() {
-  if (!props.video) return
-  link.value = generateShareLink(props.video, ttlDays.value)
-  now.value = Date.now()
+/**
+ * 打开弹窗时读取该视频当前生效的链接（无则返回 null）。
+ * 生成属于写操作，交给用户主动点击。
+ */
+async function loadLink() {
+  if (!videoId.value) return
+
+  const seq = ++loadSeq
+  loading.value = true
+  try {
+    const data = await getAdminShareLinkDetail({ videoId: videoId.value })
+    if (seq !== loadSeq || !props.open) return
+
+    link.value = data ? decorateLink(data) : null
+    if (link.value) syncTtl(link.value)
+  } catch (error) {
+    if (seq === loadSeq && props.open) {
+      errorMessage.value = error?.message || '链接加载失败，请稍后重试'
+    }
+  } finally {
+    if (seq === loadSeq) loading.value = false
+  }
+}
+
+async function generate() {
+  if (!props.video || generating.value) return
+  if (!videoId.value) {
+    errorMessage.value = '视频信息不完整，无法生成链接'
+    return
+  }
+
+  generating.value = true
   copied.value = false
   errorMessage.value = ''
+
+  try {
+    // 后端只支持 1 / 3 / 5 / 7 天；生成新链接时会自动失效该视频的旧链接
+    const data = await generateAdminShareLink({
+      videoId: videoId.value,
+      expireDays: ttlDays.value,
+    })
+    link.value = decorateLink({
+      ...data,
+      created_at: data.created_at ?? formatDateTime(Date.now()),
+    })
+    now.value = Date.now()
+    syncTtl(link.value)
+  } catch (error) {
+    errorMessage.value = error?.message || '链接生成失败，请稍后重试'
+  } finally {
+    generating.value = false
+  }
 }
 
 async function copyText(text) {
@@ -113,7 +205,7 @@ async function copyText(text) {
 }
 
 async function copyLink() {
-  if (!link.value || expired.value) return
+  if (!link.value || unavailable.value) return
   try {
     await copyText(link.value.url)
     copied.value = true
@@ -125,16 +217,25 @@ async function copyLink() {
   }
 }
 
-function revoke() {
-  if (!props.video) return
-  revokeShareLink(props.video.id)
-  link.value = null
-  copied.value = false
+/** 2.3 撤回链接：立即失效，用户无法再通过它访问；访问计数与答题数据保留 */
+async function retract() {
+  if (!videoId.value || !link.value?.id || updating.value) return
+
+  updating.value = true
   errorMessage.value = ''
+  try {
+    await revokeAdminShareLink({ videoId: videoId.value })
+    link.value = { ...link.value, status: 0 }
+    copied.value = false
+  } catch (error) {
+    errorMessage.value = error?.message || '撤回失败，请稍后重试'
+  } finally {
+    updating.value = false
+  }
 }
 
 function preview() {
-  if (link.value && !expired.value) {
+  if (link.value?.url && !unavailable.value) {
     window.open(link.value.url, '_blank', 'noopener')
   }
 }
@@ -189,19 +290,26 @@ function preview() {
 
         <div
           class="share-card"
-          :class="{ 'share-card--expired': expired, 'share-card--empty': !hasLink }"
+          :class="{ 'share-card--expired': unavailable, 'share-card--empty': !hasLink }"
         >
           <div class="share-card__head">
             <span class="share-card__status">
               <span class="share-card__dot"></span>
               {{ statusText }}
             </span>
-            <span v-if="hasLink" class="share-card__time">生成于 {{ createdText }}</span>
+            <span v-if="hasLink && createdText" class="share-card__time"
+              >生成于 {{ createdText }}</span
+            >
           </div>
 
           <div v-if="hasLink" class="share-card__link">
             <input :value="link.url" type="text" readonly @focus="$event.target.select()" />
-            <button type="button" class="share-card__copy" :disabled="expired" @click="copyLink">
+            <button
+              type="button"
+              class="share-card__copy"
+              :disabled="unavailable"
+              @click="copyLink"
+            >
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
@@ -221,15 +329,21 @@ function preview() {
           <p
             v-if="hasLink"
             class="share-card__hint"
-            :class="{ 'share-card__hint--expired': expired }"
+            :class="{ 'share-card__hint--expired': unavailable }"
           >
-            <template v-if="expired"> 链接已过期，用户端入口已自动隐藏，请重新生成。 </template>
+            <template v-if="disabled">
+              链接已撤回，用户端点击会提示「链接已失效」；如需继续分享请重新生成。
+            </template>
+            <template v-else-if="expired">
+              链接已过期，用户端入口已自动隐藏，请重新生成。
+            </template>
             <template v-else>
-              有效期 {{ link.ttlDays }} 天，{{ expiresText }} 到期（{{
+              {{ expiresText }} 到期（{{
                 remainingText
               }}）。届时用户端入口自动隐藏，点击可直达「视频观看」。
             </template>
           </p>
+          <p v-else-if="loading" class="share-card__hint">正在加载链接…</p>
           <p v-else class="share-card__hint">选择时效后点击下方「生成链接」。</p>
         </div>
 
@@ -241,13 +355,19 @@ function preview() {
         <button type="button" class="btn btn--secondary" @click="emit('close')">关闭</button>
 
         <div class="share-modal__actions">
-          <button v-if="hasLink" type="button" class="btn btn--ghost" @click="revoke">
-            撤回链接
+          <button
+            v-if="hasLink && !unavailable"
+            type="button"
+            class="btn btn--ghost"
+            :disabled="updating || generating"
+            @click="retract"
+          >
+            {{ retractLabel }}
           </button>
           <button
             type="button"
             class="btn btn--secondary"
-            :disabled="!hasLink || expired"
+            :disabled="!hasLink || unavailable || loading"
             @click="copyLink"
           >
             复制链接
@@ -255,13 +375,18 @@ function preview() {
           <button
             type="button"
             class="btn btn--secondary"
-            :disabled="!hasLink || expired"
+            :disabled="!hasLink || unavailable || loading"
             @click="preview"
           >
             预览用户端入口
           </button>
-          <button type="button" class="btn btn--primary" @click="regenerate">
-            {{ hasLink ? '重新生成' : '生成链接' }}
+          <button
+            type="button"
+            class="btn btn--primary"
+            :disabled="generating || loading"
+            @click="generate"
+          >
+            {{ generateLabel }}
           </button>
         </div>
       </footer>

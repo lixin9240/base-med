@@ -1,8 +1,14 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { QUESTION_TYPE_LABEL } from '@/utils/question'
-import { TEMPLATE_PATH, parseQuestionFile } from '@/utils/video/questionImport'
-import { importVideoQuestions, listVideos } from '@/store/video/video'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { downloadBlob } from '@/utils/download'
+import { toast } from '@/utils/toast'
+import {
+  confirmAdminImportTask,
+  downloadQuestionTemplate,
+  getAdminImportTaskDetail,
+  importAdminVideoQuestions,
+  listAdminVideos,
+} from '@/api'
 
 const props = defineProps({
   open: {
@@ -13,78 +19,171 @@ const props = defineProps({
     type: Object,
     default: null,
   },
-  stage: {
-    type: String,
-    default: '',
-  },
 })
 
 const emit = defineEmits(['close', 'imported'])
 
-const STAGE_LABEL = { pre: '前测', post: '后测' }
+const POLL_INTERVAL = 1500
+const POLL_TIMEOUT = 90_000
 
 const isScoped = computed(() => Boolean(props.video))
 const modalTitle = computed(() => (isScoped.value ? '导入本组题目' : '批量导入题目'))
+
+// 未从抽屉进入时没有 video，需要自行选择（接口要求 video_id）
+const videoOptions = ref([])
+const loadingVideos = ref(false)
+const selectedVideoId = ref('')
+
+const scopeVideo = computed(() => {
+  if (props.video) return props.video
+  return (
+    videoOptions.value.find((item) => String(item.id) === String(selectedVideoId.value)) ?? null
+  )
+})
+
 const scopeHint = computed(() => {
-  if (!isScoped.value) return ''
-  const stageLabel = STAGE_LABEL[props.stage] ?? ''
-  return `当前只导入「${props.video.title}${stageLabel ? ` · ${stageLabel}` : ''}」的题目，其他视频或阶段的题目会校验失败。`
+  if (!scopeVideo.value) return ''
+  return `当前只导入「${scopeVideo.value.title}」的题目。`
 })
 
 const fileInput = ref(null)
 const dragging = ref(false)
-/** idle | parsing | preview | importing | done | error */
+/** idle | uploading | validating | preview | confirming | done | error */
 const phase = ref('idle')
 const fileName = ref('')
 const errorMessage = ref('')
-const result = ref(null)
-const importedCount = ref(0)
+const task = ref(null)
+const taskId = ref(0)
+const downloadingTemplate = ref(false)
 
-const validCount = computed(() => result.value?.items.length ?? 0)
-const errorCount = computed(() => result.value?.errors.length ?? 0)
-const hasFile = computed(() =>
-  ['parsing', 'preview', 'importing', 'done'].includes(phase.value),
+let pollTimer = null
+let pollStartedAt = 0
+
+const busy = computed(() => ['uploading', 'validating', 'confirming'].includes(phase.value))
+const hasFile = computed(() => Boolean(fileName.value))
+const counts = computed(() => ({
+  total: Number(task.value?.total_rows) || 0,
+  valid: Number(task.value?.valid_rows) || 0,
+  errors: Number(task.value?.error_rows) || 0,
+}))
+const errorReport = computed(() =>
+  Array.isArray(task.value?.error_report) ? task.value.error_report : [],
 )
-const canImport = computed(
-  () => phase.value === 'preview' && validCount.value > 0 && errorCount.value === 0,
+const canConfirm = computed(
+  () => phase.value === 'preview' && task.value?.status === 2 && counts.value.errors === 0,
 )
 const confirmLabel = computed(() => {
-  if (phase.value === 'importing') return '导入中…'
+  if (phase.value === 'uploading') return '上传中…'
+  if (phase.value === 'validating') return '校验中…'
+  if (phase.value === 'confirming') return '导入中…'
   if (phase.value === 'done') return '完成'
-  return `确认导入 ${validCount.value} 道题`
-})
-
-const previewRows = computed(() => {
-  if (!result.value) return []
-  const itemMap = new Map(result.value.items.map((item) => [item.rowNumber, item]))
-  const errorMap = new Map(result.value.errors.map((item) => [item.rowNumber, item.messages]))
-  const rowNumbers = [...new Set([...itemMap.keys(), ...errorMap.keys()])].sort((a, b) => a - b)
-  return rowNumbers.map((rowNumber) => ({
-    rowNumber,
-    item: itemMap.get(rowNumber) ?? null,
-    messages: errorMap.get(rowNumber) ?? [],
-  }))
+  return counts.value.valid ? `确认导入 ${counts.value.valid} 道题` : '确认导入'
 })
 
 watch(
   () => props.open,
   (open) => {
-    if (open) reset()
+    if (open) {
+      reset()
+      if (!props.video) loadVideoOptions()
+    } else {
+      stopPolling()
+    }
   },
 )
 
+watch(selectedVideoId, () => {
+  if (!isScoped.value && phase.value !== 'idle') reset()
+})
+
+onBeforeUnmount(stopPolling)
+
 function reset() {
+  stopPolling()
   phase.value = 'idle'
   fileName.value = ''
   errorMessage.value = ''
-  result.value = null
-  importedCount.value = 0
+  task.value = null
+  taskId.value = 0
   dragging.value = false
   if (fileInput.value) fileInput.value.value = ''
 }
 
+async function loadVideoOptions() {
+  if (loadingVideos.value || videoOptions.value.length) return
+  loadingVideos.value = true
+  try {
+    // 后端 page_size 上限 100（VideoListRequest），逐页取全量供下拉选择
+    const pageSize = 100
+    const collected = []
+    let page = 1
+    let total = 0
+    do {
+      const result = await listAdminVideos({ page, pageSize })
+      collected.push(...result.list)
+      total = result.total
+      page += 1
+      if (!result.list.length) break
+    } while (collected.length < total)
+    videoOptions.value = collected
+  } catch (error) {
+    toast(error?.message || '视频列表加载失败')
+  } finally {
+    loadingVideos.value = false
+  }
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearTimeout(pollTimer)
+    pollTimer = null
+  }
+}
+
+function schedulePoll() {
+  pollTimer = setTimeout(tickPoll, POLL_INTERVAL)
+}
+
+function startPolling() {
+  stopPolling()
+  pollStartedAt = Date.now()
+  schedulePoll()
+}
+
+async function tickPoll() {
+  pollTimer = null
+  try {
+    const detail = await getAdminImportTaskDetail({ taskId: taskId.value })
+    task.value = detail
+
+    if (detail.status === 2) {
+      phase.value = 'preview'
+      return
+    }
+    if (detail.status === 4) {
+      phase.value = 'done'
+      emit('imported', { imported: counts.value.valid })
+      return
+    }
+    if (detail.status === 5) {
+      phase.value = 'error'
+      errorMessage.value = '导入任务处理失败，请检查文件内容后重试'
+      return
+    }
+    if (Date.now() - pollStartedAt > POLL_TIMEOUT) {
+      phase.value = 'error'
+      errorMessage.value = '任务处理超时，请稍后在导入任务中查看结果'
+      return
+    }
+    schedulePoll()
+  } catch (error) {
+    phase.value = 'error'
+    errorMessage.value = error?.message || '导入任务查询失败'
+  }
+}
+
 function pickFile() {
-  if (phase.value === 'parsing' || phase.value === 'importing') return
+  if (busy.value) return
   fileInput.value?.click()
 }
 
@@ -96,7 +195,7 @@ function onChoose(event) {
 
 function onDrop(event) {
   dragging.value = false
-  if (phase.value === 'parsing' || phase.value === 'importing') return
+  if (busy.value) return
   const file = event.dataTransfer?.files?.[0]
   if (file) handleFile(file)
 }
@@ -110,40 +209,56 @@ async function handleFile(file) {
     errorMessage.value = '只支持 .xlsx / .xls 格式的文件'
     return
   }
+  if (!scopeVideo.value) {
+    phase.value = 'error'
+    errorMessage.value = '请先选择要导入的视频'
+    return
+  }
 
-  phase.value = 'parsing'
+  phase.value = 'uploading'
   try {
-    const videos = props.video ? [props.video] : listVideos()
-    const parsed = await parseQuestionFile(file, videos, { stage: props.stage || undefined })
-    result.value = parsed
-    if (!parsed.items.length && !parsed.errors.length) {
-      phase.value = 'error'
-      errorMessage.value = '没有读取到题目数据，请确认内容填写在「题目模板」表中'
-      return
-    }
-    phase.value = 'preview'
+    const created = await importAdminVideoQuestions({
+      // 从抽屉进入时 scopeVideo 是本地记录，真实 video_id 在 apiId 上
+      videoId: scopeVideo.value.apiId ?? scopeVideo.value.id,
+      file,
+    })
+    taskId.value = created.task_id
+    task.value = created
+    phase.value = 'validating'
+    startPolling()
   } catch (error) {
     phase.value = 'error'
-    errorMessage.value = error?.message || '文件解析失败，请检查文件后重试'
+    errorMessage.value = error?.message || '上传失败，请重试'
   }
 }
 
-function confirmImport() {
+async function onDownloadTemplate() {
+  if (downloadingTemplate.value) return
+  downloadingTemplate.value = true
+  try {
+    const blob = await downloadQuestionTemplate()
+    downloadBlob(blob, '科普视频题目_批量导入模板.xlsx')
+  } catch (error) {
+    toast(error?.message || '模板下载失败，请重试')
+  } finally {
+    downloadingTemplate.value = false
+  }
+}
+
+async function confirmImport() {
   if (phase.value === 'done') {
     emit('close')
     return
   }
-  if (!canImport.value) return
+  if (!canConfirm.value) return
 
-  phase.value = 'importing'
+  phase.value = 'confirming'
   try {
-    const { imported } = importVideoQuestions(result.value.groups)
-    importedCount.value = imported
-    phase.value = 'done'
-    emit('imported', { imported })
+    await confirmAdminImportTask({ taskId: taskId.value })
+    startPolling()
   } catch (error) {
     phase.value = 'error'
-    errorMessage.value = error?.message || '导入失败，请重试'
+    errorMessage.value = error?.message || '确认导入失败，请重试'
   }
 }
 </script>
@@ -159,12 +274,7 @@ function confirmImport() {
       <!-- 标题栏 -->
       <header class="import-modal__head">
         <h2 id="import-modal-title" class="import-modal__title">{{ modalTitle }}</h2>
-        <button
-          type="button"
-          class="import-modal__close"
-          aria-label="关闭"
-          @click="$emit('close')"
-        >
+        <button type="button" class="import-modal__close" aria-label="关闭" @click="$emit('close')">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -187,16 +297,14 @@ function confirmImport() {
           </div>
 
           <p class="import-step__desc">
-            模板只有一张表：「视频标题 + 题目用途（前测/后测）+ 题目内容」。<strong
-              class="import-step__strong"
-              >视频标题</strong
-            >必须与管理端视频列表里的标题完全一致。
+            模板中的题目前后测共用，按列填写题干、选项与正确答案即可。
           </p>
 
-          <a
+          <button
+            type="button"
             class="btn btn--secondary"
-            :href="TEMPLATE_PATH"
-            download="科普视频题目_批量导入模板.xlsx"
+            :disabled="downloadingTemplate"
+            @click="onDownloadTemplate"
           >
             <svg
               class="btn__icon"
@@ -211,8 +319,8 @@ function confirmImport() {
               <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5" />
               <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
             </svg>
-            下载 Excel 模板
-          </a>
+            {{ downloadingTemplate ? '下载中…' : '下载 Excel 模板' }}
+          </button>
         </section>
 
         <hr class="import-modal__divider" />
@@ -222,6 +330,18 @@ function confirmImport() {
           <div class="import-step__head">
             <span class="import-step__index">2</span>
             <h3 class="import-step__title">上传填好的文件</h3>
+          </div>
+
+          <div v-if="!isScoped" class="scope-fields">
+            <label class="scope-field">
+              <span class="scope-field__label">视频</span>
+              <select v-model="selectedVideoId" class="scope-field__select" :disabled="busy">
+                <option value="">{{ loadingVideos ? '加载中…' : '请选择视频' }}</option>
+                <option v-for="item in videoOptions" :key="item.id" :value="item.id">
+                  {{ item.title }}
+                </option>
+              </select>
+            </label>
           </div>
 
           <p v-if="scopeHint" class="import-step__desc">{{ scopeHint }}</p>
@@ -261,7 +381,7 @@ function confirmImport() {
               <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
             </svg>
             <p class="dropzone__text">拖拽文件到此处，或点击选择文件</p>
-            <p class="dropzone__hint">支持 .xlsx / .xls，解析在浏览器本地完成</p>
+            <p class="dropzone__hint">支持 .xlsx / .xls，上传后由服务端校验</p>
           </div>
 
           <div v-else class="file-chip">
@@ -279,9 +399,11 @@ function confirmImport() {
               <path d="M14 3v5h5" />
             </svg>
             <span class="file-chip__name">{{ fileName }}</span>
-            <span v-if="phase === 'parsing'" class="file-chip__state">解析中…</span>
+            <span v-if="phase === 'uploading'" class="file-chip__state">上传中…</span>
+            <span v-else-if="phase === 'validating'" class="file-chip__state">校验中…</span>
+            <span v-else-if="phase === 'confirming'" class="file-chip__state">导入中…</span>
             <button
-              v-else-if="phase !== 'importing'"
+              v-else-if="phase !== 'done'"
               type="button"
               class="file-chip__change"
               @click="pickFile"
@@ -293,78 +415,46 @@ function confirmImport() {
           <p v-if="phase === 'error'" class="import-error">{{ errorMessage }}</p>
         </section>
 
-        <!-- 步骤 3：校验预览 -->
-        <template v-if="result && ['preview', 'importing', 'done'].includes(phase)">
+        <!-- 步骤 3：校验结果 -->
+        <template v-if="task && ['preview', 'confirming', 'done'].includes(phase)">
           <hr class="import-modal__divider" />
 
           <section class="import-step">
             <div class="import-step__head">
               <span class="import-step__index">3</span>
-              <h3 class="import-step__title">校验预览</h3>
+              <h3 class="import-step__title">校验结果</h3>
             </div>
 
             <p class="import-summary">
-              共解析 <strong>{{ validCount + errorCount }}</strong> 行，其中
-              <strong class="import-summary__ok">{{ validCount }} 道可导入</strong>
-              <template v-if="errorCount">
-                ，<strong class="import-summary__bad">{{ errorCount }} 行需修正</strong>
+              共校验 <strong>{{ counts.total }}</strong> 行，其中
+              <strong class="import-summary__ok">{{ counts.valid }} 行可导入</strong>
+              <template v-if="counts.errors">
+                ，<strong class="import-summary__bad">{{ counts.errors }} 行需修正</strong>
               </template>
             </p>
 
-            <p v-if="errorCount" class="import-tip">
-              存在错误的行不会导入，请按提示修正后重新上传。同一视频同一用途会整组替换原有题目。
+            <p v-if="counts.errors" class="import-tip">
+              存在错误的行不会导入，请按提示修正后重新上传。
             </p>
 
-            <div class="preview-table">
-              <div class="preview-table__head">
-                <span class="pcol pcol--row">行</span>
-                <span class="pcol pcol--title">视频标题</span>
-                <span class="pcol pcol--stage">用途</span>
-                <span class="pcol pcol--order">题序</span>
-                <span class="pcol pcol--type">题型</span>
-                <span class="pcol pcol--stem">题干</span>
-                <span class="pcol pcol--answer">答案</span>
-                <span class="pcol pcol--status">状态</span>
+            <div v-if="errorReport.length" class="error-list">
+              <div class="error-list__head">
+                <span>行</span>
+                <span>工作表</span>
+                <span>错误信息</span>
               </div>
-
-              <div
-                v-for="row in previewRows"
-                :key="row.rowNumber"
-                class="preview-row"
-                :class="{ 'preview-row--error': row.messages.length }"
-              >
-                <span class="pcol pcol--row">{{ row.rowNumber }}</span>
-                <span class="pcol pcol--title" :title="row.item?.videoTitle">
-                  {{ row.item?.videoTitle ?? '—' }}
-                </span>
-                <span class="pcol pcol--stage">
-                  {{ row.item ? STAGE_LABEL[row.item.stage] : '—' }}
-                </span>
-                <span class="pcol pcol--order">{{ row.item?.order ?? '—' }}</span>
-                <span class="pcol pcol--type">
-                  {{ row.item ? QUESTION_TYPE_LABEL[row.item.type] : '—' }}
-                </span>
-                <span class="pcol pcol--stem" :title="row.item?.stem">
-                  {{ row.item?.stem ?? '—' }}
-                </span>
-                <span class="pcol pcol--answer">
-                  {{ row.item ? String(row.item.answer).replace(/,/g, '') : '—' }}
-                </span>
-                <span class="pcol pcol--status">
-                  {{ row.messages.length ? '需修正' : '可导入' }}
-                </span>
-
-                <p v-if="row.messages.length" class="preview-row__errors">
-                  {{ row.messages.join('；') }}
-                </p>
+              <div v-for="(item, index) in errorReport" :key="index" class="error-list__row">
+                <span>{{ item.row }}</span>
+                <span>{{ item.sheet }}</span>
+                <span :title="item.message">{{ item.message }}</span>
               </div>
             </div>
 
             <p v-if="phase === 'done'" class="import-success">
-              已成功导入 {{ importedCount }} 道题，视频列表已更新。
+              已成功导入 {{ counts.valid }} 道题，题目列表已更新。
             </p>
-            <p v-else-if="errorCount" class="import-tip">
-              当前有 {{ errorCount }} 行错误，修正前无法提交导入。
+            <p v-else-if="counts.errors" class="import-tip">
+              当前有 {{ counts.errors }} 行错误，修正前无法提交导入。
             </p>
           </section>
         </template>
@@ -376,7 +466,7 @@ function confirmImport() {
         <button
           type="button"
           class="btn btn--primary"
-          :disabled="!canImport && phase !== 'done'"
+          :disabled="!canConfirm && phase !== 'done'"
           @click="confirmImport"
         >
           {{ confirmLabel }}
@@ -712,23 +802,23 @@ function confirmImport() {
   border-radius: var(--r-md);
 }
 
-.preview-table {
+.error-list {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
 }
 
-.preview-table__head,
-.preview-row {
+.error-list__head,
+.error-list__row {
   display: grid;
-  grid-template-columns: 44px minmax(110px, 1.3fr) 56px 48px 72px minmax(150px, 2.2fr) 56px 64px;
+  grid-template-columns: 56px 96px minmax(0, 1fr);
   gap: var(--sp-2);
   align-items: center;
   padding: var(--sp-2) var(--sp-3);
 }
 
-.preview-table__head {
+.error-list__head {
   font-size: var(--fs-xs);
   font-weight: var(--fw-medium);
   color: var(--text-secondary);
@@ -736,52 +826,64 @@ function confirmImport() {
   border-bottom: 1px solid var(--border);
 }
 
-.preview-row {
+.error-list__row {
   font-size: var(--fs-xs);
-  color: var(--text-primary);
+  color: var(--danger-text);
+  background: var(--danger-bg);
   border-bottom: 1px solid var(--border-light);
 }
 
-.preview-row:last-child {
+.error-list__row:last-child {
   border-bottom: none;
 }
 
-.preview-row--error {
-  color: var(--danger-text);
-  background: var(--danger-bg);
-}
-
-.pcol {
+.error-list__row > span {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.pcol--row,
-.pcol--order,
-.pcol--answer {
+.error-list__head > span:first-child,
+.error-list__row > span:first-child {
   text-align: center;
 }
 
-.pcol--status {
-  font-weight: var(--fw-semibold);
+/* ===== 视频 / 用途选择（列表页批量导入） ===== */
+.scope-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  width: 100%;
 }
 
-.preview-row--error .pcol--status {
-  color: var(--danger-text);
+.scope-field {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
 }
 
-.preview-row:not(.preview-row--error) .pcol--status {
-  color: var(--success);
+.scope-field__label {
+  flex-shrink: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
 }
 
-.preview-row__errors {
-  grid-column: 1 / -1;
-  margin: var(--sp-1) 0 0;
-  font-size: var(--fs-xs);
-  line-height: 1.5;
-  color: var(--danger-text);
+.scope-field__select {
+  height: 36px;
+  min-width: 180px;
+  padding: 0 var(--sp-3);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  background: var(--bg-surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  outline: none;
+}
+
+.scope-field__select:focus {
+  border-color: var(--brand-primary-hover);
 }
 
 /* ===== 底部操作 ===== */
@@ -811,13 +913,14 @@ function confirmImport() {
     padding: var(--sp-8) var(--sp-4);
   }
 
-  .preview-table {
-    overflow-x: auto;
+  .scope-fields {
+    flex-direction: column;
+    gap: var(--sp-2);
   }
 
-  .preview-table__head,
-  .preview-row {
-    min-width: 620px;
+  .scope-field__select {
+    flex: 1;
+    min-width: 0;
   }
 }
 </style>

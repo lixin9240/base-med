@@ -5,38 +5,44 @@ import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import { formatArticleHtml } from '@/utils/article'
 import { toast } from '@/utils/toast'
-import { WATCH_PERCENT, getProgress, saveProgress } from '@/store'
-import { resolveDrId } from '@/store/mobile/session'
-import { getPublicVideoDetail } from '@/api/public'
+import { getPublicVideoDetail, reportVideoProgress } from '@/api/public'
+import { currentDrId, issueDrId, setSkipWatch } from '@/store/mobile/session'
 
 const route = useRoute()
 const router = useRouter()
 const videoId = String(route.query.videoId || '')
+// 分享链接入口（后端生成的 H5 链接形如 /mobile/learn?video_id=5&share=xxx）
+const shareVideoId = String(route.query.video_id || '')
 
 const video = ref(null)
-const drId = ref('')
 const error = ref('')
 const videoEl = ref(null)
-const watched = ref(0)
-const canQuiz = ref(false)
+const watched = ref(0) // 观看进度百分比
+const required = ref(90) // 解锁门槛
+const canQuiz = ref(false) // 是否已解锁后测
 const badRate = ref(false)
 const noVideoMode = ref(false)
 
-let watchedSeconds = 0
-let maxTime = 0
-let lastTick = 0
-let saveTimer
+let maxTime = 0 // 最大观看位置（秒）
+let reportTimer = null
 
 const articleHtml = computed(() => formatArticleHtml(video.value?.articleBody || ''))
 
 onMounted(async () => {
   try {
-    if (!videoId) {
+    // 通过分享链接进入：先签发匿名编号，再跳转到对应视频的前测题页面
+    if (shareVideoId) {
+      await issueDrId(shareVideoId)
+      router.replace({ name: 'mobile-quiz', query: { videoId: shareVideoId, stage: 'pre' } })
+      return
+    }
+
+    const drId = currentDrId()
+    if (!drId || !videoId) {
       router.replace('/mobile/home')
       return
     }
-    drId.value = await resolveDrId()
-    const detail = await getPublicVideoDetail(drId.value, videoId)
+    const detail = await getPublicVideoDetail(drId, videoId)
     video.value = {
       id: detail.id,
       title: detail.title,
@@ -51,10 +57,18 @@ onMounted(async () => {
       examState: detail.exam_state,
     }
 
-    const p = getProgress(drId.value, videoId)
-    watched.value = p.watchedPercent || 0
-    if (watched.value >= WATCH_PERCENT) canQuiz.value = true
-    saveTimer = window.setInterval(persistProgress, 5000)
+    const wp = detail.watch_progress || {}
+    if (!detail.video_url) {
+      // 纯图文内容：无需观看进度，可直接答题
+      noVideoMode.value = true
+      canQuiz.value = true
+    } else {
+      watched.value = wp.progress_percent ?? 0
+      required.value = wp.watch_required_percent ?? 90
+      canQuiz.value = wp.is_unlocked === 1
+      if (canQuiz.value) maxTime = Number(wp.watched_seconds) || 0
+      reportTimer = window.setInterval(reportProgress, 3000)
+    }
     document.addEventListener('visibilitychange', onVisibility)
   } catch (e) {
     error.value = e?.message || '加载失败'
@@ -62,48 +76,45 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  clearInterval(saveTimer)
+  clearInterval(reportTimer)
   document.removeEventListener('visibilitychange', onVisibility)
-  persistProgress()
+  reportProgress()
 })
 
-function persistProgress() {
-  if (!drId.value || !videoId) return
-  const p = getProgress(drId.value, videoId)
-  saveProgress(drId.value, videoId, {
-    ...p,
-    watchedPercent: Math.max(p.watchedPercent || 0, Math.round(watched.value)),
-  })
+async function reportProgress() {
+  const drId = currentDrId()
+  const el = videoEl.value
+  if (!drId || !videoId || !el) return
+  try {
+    const res = await reportVideoProgress({
+      dr_id: drId,
+      video_id: videoId,
+      watched_seconds: Math.floor(maxTime || el.currentTime || 0),
+      duration: Math.round(el.duration) || undefined,
+    })
+    if (res) {
+      watched.value = res.progress_percent ?? watched.value
+      required.value = res.watch_required_percent ?? required.value
+      if (res.is_unlocked === 1 && !canQuiz.value) {
+        canQuiz.value = true
+        toast('已看完，可以去答题了')
+      }
+    }
+  } catch {
+    // 上报失败忽略，避免打断播放
+  }
 }
 
 function onVisibility() {
-  if (document.visibilityState === 'hidden' && videoEl.value) {
-    lastTick = videoEl.value.currentTime
-  }
-}
-
-function setProgress(next) {
-  const prev = watched.value
-  watched.value = Math.min(100, Math.max(0, next))
-  if (prev < WATCH_PERCENT && watched.value >= WATCH_PERCENT) {
-    canQuiz.value = true
-    persistProgress()
-    toast('已看完，可以去答题了')
-  }
+  if (document.visibilityState === 'hidden') reportProgress()
 }
 
 function onTimeUpdate() {
   const el = videoEl.value
   if (!el || !el.duration) return
   if (!el.paused && !el.seeking && Number(el.playbackRate) === 1 && document.visibilityState === 'visible') {
-    const delta = el.currentTime - lastTick
-    if (delta > 0 && delta < 1.5) {
-      watchedSeconds += delta
-      if (el.currentTime > maxTime) maxTime = el.currentTime
-    }
+    if (el.currentTime > maxTime) maxTime = el.currentTime
   }
-  lastTick = el.currentTime
-  setProgress((watchedSeconds / el.duration) * 100)
 }
 
 function onSeeking() {
@@ -113,7 +124,6 @@ function onSeeking() {
     el.currentTime = maxTime
     toast('请完整观看视频后再继续')
   }
-  lastTick = el.currentTime
 }
 
 function onRateChange() {
@@ -124,22 +134,18 @@ function onRateChange() {
 function onEnded() {
   const el = videoEl.value
   if (el?.duration) {
-    watchedSeconds = el.duration
     maxTime = el.duration
-    lastTick = el.duration
-    setProgress(100)
-    persistProgress()
+    reportProgress()
   }
 }
 
 function onVideoError() {
   noVideoMode.value = true
-  setProgress(100)
-  persistProgress()
+  canQuiz.value = true
+  setSkipWatch(videoId)
 }
 
 function goQuiz() {
-  persistProgress()
   router.push({ name: 'mobile-quiz', query: { videoId, stage: 'post' } })
 }
 </script>
@@ -230,7 +236,7 @@ function goQuiz() {
           </div>
         </div>
         <button type="button" class="btn btn--primary btn--lg btn--block" :disabled="!canQuiz" @click="goQuiz">
-          {{ canQuiz ? '去答题' : `请看完视频（${WATCH_PERCENT}% 后可答题）` }}
+          {{ canQuiz ? '去答题' : `请看完视频（${required}% 后可答题）` }}
         </button>
       </div>
     </template>
