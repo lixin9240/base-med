@@ -102,6 +102,20 @@ Route::prefix('admin/admin-user')->middleware('auth:admin')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
+| 用户管理-启用/禁用（2.2.5，列表页「禁用登录 / 恢复登录」按钮）
+|--------------------------------------------------------------------------
+*/
+
+Route::prefix('admin/user')->middleware('auth:admin')->group(function () {
+    // 按状态筛选用户列表（2.2.6，status 必填：0禁用 1正常）
+    Route::get(uri: '/list', action: [AdminUserController::class, 'listByStatus']);
+
+    // 启用/禁用用户（2.2.5，禁用后该用户立即无法登录，已签发 token 同步失效）
+    Route::post(uri: '/update-status', action: [AdminUserController::class, 'updateStatus']);
+});
+
+/*
+|--------------------------------------------------------------------------
 | WJC-题目配置模块（2.3）
 |--------------------------------------------------------------------------
 */
