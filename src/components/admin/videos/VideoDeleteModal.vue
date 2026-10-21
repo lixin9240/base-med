@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { deleteAdminVideo } from '@/api'
 import { listVideoQuestions, removeVideo } from '@/store/video/video'
 
 const props = defineProps({
@@ -43,14 +44,16 @@ watch(
   },
 )
 
-function confirmDelete() {
+async function confirmDelete() {
   if (!props.video || deleting.value) return
 
   deleting.value = true
   errorMessage.value = ''
   try {
-    const removed = removeVideo(props.video.id)
-    if (!removed) throw new Error('视频不存在或已被删除')
+    // 先走 2.2.6 软删除：已存在答题记录时后端前置校验不通过，本地记录不动
+    await deleteAdminVideo({ id: props.video.apiId ?? props.video.id })
+    // 后端删除成功后同步清理本地记录；无本地记录时不影响删除结果
+    removeVideo(props.video.id)
     emit('deleted', props.video.id)
     emit('close')
   } catch (error) {

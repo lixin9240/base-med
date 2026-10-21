@@ -12,8 +12,11 @@ export {
   updateAdminVideoQuestion,
 } from './question'
 export {
+  completeAdminVideoUpload,
   createAdminVideo,
+  deleteAdminVideo,
   getAdminVideoDetail,
+  initAdminVideoUpload,
   listAdminVideos,
   updateAdminVideo,
   updateAdminVideoStatus,
