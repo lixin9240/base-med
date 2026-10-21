@@ -1,48 +1,86 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { adminRecords } from '@/mock/admin'
-import { listRecords } from '@/store'
+import { computed, onMounted, ref } from 'vue'
+import { listAdminRecords, listAdminVideos } from '@/api'
 import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
 
 const PAGE_SIZE = 20
 
-// 真实答题记录（用户端产生） + 演示数据，按完成时间倒序
-const allRecords = [...listRecords(), ...adminRecords].sort(
-  (a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0),
-)
+/** 2.5.1 接口返回的记录（字段已转成列表展示用） */
+const rows = ref([])
+const total = ref(0)
+const page = ref(1)
+const loading = ref(false)
+const loadError = ref('')
 
 const filterVideo = ref('')
 const filterResult = ref('')
-const page = ref(1)
 const activeRecord = ref(null)
 
-const videoOptions = [...new Set(allRecords.map((r) => r.courseTitle).filter(Boolean))]
+/** 「全部视频」下拉选项：复用已接入的视频列表接口（文档 2.5.1 注明选项来自视频列表） */
+const videoOptions = ref([])
 
-const filtered = computed(() =>
-  allRecords.filter((r) => {
-    if (filterVideo.value && r.courseTitle !== filterVideo.value) return false
-    if (filterResult.value === 'pass' && !r.passed) return false
-    if (filterResult.value === 'fail' && r.passed) return false
-    return true
-  }),
-)
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
-const totalPages = computed(() => Math.max(1, Math.ceil(filtered.value.length / PAGE_SIZE)))
+/** 把 2.5.1 接口返回的一条记录转成列表页展示需要的字段 */
+function toRow(item) {
+  return {
+    id: item.id,
+    time: item.submit_at || '—',
+    courseTitle: item.video_title || '',
+    userId: item.dr_id || '',
+    preCorrect: Number(item.pre_correct) || 0,
+    preTotal: Number(item.pre_total) || 0,
+    postCorrect: Number(item.post_correct) || 0,
+    postTotal: Number(item.post_total) || 0,
+    percent: Number(item.accuracy_rate) || 0,
+    passed: item.result_status === 'pass',
+  }
+}
 
-const paged = computed(() => {
-  const start = (page.value - 1) * PAGE_SIZE
-  return filtered.value.slice(start, start + PAGE_SIZE)
+async function refreshRecords() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const data = await listAdminRecords({
+      page: page.value,
+      pageSize: PAGE_SIZE,
+      videoId: filterVideo.value,
+      resultStatus: filterResult.value,
+    })
+    rows.value = data.list.map(toRow)
+    total.value = data.total
+  } catch (error) {
+    rows.value = []
+    total.value = 0
+    loadError.value = error?.message || '答题记录加载失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadVideoOptions() {
+  try {
+    const data = await listAdminVideos({ page: 1, pageSize: 100 })
+    videoOptions.value = data.list.map((item) => ({ id: item.id, title: item.title }))
+  } catch {
+    // 下拉仅用于筛选，视频列表取不到时不影响答题记录列表本身
+    videoOptions.value = []
+  }
+}
+
+onMounted(() => {
+  refreshRecords()
+  loadVideoOptions()
 })
 
 function onFilterChange() {
   page.value = 1
+  refreshRecords()
 }
 
-function fmtTime(ts) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+function goPage(next) {
+  page.value = next
+  refreshRecords()
 }
 
 function csvCell(value) {
@@ -51,9 +89,9 @@ function csvCell(value) {
 
 function exportCsv() {
   const head = ['时间', '视频', '编号', '前测', '看课答题', '正确率', '结果']
-  const lines = filtered.value.map((r) =>
+  const lines = rows.value.map((r) =>
     [
-      fmtTime(r.completedAt),
+      r.time,
       r.courseTitle,
       r.userId,
       `${r.preCorrect}/${r.preTotal}`,
@@ -119,7 +157,9 @@ function isPicked(item, optIndex) {
       <div class="records-page__actions">
         <select v-model="filterVideo" class="select" aria-label="按视频筛选" @change="onFilterChange">
           <option value="">全部视频</option>
-          <option v-for="title in videoOptions" :key="title" :value="title">{{ title }}</option>
+          <option v-for="item in videoOptions" :key="item.id" :value="item.id">
+            {{ item.title }}
+          </option>
         </select>
 
         <select v-model="filterResult" class="select" aria-label="按结果筛选" @change="onFilterChange">
@@ -160,8 +200,8 @@ function isPicked(item, optIndex) {
         <span class="col col--ops">操作</span>
       </div>
 
-      <div v-for="record in paged" :key="record.id" class="records-row">
-        <span class="col col--time">{{ fmtTime(record.completedAt) }}</span>
+      <div v-for="record in rows" :key="record.id" class="records-row">
+        <span class="col col--time">{{ record.time }}</span>
         <span class="col col--video">{{ record.courseTitle }}</span>
         <span class="col col--uid">{{ record.userId }}</span>
         <span class="col col--score">{{ record.preCorrect }}/{{ record.preTotal }}</span>
@@ -180,18 +220,21 @@ function isPicked(item, optIndex) {
         </span>
       </div>
 
-      <div v-if="!paged.length" class="records-empty">暂无符合条件的答题记录</div>
+      <div v-if="loadError" class="records-empty">{{ loadError }}</div>
+      <div v-else-if="!rows.length" class="records-empty">
+        {{ loading ? '加载中…' : '暂无符合条件的答题记录' }}
+      </div>
     </div>
 
     <!-- 分页 -->
-    <footer v-if="filtered.length" class="records-page__foot">
+    <footer v-if="total" class="records-page__foot">
       <div class="pager">
         <button
           type="button"
           class="pager__btn"
-          :disabled="page <= 1"
+          :disabled="page <= 1 || loading"
           aria-label="上一页"
-          @click="page -= 1"
+          @click="goPage(page - 1)"
         >
           ‹
         </button>
@@ -201,21 +244,22 @@ function isPicked(item, optIndex) {
           type="button"
           class="pager__btn"
           :class="{ 'pager__btn--active': n === page }"
-          @click="page = n"
+          :disabled="loading"
+          @click="goPage(n)"
         >
           {{ n }}
         </button>
         <button
           type="button"
           class="pager__btn"
-          :disabled="page >= totalPages"
+          :disabled="page >= totalPages || loading"
           aria-label="下一页"
-          @click="page += 1"
+          @click="goPage(page + 1)"
         >
           ›
         </button>
       </div>
-      <span class="records-page__total">共 {{ filtered.length }} 条</span>
+      <span class="records-page__total">共 {{ total }} 条</span>
     </footer>
 
     <!-- 查看作答弹窗 -->
@@ -226,7 +270,7 @@ function isPicked(item, optIndex) {
             <h2 class="modal__title">作答详情</h2>
             <p class="modal__meta">
               {{ activeRecord.userId }} · 《{{ activeRecord.courseTitle }}》 ·
-              {{ fmtTime(activeRecord.completedAt) }}
+              {{ activeRecord.time }}
             </p>
           </div>
           <div class="modal__summary">
@@ -256,6 +300,10 @@ function isPicked(item, optIndex) {
         </header>
 
         <div class="modal__body">
+          <p v-if="!activePre.length && !activePost.length" class="records-empty">
+            作答详情接口（2.5.2）尚未接入，暂不支持查看逐题明细。
+          </p>
+
           <section v-if="activePre.length" class="stage">
             <h3 class="stage__title">前测（看视频前）</h3>
             <article
@@ -293,7 +341,7 @@ function isPicked(item, optIndex) {
             </article>
           </section>
 
-          <section class="stage">
+          <section v-if="activePost.length" class="stage">
             <h3 class="stage__title">看课答题（看完视频后）</h3>
             <article
               v-for="(item, index) in activePost"
