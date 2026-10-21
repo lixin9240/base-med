@@ -47,7 +47,7 @@ class VideoController extends Controller
         $data = $this->videoService->progress(
             (string) $request->validated('dr_id'),
             (int) $request->validated('video_id'),
-            (int) $request->validated('watched_seconds'),
+            (float) $request->validated('watched_seconds'),
             $request->validated('duration') !== null ? (int) $request->validated('duration') : null
         );
 
