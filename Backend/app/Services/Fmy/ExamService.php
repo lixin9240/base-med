@@ -8,6 +8,7 @@ use App\Models\ExamAnswer;
 use App\Models\ExamPretest;
 use App\Models\ExamRecord;
 use App\Models\SystemConfig;
+use App\Models\Video;
 use App\Models\VideoProgress;
 use App\Models\VideoQuestion;
 use Illuminate\Support\Collection;
@@ -72,7 +73,7 @@ class ExamService
         $video = $this->videoService->onShelfVideo($videoId);
         $this->videoService->assertVisitVideo($visit, $video->id);
 
-        $this->assertWatchProgressUnlocked($visit->id, $video->id);
+        $this->assertWatchProgressUnlocked($visit->id, $video);
 
         $pretest = ExamPretest::query()
             ->where('user_id', $visit->id)
@@ -181,15 +182,20 @@ class ExamService
     }
 
     /**
-     * 观看进度门槛校验：达到配置百分比（默认 90%）才能提交后测
+     * 观看进度门槛校验：达到配置百分比（默认 90%）才能提交后测。
+     * 视频损坏（转码失败或无视频源）时跳过该校验，直接放行。
      */
-    private function assertWatchProgressUnlocked(int $visitId, int $videoId): void
+    private function assertWatchProgressUnlocked(int $visitId, Video $video): void
     {
+        if ($this->videoService->isBrokenVideo($video)) {
+            return;
+        }
+
         $required = $this->videoService->watchRequiredPercent();
 
         $percent = (int) (VideoProgress::query()
             ->where('user_id', $visitId)
-            ->where('video_id', $videoId)
+            ->where('video_id', $video->id)
             ->value('progress_percent') ?? 0);
 
         if ($percent < $required) {
