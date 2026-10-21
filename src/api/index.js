@@ -28,6 +28,7 @@ export {
   getPublicVideoDetail,
   listPublicQuestions,
   listPublicVideos,
+  reportVideoProgress,
   submitPostExam,
   submitPreExam,
 } from './public'

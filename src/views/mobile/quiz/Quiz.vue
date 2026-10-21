@@ -5,8 +5,7 @@ import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
 import { toast } from '@/utils/toast'
-import { WATCH_PERCENT, getProgress } from '@/store'
-import { resolveDrId } from '@/store/mobile/session'
+import { currentDrId } from '@/store/mobile/session'
 import { getPublicVideoDetail, listPublicQuestions, submitPostExam, submitPreExam } from '@/api/public'
 
 const route = useRoute()
@@ -41,11 +40,11 @@ function categoryTone(category) {
 
 onMounted(async () => {
   try {
-    if (!videoId) {
+    drId.value = currentDrId()
+    if (!drId.value || !videoId) {
       router.replace('/mobile/home')
       return
     }
-    drId.value = await resolveDrId()
     const detail = await getPublicVideoDetail(drId.value, videoId)
     course.value = {
       id: detail.id,
@@ -54,6 +53,7 @@ onMounted(async () => {
       cover: detail.cover_url,
       videoUrl: detail.video_url,
       examState: detail.exam_state,
+      watchProgress: detail.watch_progress,
     }
     questions.value = await listPublicQuestions(videoId)
 
@@ -69,13 +69,10 @@ onMounted(async () => {
         router.replace({ name: 'mobile-quiz', query: { videoId, stage: 'pre' } })
         return
       }
-      if (course.value.videoUrl) {
-        const progress = getProgress(drId.value, videoId)
-        if ((progress.watchedPercent || 0) < WATCH_PERCENT) {
-          toast('请先完整观看视频再来答题')
-          router.replace({ name: 'mobile-learn', query: { videoId } })
-          return
-        }
+      if (course.value.videoUrl && course.value.watchProgress?.is_unlocked !== 1) {
+        toast('请先完整观看视频再来答题')
+        router.replace({ name: 'mobile-learn', query: { videoId } })
+        return
       }
     }
 

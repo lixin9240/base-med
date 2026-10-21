@@ -18,32 +18,34 @@ import {
 const DR_CREATE_PATH = '/api/public/dr/create'
 const VIDEO_LIST_PATH = '/api/public/video/list'
 const VIDEO_DETAIL_PATH = '/api/public/video/detail'
+const VIDEO_PROGRESS_PATH = '/api/public/video/progress'
 const QUESTION_LIST_PATH = '/api/public/video/question-list'
 const EXAM_SUBMIT_PRE_PATH = '/api/public/exam/submit-pre'
+const EXAM_SUBMIT_POST_PATH = '/api/public/exam/submit-post'
 const EXAM_RESULT_PATH = '/api/public/exam/result'
 
-/** 3.1 获取匿名 DR 编号（token 来自分享链接 ?token=）。返回 dr_id 字符串 */
-export async function createPublicDr(token) {
+/** 3.1 获取匿名 DR 编号（点击视频时签发）。参数 video_id。返回 dr_id 字符串 */
+export async function createPublicDr(videoId) {
   if (USE_MOCK) return mockCreateDr()
 
-  const body = await get(`${DR_CREATE_PATH}?token=${encodeURIComponent(token)}`)
+  const body = await get(`${DR_CREATE_PATH}?video_id=${encodeURIComponent(videoId)}`)
   const drId = body?.data?.dr_id
   if (!drId) throw new Error('获取匿名编号失败：服务未返回 dr_id')
   return String(drId)
 }
 
-/** 3.2 用户端首页视频列表。返回后端原始字段数组 */
-export async function listPublicVideos(drId) {
-  if (USE_MOCK) return mockListVideos(drId)
+/** 3.2 用户端首页视频列表（免登录、无需 dr_id）。返回后端原始字段数组 */
+export async function listPublicVideos() {
+  if (USE_MOCK) return mockListVideos()
 
-  const body = await get(`${VIDEO_LIST_PATH}?dr_id=${encodeURIComponent(drId)}`)
+  const body = await get(VIDEO_LIST_PATH)
   if (!body || typeof body !== 'object' || !Array.isArray(body.data)) {
     throw new Error('视频列表加载失败：服务未返回标准数据')
   }
   return body.data
 }
 
-/** 3.3 视频详情。返回后端原始字段对象 */
+/** 3.3 视频详情。返回后端原始字段对象（含 watch_progress） */
 export async function getPublicVideoDetail(drId, videoId) {
   if (USE_MOCK) return mockVideoDetail(drId, videoId)
 
@@ -56,7 +58,18 @@ export async function getPublicVideoDetail(drId, videoId) {
   return body.data
 }
 
-/** 3.5 获取视频题目列表（学前/看完答题共用）。返回后端原始字段数组，不含答案与解析 */
+/** 3.4 上报视频观看进度。payload：{ dr_id, video_id, watched_seconds, duration? } */
+export async function reportVideoProgress(payload) {
+  if (USE_MOCK) return mockReportProgress(payload)
+
+  const body = await post(VIDEO_PROGRESS_PATH, payload)
+  if (!body || typeof body !== 'object' || !('data' in body)) {
+    throw new Error('进度上报失败：服务未返回标准数据')
+  }
+  return body.data ?? {}
+}
+
+/** 3.6 获取视频题目列表（学前/看完答题共用）。返回后端原始字段数组，不含答案与解析 */
 export async function listPublicQuestions(videoId) {
   if (USE_MOCK) return mockQuestions(videoId)
 
@@ -67,7 +80,7 @@ export async function listPublicQuestions(videoId) {
   return body.data
 }
 
-/** 3.4 提交学前答题。payload：{ dr_id, video_id, answers: [{ question_id, user_answer }] } */
+/** 3.5 提交学前答题。payload：{ dr_id, video_id, answers: [{ question_id, user_answer }] } */
 export async function submitPreExam(payload) {
   if (USE_MOCK) return mockSubmitPre(payload)
 
@@ -78,16 +91,18 @@ export async function submitPreExam(payload) {
   return body.data ?? {}
 }
 
-/**
- * 提交看完答题。接口文档未定义该接口（submit-post），真实模式下不可用；
- * mock 模式下本地判分并落记录，返回 exam_record_id。
- */
+/** 3.7 提交看完答题。返回结构与 3.8 一致（含 result_status / accuracy_rate / question_detail） */
 export async function submitPostExam(payload) {
   if (USE_MOCK) return mockSubmitPost(payload)
-  throw new Error('提交看完答题接口尚未定义')
+
+  const body = await post(EXAM_SUBMIT_POST_PATH, payload)
+  if (!body || typeof body !== 'object' || !body.data) {
+    throw new Error('提交失败：服务未返回标准数据')
+  }
+  return body.data
 }
 
-/** 3.6 获取答题结果。params：{ dr_id, video_id? , exam_record_id? }（video_id 与 exam_record_id 二选一） */
+/** 3.8 获取答题结果。params：{ dr_id, video_id? , exam_record_id? }（video_id 与 exam_record_id 二选一） */
 export async function getExamResult(params) {
   if (USE_MOCK) return mockResult(params)
 
@@ -106,29 +121,25 @@ export async function getExamResult(params) {
 /* ------------------------------- mock 实现 ------------------------------- */
 
 function mockCreateDr() {
-  // 本地签发匿名编号（沿用旧的 DR-2026-XXXXXX 规则）
   return ensureLearner().userId
 }
 
-function mockListVideos(drId) {
-  return listPublishedCourses().map((course) => {
-    const p = getProgress(drId, course.id)
-    return {
-      id: course.id,
-      title: course.title,
-      category_name: course.category,
-      speaker: course.speaker,
-      brief_intro: course.intro,
-      cover_url: course.cover,
-      exam_status: p.postDone ? 'done' : p.preDone ? 'pre' : 'none',
-    }
-  })
+function mockListVideos() {
+  return listPublishedCourses().map((course) => ({
+    id: course.id,
+    title: course.title,
+    category_name: course.category,
+    speaker: course.speaker,
+    brief_intro: course.intro,
+    cover_url: course.cover,
+  }))
 }
 
 function mockVideoDetail(drId, videoId) {
   const course = getCourse(videoId)
   if (!course) throw new Error('视频不存在或已下架')
   const p = getProgress(drId, videoId)
+  const watchedPercent = p.watchedPercent || 0
 
   return {
     id: course.id,
@@ -147,6 +158,27 @@ function mockVideoDetail(drId, videoId) {
       post_submitted: p.postDone ? 1 : 0,
       exam_record_id: p.lastRecordId || null,
     },
+    watch_progress: {
+      watched_seconds: watchedPercent,
+      progress_percent: watchedPercent,
+      watch_required_percent: 90,
+      is_unlocked: watchedPercent >= 90 ? 1 : 0,
+    },
+  }
+}
+
+function mockReportProgress({ dr_id, video_id, watched_seconds, duration }) {
+  const dur = Number(duration) || 100
+  const percent = dur ? Math.min(100, Math.round((Number(watched_seconds) / dur) * 100)) : 0
+  const p = getProgress(dr_id, video_id)
+  const watchedPercent = Math.max(p.watchedPercent || 0, percent)
+  saveProgress(dr_id, video_id, { ...p, watchedPercent })
+  return {
+    watched_seconds: Number(watched_seconds) || 0,
+    duration: dur,
+    progress_percent: watchedPercent,
+    watch_required_percent: 90,
+    is_unlocked: watchedPercent >= 90 ? 1 : 0,
   }
 }
 
@@ -175,7 +207,8 @@ function mockSubmitPost({ dr_id, video_id, answers }) {
   const recordId = newId('r_')
   saveProgress(dr_id, video_id, { ...p, postDone: true, postAnswers: userAnswers, lastRecordId: recordId })
   saveRecord({ id: recordId, videoId: video_id, courseId: video_id })
-  return { exam_record_id: recordId, video_id }
+  // 3.7 返回结构与 3.8 一致
+  return mockResult({ dr_id, exam_record_id: recordId })
 }
 
 function mockResult(params) {

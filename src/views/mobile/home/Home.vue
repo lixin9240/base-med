@@ -3,11 +3,12 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import { listPublicVideos } from '@/api/public'
-import { resolveDrId } from '@/store/mobile/session'
+import { issueDrId } from '@/store/mobile/session'
 
 const router = useRouter()
 const videos = ref([])
 const error = ref('')
+const opening = ref(false)
 
 const cards = computed(() =>
   videos.value.map((video) => ({
@@ -17,14 +18,12 @@ const cards = computed(() =>
     speaker: video.speaker,
     intro: video.brief_intro,
     cover: video.cover_url,
-    examStatus: video.exam_status,
   })),
 )
 
 onMounted(async () => {
   try {
-    const drId = await resolveDrId()
-    videos.value = await listPublicVideos(drId)
+    videos.value = await listPublicVideos()
   } catch (e) {
     error.value = e?.message || '加载失败'
   }
@@ -44,19 +43,16 @@ function categoryTone(category) {
   return 'mint'
 }
 
-function examHint(status) {
-  if (status === 'done') return '已完成'
-  if (status === 'pre') return '前测已完成，待看视频'
-  return ''
-}
-
-function openCourse(item) {
-  if (item.examStatus === 'none') {
+async function openCourse(item) {
+  if (opening.value) return
+  opening.value = true
+  try {
+    await issueDrId(item.id)
     router.push({ name: 'mobile-quiz', query: { videoId: item.id, stage: 'pre' } })
-  } else if (item.examStatus === 'pre') {
-    router.push({ name: 'mobile-learn', query: { videoId: item.id } })
-  } else {
-    router.push({ name: 'mobile-report', query: { videoId: item.id } })
+  } catch (e) {
+    error.value = e?.message || '加载失败'
+  } finally {
+    opening.value = false
   }
 }
 </script>
@@ -115,10 +111,6 @@ function openCourse(item) {
             <span>{{ item.speaker }}</span>
           </p>
           <p class="vcard__intro">{{ item.intro }}</p>
-          <p v-if="examHint(item.examStatus)" class="vcard__state">
-            <AppIcon name="checkCircle" :size="13" />
-            {{ examHint(item.examStatus) }}
-          </p>
         </div>
         <span class="vcard__go">
           <AppIcon name="chevronRight" :size="18" />
