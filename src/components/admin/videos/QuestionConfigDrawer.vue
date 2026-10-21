@@ -334,10 +334,10 @@ async function onExport() {
             <button type="button" class="link-btn" @click="load">重试</button>
           </div>
           <template v-else-if="questions.length">
-            <article v-for="question in questions" :key="question.id" class="q-card">
+            <article v-for="(question, index) in questions" :key="question.id" class="q-card">
               <div class="q-card__head">
                 <span class="q-card__type">{{ QUESTION_TYPE_LABEL[question.type] }}</span>
-                <span class="q-card__order">第 {{ question.order }} 题</span>
+                <span class="q-card__order">第 {{ index + 1 }} 题</span>
                 <div class="q-card__actions">
                   <button type="button" class="link-btn" @click="openEdit(question)">编辑</button>
                   <button
