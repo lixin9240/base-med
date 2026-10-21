@@ -3,6 +3,7 @@ import { get, post } from '../http'
 // 访问链接模块接口（接口文档 2.4）
 const CREATE_PATH = '/api/admin/share-link/create'
 const LIST_PATH = '/api/admin/share-link/list'
+const UPDATE_STATUS_PATH = '/api/admin/share-link/update-status'
 const DELETE_PATH = '/api/admin/share-link/delete'
 
 /**
@@ -47,6 +48,21 @@ export async function createAdminShareLink({ video_id, org_id, expire_type, expi
     throw new Error('链接生成失败：服务未返回标准数据')
   }
   return body.data
+}
+
+/**
+ * 2.4.3 启用/失效链接。status：0 失效，1 启用；历史访问计数保留。
+ * @param {{ id: number|string, status: 0|1 }} params
+ */
+export async function updateAdminShareLinkStatus({ id, status }) {
+  const body = await post(UPDATE_STATUS_PATH, { id, status })
+
+  if (!body || typeof body !== 'object' || body.success === false) {
+    throw new Error(
+      status === 1 ? '链接启用失败：服务未返回成功结果' : '链接失效失败：服务未返回成功结果',
+    )
+  }
+  return true
 }
 
 /**

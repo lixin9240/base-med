@@ -21,7 +21,12 @@ export {
   updateAdminVideo,
   updateAdminVideoStatus,
 } from './video'
-export { createAdminShareLink, deleteAdminShareLink, listAdminShareLinks } from './video/shareLink'
+export {
+  createAdminShareLink,
+  deleteAdminShareLink,
+  listAdminShareLinks,
+  updateAdminShareLinkStatus,
+} from './video/shareLink'
 export { listAdminCategories } from './category'
 export {
   createPublicDr,
