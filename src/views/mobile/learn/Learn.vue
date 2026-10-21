@@ -89,8 +89,8 @@ async function reportProgress() {
     const res = await reportVideoProgress({
       dr_id: drId,
       video_id: videoId,
-      watched_seconds: Math.floor(maxTime || el.currentTime || 0),
-      duration: Math.round(el.duration) || undefined,
+      watched_seconds: maxTime || el.currentTime || 0,
+      duration: el.duration || undefined,
     })
     if (res) {
       watched.value = Math.max(watched.value, res.progress_percent ?? 0)
