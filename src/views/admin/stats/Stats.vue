@@ -1,40 +1,28 @@
 <script setup>
-import { computed } from 'vue'
-import { adminRecords, adminVideos } from '@/mock/admin'
-import { PASS_PERCENT, listRecords } from '@/store'
+import { computed, onMounted, ref } from 'vue'
+import {
+  exportAdminStatistics,
+  getAdminStatisticsOverview,
+  listAdminStatisticsVideos,
+  listAdminStatisticsWrongQuestions,
+} from '@/api'
+import { PASS_PERCENT } from '@/store'
 
-// 与答题记录页同源：真实记录（用户端产生） + 演示数据
-const records = [...listRecords(), ...adminRecords]
+const overview = ref(null)
+const videoStats = ref([])
+const errorQuestions = ref([])
+const loading = ref(false)
+const loadError = ref('')
+const exporting = ref(false)
 
-// ===== 顶部统计卡 =====
-const publishedCount = adminVideos.filter((v) => v.published).length
-
-const totalAttempts = records.length
-
-const avgPercent = computed(() =>
-  totalAttempts ? Math.round(records.reduce((sum, r) => sum + (r.percent ?? 0), 0) / totalAttempts) : 0,
-)
-
-const passRate = computed(() =>
-  totalAttempts ? Math.round((records.filter((r) => r.passed).length / totalAttempts) * 100) : 0,
-)
-
-// ===== 各视频答题情况 =====
-const videoStats = computed(() =>
-  adminVideos.map((video) => {
-    const list = records.filter((r) => r.courseTitle === video.title)
-    const attempts = list.length
-    if (!attempts) {
-      return { ...video, attempts, avgPercent: null, passRate: null }
-    }
-    return {
-      ...video,
-      attempts,
-      avgPercent: Math.round(list.reduce((sum, r) => sum + (r.percent ?? 0), 0) / attempts),
-      passRate: Math.round((list.filter((r) => r.passed).length / attempts) * 100),
-    }
-  }),
-)
+// ===== 顶部统计卡（2.6.1）=====
+const videoTotal = computed(() => Number(overview.value?.video_total) || 0)
+const publishedCount = computed(() => Number(overview.value?.video_online) || 0)
+const totalAttempts = computed(() => Number(overview.value?.answer_total_times) || 0)
+const avgPercent = computed(() => Number(overview.value?.avg_accuracy) || 0)
+const passRate = computed(() => Number(overview.value?.pass_rate) || 0)
+/** 通过线取自 system_config，接口未返回时回退本地默认值 */
+const passScore = computed(() => Number(overview.value?.pass_score) || PASS_PERCENT)
 
 function barTone(rate) {
   if (rate >= 80) return 'success'
@@ -42,79 +30,80 @@ function barTone(rate) {
   return 'danger'
 }
 
-// ===== 最容易答错的题 =====
-const errorQuestions = computed(() => {
-  const map = new Map()
-  for (const r of records) {
-    const all = r.detail || []
-    const postTotal = r.postTotal || 0
-    const pre = postTotal ? all.slice(0, Math.max(0, all.length - postTotal)) : []
-    const post = postTotal ? all.slice(all.length - postTotal) : all
-    for (const [stage, items] of [
-      ['前测', pre],
-      ['后测', post],
-    ]) {
-      for (const item of items) {
-        const key = item.questionId || item.stem
-        if (!map.has(key)) {
-          map.set(key, {
-            stem: item.stem,
-            courseTitle: r.courseTitle,
-            stage,
-            attempts: 0,
-            wrong: 0,
-          })
-        }
-        const entry = map.get(key)
-        entry.attempts += 1
-        if (!item.correct) entry.wrong += 1
-      }
-    }
+/** 把 2.6.2 接口返回的一条记录转成表格展示字段 */
+function toVideoRow(item) {
+  return {
+    id: item.video_id,
+    title: item.title || '',
+    category: item.category_name || '',
+    published: Number(item.status) === 1,
+    attempts: Number(item.answer_times) || 0,
+    avgPercent:
+      item.avg_accuracy === null || item.avg_accuracy === undefined
+        ? null
+        : Number(item.avg_accuracy),
+    passRate:
+      item.pass_rate === null || item.pass_rate === undefined ? null : Number(item.pass_rate),
   }
-  return [...map.values()]
-    .filter((q) => q.attempts > 0 && q.wrong > 0)
-    .map((q) => ({ ...q, errorRate: Math.round((q.wrong / q.attempts) * 100) }))
-    .sort((a, b) => b.errorRate - a.errorRate || b.attempts - a.attempts)
-    .slice(0, 8)
-})
-
-// ===== 导出 =====
-function csvCell(value) {
-  return `"${String(value ?? '').replace(/"/g, '""')}"`
 }
 
-function exportCsv() {
-  const lines = [
-    ['各视频答题情况'],
-    ['视频', '状态', '答题次数', '平均正确率', '通过率'].map(csvCell).join(','),
-    ...videoStats.value.map((v) =>
-      [
-        v.title,
-        v.published ? '已上架' : '已下架',
-        v.attempts,
-        v.avgPercent === null ? '—' : `${v.avgPercent}%`,
-        v.passRate === null ? '—' : `${v.passRate}%`,
-      ]
-        .map(csvCell)
-        .join(','),
-    ),
-    '',
-    ['最容易答错的题'],
-    ['题干', '所属视频', '环节', '作答次数', '错误率'].map(csvCell).join(','),
-    ...errorQuestions.value.map((q) =>
-      [q.stem, q.courseTitle, q.stage, q.attempts, `${q.errorRate}%`].map(csvCell).join(','),
-    ),
-  ]
-  const csv = '﻿' + lines.join('\r\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  const d = new Date()
-  const p = (n) => String(n).padStart(2, '0')
-  a.href = url
-  a.download = `数据统计_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+/** 把 2.6.3 接口返回的一条记录转成表格展示字段 */
+function toQuestionRow(item) {
+  return {
+    key: item.question_id ?? item.stem,
+    stem: item.stem || '',
+    courseTitle: item.video_title || '',
+    stage: item.stage === 'posttest' ? '后测' : '前测',
+    attempts: Number(item.answer_times) || 0,
+    errorRate: Number(item.wrong_rate) || 0,
+  }
+}
+
+async function refreshStatistics() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const [overviewData, videos, questions] = await Promise.all([
+      getAdminStatisticsOverview(),
+      listAdminStatisticsVideos(),
+      listAdminStatisticsWrongQuestions(),
+    ])
+    overview.value = overviewData
+    videoStats.value = videos.map(toVideoRow)
+    errorQuestions.value = questions.map(toQuestionRow)
+  } catch (error) {
+    overview.value = null
+    videoStats.value = []
+    errorQuestions.value = []
+    loadError.value = error?.message || '数据统计加载失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(refreshStatistics)
+
+// ===== 导出统计（2.6.4）=====
+async function exportStatistics() {
+  if (exporting.value) return
+
+  exporting.value = true
+  loadError.value = ''
+  try {
+    const blob = await exportAdminStatistics()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const d = new Date()
+    const p = (n) => String(n).padStart(2, '0')
+    a.href = url
+    a.download = `数据统计_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.xlsx`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    loadError.value = error?.message || '导出失败，请稍后重试'
+  } finally {
+    exporting.value = false
+  }
 }
 </script>
 
@@ -127,7 +116,12 @@ function exportCsv() {
         <p class="stats-page__desc">只看三件事：有多少人学了、答得怎么样、哪道题最容易错。</p>
       </div>
 
-      <button type="button" class="btn btn--secondary" @click="exportCsv">
+      <button
+        type="button"
+        class="btn btn--secondary"
+        :disabled="exporting"
+        @click="exportStatistics"
+      >
         <svg
           class="btn__icon"
           viewBox="0 0 24 24"
@@ -141,9 +135,11 @@ function exportCsv() {
           <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5" />
           <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
         </svg>
-        导出统计
+        {{ exporting ? '导出中…' : '导出统计' }}
       </button>
     </header>
+
+    <p v-if="loadError" class="stats-banner">{{ loadError }}</p>
 
     <!-- 统计卡 -->
     <div class="stat-cards">
@@ -166,7 +162,7 @@ function exportCsv() {
           </span>
         </div>
         <p class="stat-card__num">
-          {{ adminVideos.length }}<span class="stat-card__unit">条</span>
+          {{ videoTotal }}<span class="stat-card__unit">条</span>
         </p>
         <p class="stat-card__sub">其中已上架 {{ publishedCount }} 条</p>
       </div>
@@ -241,7 +237,7 @@ function exportCsv() {
         <p class="stat-card__num">
           {{ passRate }}<span class="stat-card__unit">%</span>
         </p>
-        <p class="stat-card__sub">正确率达到 {{ PASS_PERCENT }}% 视为通过</p>
+        <p class="stat-card__sub">正确率达到 {{ passScore }}% 视为通过</p>
       </div>
     </div>
 
@@ -339,7 +335,7 @@ function exportCsv() {
           <span class="col col--error">错误率</span>
         </div>
 
-        <div v-for="q in errorQuestions" :key="q.stem + q.stage" class="qtable__row">
+        <div v-for="q in errorQuestions" :key="q.key" class="qtable__row">
           <span class="col col--stem">{{ q.stem }}</span>
           <span class="col col--course">{{ q.courseTitle }}</span>
           <span class="col col--stage">{{ q.stage }}</span>
@@ -358,6 +354,15 @@ function exportCsv() {
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
+}
+
+.stats-banner {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--danger-text);
+  background: var(--danger-bg);
+  border-radius: var(--r-md);
 }
 
 /* ===== 页头 ===== */

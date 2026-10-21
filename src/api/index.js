@@ -28,6 +28,12 @@ export {
   updateAdminShareLinkStatus,
 } from './video/shareLink'
 export { listAdminCategories } from './category'
+export {
+  exportAdminStatistics,
+  getAdminStatisticsOverview,
+  listAdminStatisticsVideos,
+  listAdminStatisticsWrongQuestions,
+} from './statistics'
 export { exportAdminRecords, getAdminRecordDetail, listAdminRecords } from './record'
 export {
   createPublicDr,
