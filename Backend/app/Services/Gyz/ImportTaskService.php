@@ -20,15 +20,17 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
  * 批量导入任务服务
  *
  * 只做业务逻辑：任务列表（懒触发校验）、任务详情、确认导入。
- * 导入模板按 G4 全量语义：一次 Excel 导入课程 + 视频（含图文）+ 前测 3 题 + 后测 3 题，
- * 共 4 个 sheet：课程 / 视频 / 前测题目 / 后测题目，「所属视频」来自 Excel 内容本身。
+ * 支持两类导入：
+ * 1. G4 全量语义：一次 Excel 导入课程 + 视频（含图文）+ 前测 3 题 + 后测 3 题，
+ *    共 4 个 sheet：课程 / 视频 / 前测题目 / 后测题目，「所属视频」来自 Excel 内容本身（任务 video_id 为空）。
+ * 2. 2.3 题目配置导入：单 sheet「题目模板」（13 列），目标视频来自任务 video_id，
+ *    前后测共用一套（统一按前测存储）。
  */
 class ImportTaskService
 {
     /**
      * 任务状态：0 待校验 1 校验中 2 待确认 3 导入中 4 已完成 5 失败
      */
-    private const STATUS_PENDING_VALIDATE = 0;
     private const STATUS_VALIDATING = 1;
     private const STATUS_PENDING_CONFIRM = 2;
     private const STATUS_IMPORTING = 3;
@@ -44,9 +46,34 @@ class ImportTaskService
     private const SHEET_POSTTEST = '后测题目';
 
     /**
+     * 题目模板（2.3 题目配置下载/导入用）sheet 名称与表头
+     */
+    private const SHEET_QUESTION_TEMPLATE = '题目模板';
+
+    private const QUESTION_TEMPLATE_HEADERS = [
+        '视频标题*', '题目用途*', '题序*', '题型*', '题干*',
+        '选项A*', '选项B*', '选项C', '选项D', '选项E', '选项F',
+        '正确答案*', '答案解析',
+    ];
+
+    /**
      * 题型
      */
     private const QUESTION_TYPES = ['single', 'multiple', 'judge'];
+
+    /**
+     * 中文题型标签 → 英文题型码（与题目模板一致）
+     */
+    private const TYPE_LABELS = [
+        '单选题' => 'single',
+        '多选题' => 'multiple',
+        '判断题' => 'judge',
+    ];
+
+    /**
+     * 题目统一存储的环节（前后测共用一套，固定按前测存储）
+     */
+    private const UNIFIED_STAGE = 'pretest';
 
     public function __construct(
         private readonly OperationLogService $operationLogService
@@ -186,6 +213,13 @@ class ImportTaskService
      */
     private function validate(ImportTask $task): void
     {
+        // 题目导入任务（video_id 非空）：按单 sheet「题目模板」格式校验
+        if ($task->video_id !== null) {
+            $this->validateQuestionTemplateTask($task);
+
+            return;
+        }
+
         try {
             $sheets = $this->readSheets(Storage::disk('local')->path($task->file_path));
         } catch (\Throwable $e) {
@@ -278,6 +312,13 @@ class ImportTaskService
      */
     private function doImport(ImportTask $task): void
     {
+        // 题目导入任务（video_id 非空）：按单 sheet「题目模板」格式入库
+        if ($task->video_id !== null) {
+            $this->doImportQuestionTemplate($task);
+
+            return;
+        }
+
         $sheets = $this->readSheets(Storage::disk('local')->path($task->file_path));
         $adminId = (int) ($task->created_by ?: Auth::guard('admin')->id());
 
@@ -396,6 +437,333 @@ class ImportTaskService
             'task_no' => $task->task_no,
             'valid_rows' => (int) $task->valid_rows,
         ]);
+    }
+
+    /**
+     * 校验题目模板任务（2.3 题目配置导入）：单 sheet「题目模板」，13 列
+     *
+     * 列：视频标题 / 题目用途 / 题序 / 题型 / 题干 / 选项A~F / 正确答案 / 答案解析。
+     * 前后测共用一套：题目用途仅校验合法值，不入库区分；视频标题必须与任务目标视频一致。
+     *
+     * @param  ImportTask  $task  题目导入任务（video_id 非空）
+     */
+    private function validateQuestionTemplateTask(ImportTask $task): void
+    {
+        $videoId = (int) $task->video_id;
+        $video = Video::withTrashed()->find($videoId);
+
+        $errors = [];
+        $totalRows = 0;
+        $validRows = 0;
+
+        try {
+            $sheets = $this->readSheets(Storage::disk('local')->path($task->file_path));
+        } catch (\Throwable $e) {
+            Log::channel('exception')->error('导入文件读取失败', [
+                'task_id' => $task->id,
+                'file_path' => $task->file_path,
+                'message' => $e->getMessage(),
+            ]);
+
+            $task->update([
+                'status' => self::STATUS_FAILED,
+                'valid_rows' => 0,
+                'error_rows' => (int) $task->total_rows,
+                'error_report' => [['row' => 0, 'sheet' => '-', 'message' => '文件读取失败，请检查文件格式']],
+            ]);
+
+            return;
+        }
+
+        // 表头校验
+        $headerRow = $sheets[self::SHEET_QUESTION_TEMPLATE][1] ?? [];
+
+        if (! $this->matchesTemplateHeaders(array_values($headerRow))) {
+            $task->update([
+                'status' => self::STATUS_FAILED,
+                'valid_rows' => 0,
+                'error_rows' => (int) max(1, $task->total_rows),
+                'error_report' => [['row' => 0, 'sheet' => self::SHEET_QUESTION_TEMPLATE, 'message' => '模板表头与题目导入模板不一致，请使用最新模板']],
+            ]);
+
+            return;
+        }
+
+        $videoTitle = $video ? $video->title : '';
+
+        foreach ($this->sheetRows($sheets, self::SHEET_QUESTION_TEMPLATE) as [$rowNo, $row]) {
+            $totalRows++;
+
+            $error = $this->validateQuestionTemplateRow($row, $videoTitle);
+
+            if ($error !== null) {
+                $errors[] = ['row' => $rowNo, 'sheet' => self::SHEET_QUESTION_TEMPLATE, 'message' => $error];
+                continue;
+            }
+
+            $validRows++;
+        }
+
+        $task->update([
+            'total_rows' => $totalRows,
+            'valid_rows' => $validRows,
+            'error_rows' => count($errors),
+            'error_report' => $errors,
+            'status' => self::STATUS_PENDING_CONFIRM,
+        ]);
+    }
+
+    /**
+     * 校验题目模板行（13 列），返回错误信息（null 表示通过）
+     *
+     * @param  array<int, string>  $row
+     * @param  string  $targetVideoTitle  任务目标视频标题（视频不存在时为空，此时校验必定失败）
+     */
+    private function validateQuestionTemplateRow(array $row, string $targetVideoTitle): ?string
+    {
+        $videoTitle = $this->cell($row, 0);
+        $typeLabel = $this->cell($row, 3);
+        $stem = $this->cell($row, 4);
+
+        if ($videoTitle === '') {
+            return '视频标题不能为空';
+        }
+
+        if ($targetVideoTitle === '') {
+            return '目标视频不存在，无法导入';
+        }
+
+        if ($videoTitle !== $targetVideoTitle) {
+            return '视频标题与目标视频不一致';
+        }
+
+        $stageLabel = $this->cell($row, 1);
+
+        if ($stageLabel === '') {
+            return '题目用途不能为空';
+        }
+
+        if (! in_array($stageLabel, ['前测', '后测'], true)) {
+            return '题目用途只能填「前测」或「后测」';
+        }
+
+        $order = $this->cell($row, 2);
+
+        if ($order === '') {
+            return '题序不能为空';
+        }
+
+        if (! preg_match('/^[1-9]\d*$/', $order)) {
+            return '题序需填写大于 0 的整数';
+        }
+
+        $type = self::TYPE_LABELS[$typeLabel] ?? null;
+
+        if ($type === null) {
+            return '题型只能填「单选题」「多选题」或「判断题」';
+        }
+
+        if ($stem === '') {
+            return '题干不能为空';
+        }
+
+        if (mb_strlen($stem) > 300) {
+            return '题干超过300字';
+        }
+
+        // 判断题固定「正确/错误」两项
+        if ($type === 'judge') {
+            $optionA = $this->cell($row, 5);
+            $optionB = $this->cell($row, 6);
+
+            if ($optionA !== '' && $optionA !== '正确') {
+                return '判断题的选项A固定填「正确」';
+            }
+
+            if ($optionB !== '' && $optionB !== '错误') {
+                return '判断题的选项B固定填「错误」';
+            }
+
+            $options = ['正确', '错误'];
+            $optionLetters = ['A', 'B'];
+        } else {
+            // 单选/多选：选项 A 起连续填写，至少两项
+            $options = [];
+            $optionLetters = [];
+            $highest = -1;
+
+            foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $letter) {
+                $value = $this->cell($row, ord($letter) - ord('A') + 5);
+
+                if ($value !== '') {
+                    $options[] = $value;
+                    $optionLetters[] = $letter;
+                    $highest = ord($letter) - ord('A');
+                }
+            }
+
+            if (count($options) < 2) {
+                return '至少需要填写选项A、选项B';
+            }
+
+            if (count($options) !== $highest + 1) {
+                return '选项需从 A 起连续填写，中间不能留空';
+            }
+
+            foreach ($options as $option) {
+                if (mb_strlen($option) > 200) {
+                    return '单个选项不能超过200字';
+                }
+            }
+        }
+
+        $answer = str_replace([' ', '，', '、', ';', '；', '/'], '', $this->cell($row, 11));
+
+        if ($answer === '') {
+            return '正确答案不能为空';
+        }
+
+        if (! preg_match('/^[A-F]+$/', $answer)) {
+            return '正确答案应填 A~F 的大写字母（多选连写，如 ABC）';
+        }
+
+        $letters = array_values(array_unique(str_split($answer)));
+
+        if ($type === 'multiple') {
+            if (count($letters) < 2) {
+                return '多选题的正确答案至少填 2 个字母';
+            }
+
+            foreach ($letters as $letter) {
+                if (! in_array($letter, $optionLetters, true)) {
+                    return '正确答案包含未填写的选项';
+                }
+            }
+        } else {
+            if (count($letters) !== 1) {
+                return '单选题 / 判断题的正确答案只能填 1 个字母';
+            }
+
+            if (! in_array($letters[0], $optionLetters, true)) {
+                return '正确答案不在已填写的选项中';
+            }
+        }
+
+        $analysis = $this->cell($row, 12);
+
+        if (mb_strlen($analysis) > 500) {
+            return '答案解析超过500字';
+        }
+
+        return null;
+    }
+
+    /**
+     * 执行题目模板导入（2.3 题目配置导入）：题目 → question + video_question
+     *
+     * 前后测共用一套：全部按统一环节（前测）存储，排序排到本组末位。
+     *
+     * @param  ImportTask  $task  题目导入任务（video_id 非空，状态=待确认）
+     */
+    private function doImportQuestionTemplate(ImportTask $task): void
+    {
+        $sheets = $this->readSheets(Storage::disk('local')->path($task->file_path));
+        $adminId = (int) ($task->created_by ?: Auth::guard('admin')->id());
+        $videoId = (int) $task->video_id;
+
+        // 错误行集合，导入时跳过
+        $errorKeys = collect($task->error_report ?? [])
+            ->map(fn (array $error) => self::SHEET_QUESTION_TEMPLATE . ':' . $error['row'])
+            ->all();
+
+        $sortCounter = (int) VideoQuestion::query()
+            ->where('video_id', $videoId)
+            ->withTrashed()
+            ->max('sort_order');
+
+        foreach ($this->sheetRows($sheets, self::SHEET_QUESTION_TEMPLATE) as [$rowNo, $row]) {
+            if (in_array(self::SHEET_QUESTION_TEMPLATE . ':' . $rowNo, $errorKeys, true)) {
+                continue;
+            }
+
+            $question = Question::create($this->buildQuestionTemplateData($row, $adminId));
+
+            $sortCounter++;
+
+            VideoQuestion::create([
+                'video_id' => $videoId,
+                'stage' => self::UNIFIED_STAGE,
+                'question_id' => (int) $question->id,
+                'sort_order' => $sortCounter,
+            ]);
+        }
+
+        Log::channel('business')->info('执行题目模板导入任务', [
+            'task_id' => $task->id,
+            'task_no' => $task->task_no,
+            'video_id' => $videoId,
+            'valid_rows' => (int) $task->valid_rows,
+        ]);
+    }
+
+    /**
+     * 组装题目模板行的 question 表数据（判断题补默认选项）
+     *
+     * @param  array<int, string>  $row
+     * @return array<string, mixed>
+     */
+    private function buildQuestionTemplateData(array $row, int $adminId): array
+    {
+        $typeLabel = $this->cell($row, 3);
+        $type = self::TYPE_LABELS[$typeLabel] ?? 'single';
+
+        if ($type === 'judge') {
+            $options = [
+                ['key' => '正确', 'content' => '正确'],
+                ['key' => '错误', 'content' => '错误'],
+            ];
+            $optionCount = 2;
+        } else {
+            $options = [];
+
+            foreach (['A', 'B', 'C', 'D', 'E', 'F'] as $letter) {
+                $value = $this->cell($row, ord($letter) - ord('A') + 5);
+
+                if ($value !== '') {
+                    $options[] = ['key' => $letter, 'content' => $value];
+                }
+            }
+
+            $optionCount = count($options);
+        }
+
+        return [
+            'type' => $type,
+            'stem' => $this->cell($row, 4),
+            'options' => $options,
+            'option_count' => $optionCount,
+            'correct_answer' => str_replace([' ', '，', '、', ';', '；', '/'], '', $this->cell($row, 11)),
+            'analysis' => $this->cell($row, 12) ?: null,
+            'difficulty' => 1,
+            'knowledge_point' => '',
+            'created_by' => $adminId,
+        ];
+    }
+
+    /**
+     * 校验题目模板表头是否与约定一致
+     *
+     * @param  array<int, string>  $headerRow
+     */
+    private function matchesTemplateHeaders(array $headerRow): bool
+    {
+        foreach (self::QUESTION_TEMPLATE_HEADERS as $index => $expected) {
+            if (trim((string) ($headerRow[$index] ?? '')) !== $expected) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -699,6 +1067,7 @@ class ImportTaskService
             'id' => (int) $task->id,
             'task_no' => $task->task_no,
             'file_name' => $task->file_name,
+            'video_id' => $task->video_id !== null ? (int) $task->video_id : null,
             'total_rows' => (int) $task->total_rows,
             'valid_rows' => (int) $task->valid_rows,
             'error_rows' => (int) $task->error_rows,
