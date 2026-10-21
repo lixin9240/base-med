@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import { QUESTION_TYPE_LABEL } from '@/utils/question'
-import { resolveDrId } from '@/store/mobile/session'
+import { currentDrId } from '@/store/mobile/session'
 import { getExamResult } from '@/api/public'
 
 const route = useRoute()
@@ -33,7 +33,11 @@ onMounted(async () => {
     return
   }
   try {
-    const drId = await resolveDrId()
+    const drId = currentDrId()
+    if (!drId) {
+      router.replace('/mobile/home')
+      return
+    }
     const data = await getExamResult({
       dr_id: drId,
       ...(examRecordId ? { exam_record_id: examRecordId } : { video_id: videoId }),
