@@ -22,6 +22,12 @@ export {
   updateAdminVideoStatus,
 } from './video'
 export { listAdminCategories } from './category'
+export {
+  exportAdminStatistics,
+  getAdminStatisticsOverview,
+  listAdminStatisticsVideos,
+  listAdminStatisticsWrongQuestions,
+} from './statistics'
 export { exportAdminRecords, getAdminRecordDetail, listAdminRecords } from './record'
 export {
   createPublicDr,
