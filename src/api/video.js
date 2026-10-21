@@ -5,6 +5,9 @@ const DETAIL_PATH = '/api/admin/video/detail'
 const CREATE_PATH = '/api/admin/video/create'
 const UPDATE_PATH = '/api/admin/video/update'
 const UPDATE_STATUS_PATH = '/api/admin/video/update-status'
+const DELETE_PATH = '/api/admin/video/delete'
+const UPLOAD_INIT_PATH = '/api/admin/video/upload/init'
+const UPLOAD_COMPLETE_PATH = '/api/admin/video/upload/complete'
 
 /** 视频列表（管理端）。返回 { list, total, page, pageSize }，list 内字段保持后端命名。 */
 export async function listAdminVideos({ page = 1, pageSize = 20 } = {}) {
@@ -52,6 +55,37 @@ export async function updateAdminVideo(payload) {
     throw new Error('视频保存失败：服务未返回标准数据')
   }
   return body.data ?? null
+}
+
+/** 删除视频（2.2.6 软删除）。已存在答题记录等引用时后端前置校验不通过，会抛错 */
+export async function deleteAdminVideo({ id }) {
+  const body = await post(DELETE_PATH, { id })
+
+  // 文档未约定返回体；HTTP 失败 / code!==0 已在 http 层抛错，这里只拦显式失败
+  if (!body || typeof body !== 'object' || body.success === false) {
+    throw new Error('视频删除失败：服务未返回成功结果')
+  }
+  return true
+}
+
+/** 初始化视频分片上传（2.2.7，本地上传）。返回 { oss_upload_id, oss_path, part_size, parts }；存在未完成任务时返回原 oss_upload_id（断点续传） */
+export async function initAdminVideoUpload({ file_name, file_size, video_id } = {}) {
+  const body = await post(UPLOAD_INIT_PATH, { file_name, file_size, video_id })
+
+  if (!body || typeof body !== 'object' || !('data' in body) || !body.data) {
+    throw new Error('上传初始化失败：服务未返回标准数据')
+  }
+  return body.data
+}
+
+/** 完成视频上传（2.2.8）：合并分片并触发转码，返回 { video_id, transcode_status }；转码异步，状态经 2.2.1/2.2.2 查看 */
+export async function completeAdminVideoUpload({ oss_upload_id, video_id }) {
+  const body = await post(UPLOAD_COMPLETE_PATH, { oss_upload_id, video_id })
+
+  if (!body || typeof body !== 'object' || !('data' in body) || !body.data) {
+    throw new Error('完成上传失败：服务未返回标准数据')
+  }
+  return body.data
 }
 
 /** 上架 / 下架切换，status：0 已下架，1 已上架 */

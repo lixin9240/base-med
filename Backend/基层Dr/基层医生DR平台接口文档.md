@@ -13,16 +13,23 @@
 { "code": 0, "msg": "success", "data": {} }
 ```
 
-| code | 说明                                       |
-| ---- | ------------------------------------------ |
-| 0    | 成功                                       |
-| 401  | 未登录 / token 失效（管理端）              |
-| 403  | 无权限                                     |
-| 404  | 资源不存在                                 |
-| 422  | 参数错误 / 业务校验不通过                  |
-| 500  | 服务器错误                                 |
+| HTTP 状态码 | 说明                                                           |
+| ----------- | -------------------------------------------------------------- |
+| 200         | 成功                                                           |
+| 400         | 业务错误（body 内 `code` 为 40000 段，如 40001）               |
+| 401         | 未登录 / token 失效（管理端）                                  |
+| 403         | 无权限                                                         |
+| 404         | 资源不存在                                                     |
+| 409         | 冲突（数据重复 / 存在关联引用 / 并发冲突）                     |
+| 422         | 参数错误 / 业务校验不通过                                      |
+| 429         | 请求过于频繁                                                   |
+| 500         | 服务器错误（数据库 / 系统异常）                                |
+| 502         | 第三方服务异常（OSS / 短信 / 邮件等上游失败）                  |
+| 503         | 服务暂不可用                                                   |
 
 > 业务失败时 `msg` 返回具体原因；下文各接口「返回示例」仅展示 `data` 部分。
+>
+> 说明：HTTP 状态码与 body 内业务错误码 `code`（取值见 `app/Enums/ResponseCode.php`）按码段对应——`1xxxxx→422`、`2xxxxx→401`（无权限 20005→403）、`3xxxxx→404`（重复/关联冲突→409）、`4xxxxx→400`、`5xxxxx→502`、`6xxxxx/9xxxxx→500`。
 
 ## 1.2 鉴权约定
 
@@ -75,14 +82,14 @@
 
 | 参数 | 类型 | 是否必须 | 备注 |
 | ---- | ---- | ---- | ---- |
-| username | string | 是 | 登录账号 |
+| username | string | 是 | 登录账号（无需传邮箱） |
 
 返回示例：
 ```json
 { "success": true, "data": { "expire_minutes": 10 } }
 ```
 
-> 说明：校验账号存在且已绑定 email 后，发送 6 位数字验证码（10 分钟有效，同一账号 60 秒内不可重复发送）；账号不存在或未绑定邮箱时统一按成功返回，避免用户名枚举。演示环境 `MAIL_MAILER=log` 时验证码仅写入日志，正式环境走 QQ 邮箱 SMTP。
+> 说明：验证码将发送到**该账号在 `admin_user.email` 中绑定的邮箱**，调用方无需（也不应）传邮箱，以免暴露账号邮箱信息。流程：校验账号存在且已绑定 email 后，发送 6 位数字验证码（10 分钟有效，同一账号 60 秒内不可重复发送）；账号不存在或未绑定邮箱时统一按成功返回，避免用户名枚举。管理员邮箱由管理端维护（当前演示账号 admin 已绑定 wjc20070117@qq.com）。邮件经 QQ 邮箱 SMTP 发送，演示环境 `MAIL_MAILER=log` 时验证码仅写入日志。
 
 ### 2.1.5 重置密码
 - 路径：`POST /api/admin/auth/reset-password`
@@ -196,7 +203,7 @@
 }
 ```
 
-> 说明：编辑弹窗打开时调用，回填全部表单字段；分类下拉选项来自 2.7.1 分类列表。
+> 说明：编辑弹窗打开时调用，回填全部表单字段；分类下拉选项来自 2.6.1 分类列表。
 
 
 
@@ -207,7 +214,7 @@
 | 参数 | 类型 | 是否必须 | 备注 |
 | ---- | ---- | ---- | ---- |
 | title | string | 是 | 视频标题（用户端列表展示的标题），最多 60 字 |
-| category_id | int | 是 | 分类 ID，下拉选项来自 2.7.1 分类列表 |
+| category_id | int | 是 | 分类 ID，下拉选项来自 2.6.1 分类列表 |
 | speaker | string | 是 | 主讲人姓名 |
 | speaker_title | string | 否 | 职称，如：主任医师/副主任医师/主治医师 |
 | speaker_org | string | 否 | 主讲人单位 |
@@ -371,7 +378,7 @@
 { "task_id": 1, "task_no": "imp_20261019_001", "status": 1 }
 ```
 
-> 说明：上传后创建导入任务（import_task），先异步校验（状态 0待校验 → 1校验中），校验完成进入「2待确认」；校验结果与错误报告通过 2.10.2 查询，确认无误后调用 2.10.3 执行导入，真正写入 question 与 video_question。
+> 说明：上传后创建导入任务（import_task），先异步校验（状态 0待校验 → 1校验中），校验完成进入「2待确认」；校验结果与错误报告通过 2.8.2 查询，确认无误后调用 2.8.3 执行导入，真正写入 question 与 video_question。
 
 ### 2.3.6 导出本组（抽屉「导出本组」按钮）
 - 路径：`/api/admin/video-question/export`
@@ -396,130 +403,13 @@
 
 > 说明：软删除 video_question 关联（不删除 question 题库记录）；历史答题明细（exam_answer）不受影响。
 
-## 2.4 LX-访问链接管理模块（对应方案 3.2-5 视频链接）
-
-### 2.4.1 生成访问链接
-- 路径：`POST /api/admin/share-link/create`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| video_id | bigint | 是 | 关联内容 ID |
-| org_id | int | 否 | 归属机构 ID（预留，用于 G5 机构维度统计） |
-| expire_type | string | 是 | permanent 永久 / 7d / 30d / custom 自定义 |
-| expire_at | datetime | 条件必填 | 过期时间，`expire_type=custom` 时必填 |
-
-返回：
-
-```json
-{
-    "id": 1,
-    "video_id": 1,
-    "token": "8f3c9a2e5b7d",
-    "url": "https://{domain}/h5/v?token=8f3c9a2e5b7d",
-    "expire_type": "7d",
-    "expire_at": "2026-10-26 10:00:00"
-}
-```
-
-> 说明：token 全局唯一，拼接在 H5 链接后；`permanent` 时 expire_at 为 null。生成动作写入 operation_log（action=generate_link）。
-
-### 2.4.2 链接列表
-- 路径：`GET /api/admin/share-link/list`
-- Method：GET
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| page | int | 否 | 默认 1 |
-| page_size | int | 否 | 默认 20 |
-| video_id | bigint | 否 | 按视频筛选 |
-| status | tinyint | 否 | 0失效 1启用 |
-
-返回：
-
-```json
-{
-    "list": [
-        {
-            "id": 1,
-            "video_id": 1,
-            "video_title": "心肺复苏基础操作",
-            "org_id": null,
-            "token": "8f3c9a2e5b7d",
-            "url": "https://{domain}/h5/v?token=8f3c9a2e5b7d",
-            "expire_type": "7d",
-            "expire_at": "2026-10-26 10:00:00",
-            "visit_count": 35,
-            "status": 1,
-            "created_at": "2026-10-19 10:00:00"
-        }
-    ],
-    "total": 1,
-    "page": 1,
-    "page_size": 20
-}
-```
-
-### 2.4.3 启用/失效链接
-- 路径：`POST /api/admin/share-link/update-status`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| id | bigint | 是 | 链接 ID |
-| status | tinyint | 是 | 0失效 1启用 |
-
-> 说明：失效后用户端点击链接提示「链接已失效」；历史访问计数（visit_count）保留。
-
-### 2.4.4 删除链接
-- 路径：`POST /api/admin/share-link/delete`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 |
-| ---- | ---- | ---- |
-| id | bigint | 是 |
-
-> 说明：软删除（写入 deleted_at）；已产生的访问记录（visit_record）与答题数据保留。
-
-### 2.4.5 访问记录列表
-- 路径：`GET /api/admin/share-link/visit-record-list`
-- Method：GET
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| page | int | 否 | 默认 1 |
-| page_size | int | 否 | 默认 20 |
-| link_id | bigint | 否 | 指定链接 |
-| video_id | bigint | 否 | 按视频 |
-| dr_id | string | 否 | 按匿名编号 |
-
-返回：
-
-```json
-{
-    "list": [
-        {
-            "id": 1,
-            "dr_id": "DR-2026-000017",
-            "share_link_id": 1,
-            "video_title": "心肺复苏基础操作",
-            "entered_at": "2026-10-19 09:30:00",
-            "created_at": "2026-10-19 09:30:00"
-        }
-    ],
-    "total": 35
-}
-```
-
-> 说明：每次点击链接进入均生成一条访问记录（visit_record），一条记录即一次匿名访问（G2）。
-
-## 2.5 LX-答题记录模块（对应【答题记录】列表页 + 「作答详情」抽屉）
+## 2.4 LX-答题记录模块（对应【答题记录】列表页 + 「作答详情」抽屉）
 
 > 页面构成：①列表页（「全部视频」「全部结果」下拉筛选 + 导出按钮；列：时间 / 视频 / 编号 / 猜测 / 看完答题 / 正确率 / 结果 / 操作「查看作答」）；②作答详情抽屉（头部展示视频名、编号、时间、前测与看完答题小结；题目卡片逐题展示：阶段标签、答对/答错状态、题干、正确答案、用户选择）。
 >
 > 页面副标题：用户端免登录，每条记录只有一个匿名编号，不涉及任何个人信息（G2）。
 
-### 2.5.1 答题记录列表
+### 2.4.1 答题记录列表
 - 路径：`/api/admin/exam-record/list`
 - Method：GET
 
@@ -577,7 +467,7 @@
 | accuracy_rate          | int       | 「正确率」列：看完答题正确率 = post_correct / post_total × 100（四舍五入） |
 | result_status          | string    | 「结果」列：pass 通过（绿）/ fail 未通过（黄）；由 accuracy_rate ≥ 通过线（默认 60，取自 system_config）判定 |
 
-### 2.5.2 查看作答详情（作答详情抽屉）
+### 2.4.2 查看作答详情（作答详情抽屉）
 - 路径：`/api/admin/exam-record/detail`
 - Method：GET
 
@@ -644,7 +534,7 @@
 > - 数据来源 exam_record（头部汇总）+ exam_answer（逐题作答）+ question（题干/答案）。
 > - 抽屉为纯展示，无操作按钮。
 
-### 2.5.3 导出答题记录（列表页「导出」按钮）
+### 2.4.3 导出答题记录（列表页「导出」按钮）
 - 路径：`/api/admin/exam-record/export`
 - Method：GET
 
@@ -653,15 +543,15 @@
 | video_id | bigint | 否 | 筛选视频（同列表筛选条件） |
 | result_status | string | 否 | pass 通过 / fail 未通过 |
 
-返回 Excel 文件流（列与 2.5.1 列表一致：时间 / 视频 / 编号 / 猜测 / 看完答题 / 正确率 / 结果）。
+导出为真正的 `.xlsx` 文件并上传阿里云 OSS，返回 JSON（`code=0`），`data` 结构：`{ "filename": "exam_records_YYYYmmdd_His.xlsx", "url": "https://wjc1127.oss-cn-chengdu.aliyuncs.com/exam-records/xxx.xlsx?...&Signature=..." }`。`url` 为带签名的临时下载链接，有效期 7 天（Bucket 为私有 ACL 也可正常下载）；前端直接打开 `url` 即可下载；列与 2.4.1 列表一致：时间 / 视频 / 编号 / 猜测 / 看完答题 / 正确率 / 结果。
 
-## 2.6 GYZ-数据统计模块（对应【数据统计】页面）
+## 2.5 GYZ-数据统计模块（对应【数据统计】页面）
 
 > 页面构成：①顶部 4 张指标卡（视频 / 答题次数 / 平均正确率 / 通过率）；②「各视频答题情况」表（视频含分类标签、状态、答题次数、平均正确率、通过率+进度条）；③「最容易答错的题」表（题干、所属视频、环节、作答次数、错误率，按错误率从高到低，副标题「可以用来调整讲解重点」）；④右上角「导出统计」按钮。
 >
 > 页面副标题：只看三件事：有多少人答了、答得怎么样、哪道题最容易错。
 
-### 2.6.1 统计大盘（4 张指标卡）
+### 2.5.1 统计大盘（4 张指标卡）
 - 路径：`/api/admin/statistics/overview`
 - Method：GET
 
@@ -681,11 +571,11 @@
 | video_total        | int  | 视频「4 条」                 | 全部视频数（含下架）                                       |
 | video_online       | int  | 视频副文「其中已上架 3 条」  | 上架视频数                                                 |
 | answer_total_times | int  | 答题次数「37 次」            | 用户提交的答题记录合计（exam_record 计数）                 |
-| avg_accuracy       | int  | 平均正确率「70%」            | 所有答题记录正确率的平均值（口径同 2.5.1 accuracy_rate）   |
+| avg_accuracy       | int  | 平均正确率「70%」            | 所有答题记录正确率的平均值（口径同 2.4.1 accuracy_rate）   |
 | pass_rate          | int  | 通过率「78%」                | 通过记录数 / 答题记录总数 × 100                            |
 | pass_score         | int  | 通过率副文「达到 60% 视为通过」 | 通过线，取自 system_config，默认 60                     |
 
-### 2.6.2 各视频答题情况
+### 2.5.2 各视频答题情况
 - 路径：`/api/admin/statistics/video-list`
 - Method：GET
 - 返回全量数组（页面无分页/筛选），对应「视频 / 状态 / 答题次数 / 平均正确率 / 通过率」列：
@@ -739,7 +629,7 @@
 | avg_accuracy   | int/null | 「平均正确率」列；无人答题时为 null，前端显示「—」           |
 | pass_rate      | int/null | 「通过率」列，前端附进度条（颜色按高低区分）；无人答题为 null |
 
-### 2.6.3 最容易答错的题
+### 2.5.3 最容易答错的题
 - 路径：`/api/admin/statistics/wrong-question`
 - Method：GET
 - 返回：按错误率从高到低排序，对应「题干 / 所属视频 / 环节 / 作答次数 / 错误率」列：
@@ -773,16 +663,16 @@
 | answer_times | int    | 「作答次数」列（exam_answer 计数）                       |
 | wrong_rate   | int    | 「错误率」列：答错次数 / 作答次数 × 100，降序排列        |
 
-### 2.6.4 导出统计（「导出统计」按钮）
+### 2.5.4 导出统计（「导出统计」按钮）
 - 路径：`/api/admin/statistics/export`
 - Method：GET
 - 返回 Excel 文件流，内容包含：大盘指标（4 项）+ 各视频答题情况表 + 最容易答错的题表。
 
 ---
 
-## 2.7 WJC-分类管理模块（编辑视频弹窗「分类」下拉）
+## 2.6 WJC-分类管理模块（编辑视频弹窗「分类」下拉）
 
-### 2.7.1 分类列表
+### 2.6.1 分类列表
 - 路径：`GET /api/admin/category/list`
 - Method：GET
 - 返回全量列表（不分页，下拉用）：
@@ -793,7 +683,7 @@
 ]
 ```
 
-### 2.7.2 新增分类
+### 2.6.2 新增分类
 - 路径：`POST /api/admin/category/create`
 - Method：POST
 
@@ -804,12 +694,12 @@
 | sort_order | int | 否 | 排序号 |
 | status | tinyint | 否 | 0禁用 1启用，默认 1 |
 
-### 2.7.3 编辑分类
+### 2.6.3 编辑分类
 - 路径：`POST /api/admin/category/update`
 - Method：POST
 - 参数同新增，**增加 id（int，必填）**。
 
-### 2.7.4 删除分类
+### 2.6.4 删除分类
 - 路径：`POST /api/admin/category/delete`
 - Method：POST
 
@@ -819,68 +709,9 @@
 
 > 说明：软删除；存在关联视频（video.category_id）时不允许删除。
 
-## 2.8 LX-课程管理模块（topic 课程表，承载课程—内容—题目三级关联）
+## 2.7 LX-题库管理模块（question 题目表）
 
-### 2.8.1 课程列表
-- 路径：`GET /api/admin/topic/list`
-- Method：GET
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| page | int | 否 | 默认 1 |
-| page_size | int | 否 | 默认 20 |
-| name | string | 否 | 课程名称搜索 |
-
-返回：
-
-```json
-{
-    "list": [
-        {
-            "id": 1,
-            "name": "基础急救",
-            "cover_url": "",
-            "intro": "课程简介",
-            "sort_order": 1,
-            "status": 1,
-            "video_count": 4,
-            "created_at": "2026-10-19 10:00:00"
-        }
-    ],
-    "total": 1
-}
-```
-
-### 2.8.2 新增课程
-- 路径：`POST /api/admin/topic/create`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| name | string | 是 | 课程名称，最多 64 字 |
-| cover_url | string | 否 | 课程封面图 URL |
-| intro | string | 否 | 课程简介，最多 500 字 |
-| sort_order | int | 否 | 排序号 |
-| status | tinyint | 否 | 0禁用 1启用，默认 1 |
-
-### 2.8.3 编辑课程
-- 路径：`POST /api/admin/topic/update`
-- Method：POST
-- 参数同新增，**增加 id（int，必填）**。
-
-### 2.8.4 删除课程
-- 路径：`POST /api/admin/topic/delete`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 |
-| ---- | ---- | ---- |
-| id | int | 是 |
-
-> 说明：软删除；课程下存在关联视频（video.topic_id）时不允许删除。
-
-## 2.9 LX-题库管理模块（question 题目表）
-
-### 2.9.1 题目列表
+### 2.7.1 题目列表
 - 路径：`GET /api/admin/question/list`
 - Method：GET
 
@@ -911,12 +742,12 @@
 }
 ```
 
-### 2.9.2 编辑题目
+### 2.7.2 编辑题目
 - 路径：`POST /api/admin/question/update`
 - Method：POST
 - 参数同 2.3.2（题目字段），**增加 id（bigint，必填）**；另支持题库扩展字段 `image_url`（配图URL）/`difficulty`（难度1-3）/`knowledge_point`（知识点标签）；不影响已有 video_question 绑定关系。
 
-### 2.9.3 删除题目
+### 2.7.3 删除题目
 - 路径：`POST /api/admin/question/delete`
 - Method：POST
 
@@ -926,9 +757,9 @@
 
 > 说明：软删除；被 video_question 引用（仍绑定在视频上）时前置校验不通过，需先通过 2.3.5 从相关视频移除后才可删除。
 
-## 2.10 GYZ-批量导入任务模块
+## 2.8 GYZ-批量导入任务模块
 
-### 2.10.1 任务列表
+### 2.8.1 任务列表
 - 路径：`GET /api/admin/import/task-list`
 - Method：GET
 
@@ -968,7 +799,7 @@
 | 4 | 已完成 |
 | 5 | 失败 |
 
-### 2.10.2 任务详情（校验结果与错误报告）
+### 2.8.2 任务详情（校验结果与错误报告）
 - 路径：`GET /api/admin/import/task-detail`
 - Method：GET
 
@@ -976,7 +807,7 @@
 | ---- | ---- | ---- |
 | task_id | bigint | 是 |
 
-返回：任务基础字段（同 2.10.1 列表项）+ 错误报告：
+返回：任务基础字段（同 2.8.1 列表项）+ 错误报告：
 
 ```json
 {
@@ -995,7 +826,7 @@
 }
 ```
 
-### 2.10.3 确认导入
+### 2.8.3 确认导入
 - 路径：`POST /api/admin/import/confirm`
 - Method：POST
 
@@ -1007,9 +838,9 @@
 
 > 说明：执行后任务进入「3 导入中」，写入 question 与 video_question（G4：Excel 一次导入课程+视频+图文+前测3+后测3），完成转为「4 已完成」，异常转为「5 失败」；仅有效行（valid_rows）入库。
 
-## 2.11 GYZ-操作日志模块（operation_log，后台留痕）
+## 2.9 GYZ-操作日志模块（operation_log，后台留痕）
 
-### 2.11.1 操作日志列表
+### 2.9.1 操作日志列表
 - 路径：`GET /api/admin/operation-log/list`
 - Method：GET
 
@@ -1046,17 +877,18 @@
 
 # 伏明月-用户端接口（匿名免登录，仅传 dr_id）
 
-> 页面流程：①链接进入（3.1 签发 dr_id）→ ②首页视频列表（3.2）→ ③学前答题（3.5 取题 / 3.4 提交）→ ④观看视频（3.3 详情）→ ⑤看完答题（3.5 取题 / 3.6 提交）→ ⑥答题结果（3.7，可重练 R5）。
+> 页面流程：①首页视频列表（3.2，免登录、无需 dr_id）→ ②点击视频签发 dr_id（3.1，每次点击生成新的匿名编号）→ ③学前答题（3.6 取题 / 3.5 提交）→ ④观看视频（3.3 详情 + 3.4 进度上报，观看进度 ≥ 90% 解锁后测）→ ⑤看完答题（3.6 取题 / 3.7 提交）→ ⑥答题结果（3.8）。
 
-## 3.1 获取匿名 DR 编号（点击链接进入时生成访问记录）
+## 3.1 获取匿名 DR 编号（点击视频进入时生成访问记录）
 
 - 路径：`GET /api/public/dr/create`
+- Method：GET
+- 对应页面：首页视频列表——**用户每次点击一条视频数据时调用**，后台生成一条 `visit_record`（记录该视频与进入时间）并顺序签发 `dr_id`；不依赖 openid，也无需访问链接 token。
+- 业务规则：**每次点击均生成新的 dr_id**，同一用户重复点击同一视频也视为一次新的匿名访问（学习进度随新的 dr_id 重新开始）；dr_id 仅对签发时的视频有效，其余接口会校验 dr_id 与 video_id 的匹配关系。
 
-| 请求参数 | 类型   | 是否必须 | 备注                           |
-| -------- | ------ | -------- | ------------------------------ |
-| token    | string | 是       | url 参数，访问链接携带的 token |
-
-说明：每次点击链接进入均调用本接口，后台校验 token（有效性/时效）后生成一条 `visit_record` 并顺序签发 `dr_id`（不再依赖 openid）。
+| 请求参数 | 类型   | 是否必须 | 备注          |
+| -------- | ------ | -------- | ------------- |
+| video_id | bigint | 是       | 点击的视频 ID |
 
 返回示例：
 
@@ -1068,19 +900,16 @@
 
 | 场景 | 返回 |
 | ---- | ---- |
-| token 不存在 / 已删除 | 404 链接不存在 |
-| 链接已失效（status=0） | 422 链接已失效 |
-| 链接已过期（expire_at 早于当前时间） | 422 链接已过期 |
+| video_id 不存在 | 404 视频不存在 |
+| 视频已下架（status=0） | 422 视频不存在或已下架 |
 
 ## 3.2 用户端首页视频列表（首页卡片）
 
 - 路径：`GET /api/public/video/list`
 - Method：GET
-- 对应页面：首页「医学常识，讲给您听」，每个视频一张卡片（封面图标+播放按钮、标题、分类标签、主讲人、简介、学习状态）。
+- 对应页面：首页「医学常识，讲给您听」，每个视频一张卡片（封面图标+播放按钮、标题、分类标签、主讲人、简介）。**免登录、无需 dr_id**：进入首页即调用，展示全部已上架视频；dr_id 在用户点击某条视频时才通过 3.1 生成，列表阶段为纯内容目录，不含个人学习状态。
 
-| 参数       | 类型   | 是否必须 | 备注     |
-| ---------- | ------ | -------- | -------- |
-| dr_id      | string | 是       | 匿名编号 |
+无请求参数。
 
 返回：
 
@@ -1092,8 +921,7 @@
         "category_name": "急救技能",
         "speaker": "郭军",
         "brief_intro": "成人基础生命支持的规范动作：按压位置、深度、频率与通气比例，以及基层最常见的三个操作误区。",
-        "cover_url": "",
-        "exam_status": "pre"
+        "cover_url": ""
     },
     {
         "id": 2,
@@ -1101,8 +929,7 @@
         "category_name": "慢病管理",
         "speaker": "王雅琴",
         "brief_intro": "家庭血压怎么测才准？生活方式干预该抓哪几条？一条视频讲清居民最常问的问题。",
-        "cover_url": "",
-        "exam_status": "pre"
+        "cover_url": ""
     }
 ]
 ```
@@ -1113,13 +940,6 @@
 | speaker        | string | 灰色主讲人标签；未指定时前端显示「佚名」或隐藏               |
 | brief_intro    | string | 一句话简介，卡片正文                                         |
 | cover_url      | string | 封面图；为空时前端按分类用图标占位                           |
-| exam_status    | string | 学习状态（卡片底部提示行），取值与文案映射见下表             |
-
-| exam_status | 前端状态文案         | 含义                                   |
-| ----------- | -------------------- | -------------------------------------- |
-| none        | 未开始，先答几道题   | 尚未作答前测                           |
-| pre         | 前测已完成，待看视频 | 已提交学前答题，尚未提交看完答题       |
-| done        | 已完成               | 已提交看完答题，可查看结果 / 重新练习  |
 
 > 底部声明「本平台内容仅供健康科普学习，不构成诊疗建议」为静态文案，无需接口。
 
@@ -1151,6 +971,12 @@
         "pre_submitted": 1,
         "post_submitted": 0,
         "exam_record_id": null
+    },
+    "watch_progress": {
+        "watched_seconds": 39,
+        "progress_percent": 91,
+        "watch_required_percent": 90,
+        "is_unlocked": 1
     }
 }
 ```
@@ -1168,19 +994,60 @@
 | post_submitted  | tinyint     | 是否已完成看完答题 0/1             |
 | exam_record_id  | bigint/null | 已完成时返回答题记录 ID，否则 null |
 
+| watch_progress 字段      | 类型    | 备注                                                                  |
+| ------------------------ | ------- | --------------------------------------------------------------------- |
+| watched_seconds          | int     | 已观看时长（秒），由 3.4 进度上报累计                                   |
+| progress_percent         | int     | 观看进度百分比（0-100，后端按 已看时长/总时长 计算）                    |
+| watch_required_percent   | int     | 后测解锁门槛（默认 90，取自 system_config.watch_required_percent）    |
+| is_unlocked              | tinyint | 是否已达门槛可提交后测 0/1（progress_percent ≥ watch_required_percent）|
+
 > 说明：
 >
-> - 题目不在本接口返回，答题页统一通过 3.5 获取（规则 R2：作答阶段不返回 `correct_answer` / `analysis`）。
-> - 不追踪观看进度，看完答题无进度门槛，提交学前答题后即可作答。
+> - 题目不在本接口返回，答题页统一通过 3.6 获取（规则 R2：作答阶段不返回 `correct_answer` / `analysis`）。
+> - 追踪观看进度：观看过程中通过 3.4 上报进度，**观看进度达到 90%（watch_required_percent）后才能提交看完答题（3.7）**；学前答题（3.5）无需观看视频。
 
 
 
-## 3.4 提交学前答题（学前答题页）
+## 3.4 上报视频观看进度（观看视频页，新增）
+
+- 路径：`POST /api/public/video/progress`
+- Method：POST
+- 对应页面：内容学习页播放器——播放/拖动进度条时由前端按秒（或定时）心跳上报已观看位置；服务端取历史与本次最大值累计，计算观看进度百分比。
+- 业务规则：**观看进度达到 90%（system_config.watch_required_percent，默认 90）后，才允许提交看完答题（3.7）**；未达门槛提交后测返回 422。
+
+| 参数            | 类型   | 是否必须 | 备注                                                                 |
+| --------------- | ------ | -------- | -------------------------------------------------------------------- |
+| dr_id           | string | 是       | 匿名编号                                                             |
+| video_id        | bigint | 是       | 视频 ID                                                              |
+| watched_seconds | int    | 是       | 已观看时长（秒，取播放器当前最大观看位置）                            |
+| duration        | int    | 否       | 视频总时长（秒）；服务端 video.duration 未回填（如填写链接）时用于计算 |
+
+返回：
+
+```json
+{
+    "watched_seconds": 39,
+    "duration": 43,
+    "progress_percent": 91,
+    "watch_required_percent": 90,
+    "is_unlocked": 1
+}
+```
+
+| 字段                   | 类型    | 备注                                       |
+| ---------------------- | ------- | ------------------------------------------ |
+| watched_seconds        | int     | 累计已观看时长（秒，取历史与本次上报最大值）|
+| duration               | int     | 视频总时长快照（秒）                       |
+| progress_percent       | int     | 观看进度百分比（0-100）                    |
+| watch_required_percent | int     | 后测解锁门槛百分比                         |
+| is_unlocked            | tinyint | 是否已达门槛：0未达成 1已达成              |
+
+## 3.5 提交学前答题（学前答题页）
 
 - 路径：`POST /api/public/exam/submit-pre`
 - Method：POST
 - 对应页面：「学前答题」——顶部提示卡「先答 N 道题，看看您的基础认知」+《视频标题》· 提交后可以看到每道题的对错与解析；进度条与题号导航（可跳题）、逐题选择、「下一题 >」翻页、末题为「提交」。
-- 业务规则：**前测无需观看视频，可直接作答**；提交后仅将学前答案暂存到本次会话，**不生成 exam_record**，等待后测提交时合并写入完整记录。
+- 业务规则：**前测无需观看视频，可直接作答**；提交后仅将学前答案暂存到 `exam_pretest` 表（按 dr_id+视频，重复提交覆盖），**不生成 exam_record**，等待后测提交时合并写入完整记录。
 - **不返回正确答案与解析**（规则 R2）。
 
 | 参数     | 类型   | 是否必须 | 备注                                           |
@@ -1199,9 +1066,9 @@
 }
 ```
 
-> 学前正确率不在本接口返回，统一在「看完答题」提交后（3.6）与「答题结果」页（3.7）中展示。
+> 学前正确率不在本接口返回，统一在「看完答题」提交后（3.7）与「答题结果」页（3.8）中展示。
 
-## 3.5 获取视频题目列表（学前/看完答题页共用）
+## 3.6 获取视频题目列表（学前/看完答题页共用）
 
 注：前测和后测是同一套题目（question_total 即本套题目数）。
 
@@ -1234,12 +1101,31 @@
 
 
 
-## 3.6 获取答题结果（答题结果页）
+## 3.7 提交看完答题（后测，看完答题页，新增）
+
+- 路径：`POST /api/public/exam/submit-post`
+- Method：POST
+- 对应页面：「看完答题」——与学前答题同一套题目（3.6 取题），提交后进入「答题结果」页。
+- 业务规则：
+  - **观看进度门槛**：观看进度（3.4）需达到 `watch_required_percent`（默认 90%）才能提交，否则返回 422「观看进度达到 90% 后才能作答看完答题（当前 X%）」；
+  - **需先完成学前答题**（3.5，答案暂存于 `exam_pretest`），否则返回 422「请先完成学前答题」；
+  - 提交后合并学前暂存答案与本次后测答案，生成完整 `exam_record` + `exam_answer`（前后测各一份明细），并清除学前暂存记录；
+  - 未通过可重练（R5）：再次走 学前答题（3.5）→ 看完答题（3.7）流程，`attempt_no` 按 dr_id+视频 递增。
+
+| 参数     | 类型   | 是否必须 | 备注                                           |
+| -------- | ------ | -------- | ---------------------------------------------- |
+| dr_id    | string | 是       | 匿名编号                                       |
+| video_id | bigint | 是       | 视频 ID                                        |
+| answers  | array  | 是       | 同 3.5，后测作答数组                            |
+
+返回：结构与「3.8 获取答题结果」一致（含 `result_status` / `accuracy_rate` / `pre` / `post` / `question_detail`）。
+
+## 3.8 获取答题结果（答题结果页）
 
 - 路径：`GET /api/public/exam/result`
 - Method：GET
 - 对应页面：「答题结果」页——①顶部结果卡：「再复习一下？」重练入口（R5 未通过可重答）、《视频标题》· 答对 60% 以上才算通过（pass_accuracy）、大字号得分 `post.correct / post.total 题`、正确率、阶段切换按钮「学前答题 3/3 → 看完答题 0/3」；②「逐题解析」区：题号 + 答对/答错标签 + 题型 + 题干 + 选项列表（用户选择标红、正确答案标绿）+ 解析框。
-- 用途：结果页首次进入、刷新或从列表回看时获取完整结果（数据与 3.6 返回结构一致）。
+- 用途：结果页首次进入、刷新或从列表回看时获取完整结果（数据与 3.7 提交看完答题返回结构一致）。
 
 | 参数           | 类型   | 是否必须 | 备注                                  |
 | -------------- | ------ | -------- | ------------------------------------- |
@@ -1305,15 +1191,14 @@
 | 管理员登录 | 2.1 | `admin_user` |
 | 视频管理（列表/详情/增删改/上架切换） | 2.2.1~2.2.6 | `video`、`category`、`video_question`、`exam_record` |
 | 视频上传/转码 | 2.2.7、2.2.8 | `video`（oss_upload_id、transcode_status、cover_url 等） |
-| 批量导入 | 2.3.5、2.10 | `import_task`、`question`、`video_question` |
+| 批量导入 | 2.3.5、2.8 | `import_task`、`question`、`video_question` |
 | 题目配置（抽屉/新增题目弹窗） | 2.3 | `question`、`video_question` |
-| 访问链接管理 | 2.4 | `video_share_link`、`visit_record` |
-| 答题记录管理 | 2.5 | `exam_record`、`exam_answer`、`question` |
-| 数据统计 | 2.6 | `exam_record`、`exam_answer`、`video`、`system_config` |
-| 分类管理 | 2.7 | `category`、`video` |
-| 课程管理 | 2.8 | `topic`、`video` |
-| 题库管理 | 2.9 | `question`、`video_question` |
-| 操作日志 | 2.11 | `operation_log` |
-| 用户端入口 | 3.1 | `video_share_link`（token校验）、`visit_record`（签发dr_id） |
-| 用户端视频/题目 | 3.2、3.3、3.5 | `video`、`category`、`video_question`、`question` |
-| 学前/学后答题 | 3.4、3.6、3.7 | `exam_record`、`exam_answer`、`question` |
+| 答题记录管理 | 2.4 | `exam_record`、`exam_answer`、`question` |
+| 数据统计 | 2.5 | `exam_record`、`exam_answer`、`video`、`system_config` |
+| 分类管理 | 2.6 | `category`、`video` |
+| 题库管理 | 2.7 | `question`、`video_question` |
+| 操作日志 | 2.9 | `operation_log` |
+| 用户端入口 | 3.1 | `visit_record`（点击视频时绑定video_id并签发dr_id）、`video` |
+| 用户端视频/题目 | 3.2、3.3、3.6 | `video`、`category`、`video_question`、`question` |
+| 观看进度 | 3.4 | `video_progress`（进度上报、90%门槛计算） |
+| 学前/学后答题 | 3.5、3.7、3.8 | `exam_pretest`（学前暂存）、`exam_record`、`exam_answer`、`question`、`video_progress`（后测门槛校验） |

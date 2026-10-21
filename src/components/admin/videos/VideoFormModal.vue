@@ -1,6 +1,6 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { createAdminVideo, updateAdminVideo } from '@/api'
+import { completeAdminVideoUpload, createAdminVideo, initAdminVideoUpload, updateAdminVideo } from '@/api'
 import {
   VIDEO_CATEGORIES,
   VIDEO_INTRO_MAX,
@@ -42,13 +42,15 @@ const uploadingVideo = ref(false)
 const uploadingCover = ref(false)
 const uploadError = ref('')
 const videoFileName = ref('')
+/** 2.2.7 初始化返回的上传任务（oss_upload_id 等），传输完成后用于 2.2.8 完成上传 */
+const uploadTask = ref(null)
 const videoInput = ref(null)
 const coverInput = ref(null)
 
 const isEdit = computed(() => Boolean(props.video?.id))
 const modalTitle = computed(() => (isEdit.value ? '编辑视频' : '新增视频'))
 const isUpload = computed(() => draft.source === VIDEO_SOURCE.UPLOAD)
-/** 分片上传接口（2.2.7 / 2.2.8）尚未接入：新增时禁用本地上传，编辑保留原有能力 */
+/** 分片传输通道尚未就绪（文档未定义分片端点）：新增时禁用本地上传，编辑重选文件走 2.2.7 初始化 + 2.2.8 完成上传 */
 const canUpload = computed(() => isEdit.value)
 const titleCount = computed(() => draft.title.length)
 const introCount = computed(() => draft.intro.length)
@@ -88,6 +90,7 @@ function reset() {
   errors.value = {}
   uploadError.value = ''
   videoFileName.value = ''
+  uploadTask.value = null
   saving.value = false
   uploadingVideo.value = false
   uploadingCover.value = false
@@ -132,9 +135,22 @@ async function onVideoFile(event) {
   uploadingVideo.value = true
   uploadError.value = ''
   try {
+    // 2.2.7 初始化分片上传：编辑重新上传带 video_id；已有未完成任务时后端返回原 oss_upload_id（断点续传）
+    uploadTask.value = await initAdminVideoUpload({
+      file_name: file.name,
+      file_size: file.size,
+      video_id: isEdit.value ? props.video.id : undefined,
+    })
     draft.videoUrl = await uploadVideoFile(file)
     videoFileName.value = file.name
     clearError('videoUrl')
+    // 2.2.8 完成上传：通知后端合并分片并触发转码；转码异步，状态经列表/详情的 transcode_status 查看
+    if (uploadTask.value?.oss_upload_id) {
+      await completeAdminVideoUpload({
+        oss_upload_id: uploadTask.value.oss_upload_id,
+        video_id: props.video.id,
+      })
+    }
   } catch (error) {
     uploadError.value = error?.message || '视频上传失败，请重试'
   } finally {
@@ -345,7 +361,7 @@ async function submit() {
             </label>
           </div>
           <p v-if="!canUpload" class="field__hint">
-            分片上传接口（2.2.7 / 2.2.8）尚未接入，新增视频暂只支持填写视频链接。
+            分片传输通道尚未就绪，新增视频暂只支持填写视频链接。
           </p>
         </div>
 

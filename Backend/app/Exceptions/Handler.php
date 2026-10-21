@@ -117,7 +117,10 @@ class Handler extends ExceptionHandler
             );
 
             return Result::error(
-                ResponseCode::DATABASE_ERROR
+                ResponseCode::DATABASE_ERROR,
+                null,
+                null,
+                500
             );
         }
 
@@ -138,7 +141,10 @@ class Handler extends ExceptionHandler
          * 未知异常
          */
         return Result::error(
-            ResponseCode::SYSTEM_ERROR
+            ResponseCode::SYSTEM_ERROR,
+            null,
+            null,
+            500
         );
     }
 

@@ -12,9 +12,11 @@ async function parseBody(response) {
   }
 }
 
-export async function request(path, options = {}) {
-  const url = path.startsWith('http') ? path : `${baseURL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`
+function resolveUrl(path) {
+  return path.startsWith('http') ? path : `${baseURL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`
+}
 
+function buildHeaders(options) {
   const headers = new Headers(options.headers)
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
@@ -25,7 +27,13 @@ export async function request(path, options = {}) {
     headers.set('Authorization', `Bearer ${token}`)
   }
 
-  const response = await fetch(url, {
+  return headers
+}
+
+export async function request(path, options = {}) {
+  const headers = buildHeaders(options)
+
+  const response = await fetch(resolveUrl(path), {
     ...options,
     headers,
     body:
@@ -53,6 +61,41 @@ export async function request(path, options = {}) {
   }
 
   return data
+}
+
+/**
+ * 下载文件流（Excel 等）。返回 Blob。
+ * 服务端出错时会返回 JSON 信封，这里按同一规则解析并抛错。
+ */
+export async function requestBlob(path, options = {}) {
+  const response = await fetch(resolveUrl(path), {
+    ...options,
+    headers: buildHeaders(options),
+  })
+
+  const contentType = response.headers.get('Content-Type') ?? ''
+  if (
+    !response.ok ||
+    contentType.includes('application/json') ||
+    contentType.includes('text/html')
+  ) {
+    const data = await parseBody(response)
+
+    if (!response.ok) {
+      const error = new Error(data?.msg || data?.message || response.statusText || '下载失败')
+      error.status = response.status
+      error.code = data?.code
+      error.data = data
+      throw error
+    }
+
+    if (data && typeof data === 'object' && 'code' in data && data.code !== 0) {
+      throw new Error(data.msg || '下载失败')
+    }
+    throw new Error('下载失败：服务未返回文件')
+  }
+
+  return response.blob()
 }
 
 export function get(path, options) {

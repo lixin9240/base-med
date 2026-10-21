@@ -56,6 +56,18 @@ return [
             'throw' => false,
         ],
 
+        'oss' => [
+            'driver' => 'oss',
+            'access_key' => env('OSS_ACCESS_KEY_ID'),
+            'secret_key' => env('OSS_ACCESS_KEY_SECRET'),
+            'endpoint' => env('OSS_ENDPOINT', 'https://oss-cn-chengdu.aliyuncs.com'),
+            'bucket' => env('OSS_BUCKET', 'wjc1127'),
+            'isCName' => env('OSS_IS_CNAME', false),
+            'url' => env('OSS_URL', 'https://wjc1127.oss-cn-chengdu.aliyuncs.com'),
+            'root' => env('OSS_PREFIX', ''),
+            'throw' => false,
+        ],
+
     ],
 
     /*

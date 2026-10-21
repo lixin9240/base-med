@@ -14,7 +14,7 @@ class TopicCreateRequest extends FormRequest
             'cover_url' => ['nullable', 'string', 'max:256'],
             'intro' => ['nullable', 'string', 'max:500'],
             'sort_order' => ['nullable', 'integer'],
-            'status' => ['nullable', 'integer', Rule::in([0, 1])],
+            'status' => ['nullable', Rule::in([0, 1])],
         ];
     }
 
@@ -26,7 +26,7 @@ class TopicCreateRequest extends FormRequest
             'cover_url.max' => '封面图URL不能超过256字',
             'intro.max' => '课程简介不能超过500字',
             'sort_order.integer' => '排序号必须为整数',
-            'status.in' => '状态值不合法',
+            'status.in' => '状态不合法',
         ];
     }
 }
