@@ -19,9 +19,9 @@ use Illuminate\Support\Str;
 class VideoShareLinkService
 {
     /**
-     * H5 学习页路径（拼接在 OSS 域名之后）
+     * H5 答题页路径（拼接在前端域名之后）
      */
-    private const LEARN_PATH = '/mobile/learn';
+    private const QUIZ_PATH = '/mobile/quiz';
 
     /**
      * 允许的时效天数
@@ -158,7 +158,7 @@ class VideoShareLinkService
      * 拼装完整 H5 链接
      *
      * base 优先取 system_config.h5_base_url（后台可配置），
-     * 缺省回退 APP_URL，再回退当前请求 host，避免拼到 OSS 域名。
+     * 缺省回退前端本地开发地址 http://localhost:5173，避免拼到后端或 OSS 域名。
      */
     private function buildUrl(VideoShareLink $link): string
     {
@@ -166,14 +166,10 @@ class VideoShareLinkService
         $base = rtrim($base, '/');
 
         if ($base === '') {
-            $base = rtrim((string) config('app.url'), '/');
+            $base = 'http://localhost:5173';
         }
 
-        if ($base === '') {
-            $base = rtrim((string) request()->getSchemeAndHttpHost(), '/');
-        }
-
-        return $base . self::LEARN_PATH . '?video_id=' . $link->video_id . '&share=' . $link->token;
+        return $base . self::QUIZ_PATH . '?videoId=' . $link->video_id . '&share=' . $link->token;
     }
 
     /**
