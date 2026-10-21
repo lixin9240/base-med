@@ -11,6 +11,7 @@ use App\Http\Requests\Gyz\VideoUpdateRequest;
 use App\Http\Requests\Gyz\VideoUpdateStatusRequest;
 use App\Http\Requests\Gyz\VideoUploadChunkRequest;
 use App\Http\Requests\Gyz\VideoUploadCompleteRequest;
+use App\Http\Requests\Gyz\VideoUploadCoverRequest;
 use App\Http\Requests\Gyz\VideoUploadInitRequest;
 use App\Services\Gyz\VideoService;
 use App\Support\Result;
@@ -99,6 +100,16 @@ class VideoController extends Controller
         $data = $this->videoService->uploadInit($request->validated());
 
         return Result::success('上传任务已初始化', $data);
+    }
+
+    /**
+     * 上传封面图片（本地上传，source_type=2）
+     */
+    public function uploadCover(VideoUploadCoverRequest $request): JsonResponse
+    {
+        $data = $this->videoService->uploadCover($request->validated());
+
+        return Result::success('封面上传成功', $data);
     }
 
     /**

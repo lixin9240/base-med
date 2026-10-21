@@ -217,6 +217,9 @@ Route::prefix('admin/video')->middleware('auth:admin')->group(function () {
     // 2.2.7 初始化视频上传（本地上传，source_type=2）
     Route::post(uri: '/upload/init', action: [GyzVideoController::class, 'uploadInit']);
 
+    // 上传封面图片（本地上传，source_type=2）
+    Route::post(uri: '/upload/cover', action: [GyzVideoController::class, 'uploadCover']);
+
     // 本地模拟辅助：上传单个分片（OSS 直传时由前端 SDK 分片，可跳过）
     Route::post(uri: '/upload/chunk', action: [GyzVideoController::class, 'uploadChunk']);
 
