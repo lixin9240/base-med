@@ -17,7 +17,7 @@ class OperationLogService
      */
     public function record(string $module, string $action, ?int $targetId = null, array $detail = []): void
     {
-        $adminId = auth()->id(); // 登录模块未就绪，当前为 null，接入后自动填充
+        $adminId = auth('admin')->id();
 
         OperationLog::create([
             'admin_id' => $adminId,

@@ -64,8 +64,8 @@ class AuthService
             'last_login_at' => now(),
         ]);
 
-        // 签发 token
-        $token = $admin->createToken('admin_login')->plainTextToken;
+        // 签发 JWT token
+        $token = auth('admin')->login($admin);
 
         Log::channel('business')->info('管理员登录成功', [
             'admin_id' => $admin->id,
@@ -88,11 +88,15 @@ class AuthService
     }
 
     /**
-     * 管理员登出（销毁当前 token）
+     * 管理员登出（JWT 加入黑名单失效）
      */
     public function logout(AdminUser $admin): void
     {
-        $admin->currentAccessToken()?->delete();
+        try {
+            auth('admin')->logout();
+        } catch (\Throwable $e) {
+            // token 已过期/无 token 时无需处理
+        }
 
         Log::channel('business')->info('管理员登出', [
             'admin_id' => $admin->id,
@@ -140,12 +144,18 @@ class AuthService
             now()->addSeconds(self::CODE_RESEND_SECONDS)
         );
 
-        // 发送邮件（MAIL_MAILER=log 时仅写日志，验证码可见于日志）
+        // 发送 HTML 邮件（QQ 邮箱 SMTP）
         try {
-            Mail::raw("您的重置密码验证码为：{$code}，{$this->CODE_EXPIRE_MINUTES} 分钟内有效。", function ($message) use ($admin) {
-                /** @var \Illuminate\Mail\Message $message */
-                $message->to($admin->email)->subject('基层医生DR平台 - 重置密码验证码');
-            });
+            Mail::html(
+                view('emails.reset-code', [
+                    'code' => $code,
+                    'expireMinutes' => self::CODE_EXPIRE_MINUTES,
+                ])->render(),
+                function ($message) use ($admin) {
+                    /** @var \Illuminate\Mail\Message $message */
+                    $message->to($admin->email)->subject('【基层医生DR平台】重置密码验证码');
+                }
+            );
         } catch (\Throwable $e) {
             Log::channel('exception')->error('重置密码邮件发送失败', [
                 'admin_id' => $admin->id,

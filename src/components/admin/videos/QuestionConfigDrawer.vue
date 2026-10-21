@@ -3,12 +3,10 @@ import { ref, watch } from 'vue'
 import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
 import { TEMPLATE_PATH } from '@/utils/video/questionImport'
 import { exportQuestionGroup } from '@/utils/video/questionExport'
-import {
-  REQUIRED_PER_STAGE,
-  listVideoQuestions,
-  removeVideoQuestion,
-  saveVideoQuestion,
-} from '@/store/video/video'
+import { questionToApiPayload } from '@/utils/video/questionDraft'
+import { toast } from '@/utils/toast'
+import { createAdminVideoQuestion, listAdminVideoQuestions, updateAdminVideoQuestion } from '@/api'
+import { REQUIRED_PER_STAGE, removeVideoQuestion } from '@/store/video/video'
 import QuestionEditorModal from './QuestionEditorModal.vue'
 import QuestionImportModal from './QuestionImportModal.vue'
 
@@ -35,6 +33,9 @@ const counts = ref({ pre: 0, post: 0 })
 const questions = ref([])
 const deletingId = ref('')
 const exporting = ref(false)
+const saving = ref(false)
+const loading = ref(false)
+const loadError = ref('')
 
 const editorOpen = ref(false)
 const editingQuestion = ref(null)
@@ -55,18 +56,63 @@ watch(activeStage, () => {
   load()
 })
 
-function load() {
+const STAGE_TO_API = { pre: 'pretest', post: 'posttest' }
+
+function mapAnswer(correctAnswer, type, options) {
+  const raw = String(correctAnswer ?? '')
+  if (type === 'multiple') {
+    return raw
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  if (type === 'judge') {
+    const index = options.findIndex((option) => option.content === raw)
+    return index >= 0 ? optionLetter(index) : raw
+  }
+  return raw
+}
+
+function toQuestion(item) {
+  const options = Array.isArray(item.options) ? item.options : []
+  return {
+    id: String(item.question_id ?? item.id),
+    questionId: item.question_id,
+    order: Number(item.sort_order) || 0,
+    type: item.type,
+    stem: item.stem,
+    options: options.map((option) => option.content),
+    answer: mapAnswer(item.correct_answer, item.type, options),
+    analysis: item.analysis || '',
+  }
+}
+
+async function load() {
   if (!props.video) {
     counts.value = { pre: 0, post: 0 }
     questions.value = []
+    loading.value = false
+    loadError.value = ''
     return
   }
 
-  counts.value = {
-    pre: listVideoQuestions(props.video.id, 'pre').length,
-    post: listVideoQuestions(props.video.id, 'post').length,
+  loading.value = true
+  loadError.value = ''
+  try {
+    const [preRes, postRes] = await Promise.all([
+      listAdminVideoQuestions({ videoId: props.video.id, stage: STAGE_TO_API.pre }),
+      listAdminVideoQuestions({ videoId: props.video.id, stage: STAGE_TO_API.post }),
+    ])
+    counts.value = { pre: preRes.total, post: postRes.total }
+    const current = activeStage.value === 'pre' ? preRes : postRes
+    questions.value = current.list.map(toQuestion)
+  } catch (error) {
+    counts.value = { pre: 0, post: 0 }
+    questions.value = []
+    loadError.value = error?.message || '题目加载失败'
+  } finally {
+    loading.value = false
   }
-  questions.value = listVideoQuestions(props.video.id, activeStage.value)
 }
 
 function countTone(count) {
@@ -91,18 +137,34 @@ function openEdit(question) {
   editorOpen.value = true
 }
 
-function onSave(payload) {
-  if (!props.video) return
+async function onSave(payload) {
+  if (!props.video || saving.value) return
 
-  const question = editingQuestion.value
-    ? { ...payload, id: editingQuestion.value.id }
-    : payload
+  const apiPayload = {
+    video_id: props.video.id,
+    stage: STAGE_TO_API[activeStage.value],
+    ...questionToApiPayload(payload),
+  }
+  if (editingQuestion.value) {
+    apiPayload.question_id = editingQuestion.value.questionId
+  }
 
-  saveVideoQuestion(props.video.id, activeStage.value, question)
-  editorOpen.value = false
-  editingQuestion.value = null
-  load()
-  emit('changed')
+  saving.value = true
+  try {
+    if (editingQuestion.value) {
+      await updateAdminVideoQuestion(apiPayload)
+    } else {
+      await createAdminVideoQuestion(apiPayload)
+    }
+    editorOpen.value = false
+    editingQuestion.value = null
+    load()
+    emit('changed')
+  } catch (error) {
+    toast(error?.message || '保存失败，请重试')
+  } finally {
+    saving.value = false
+  }
 }
 
 function askDelete(question) {
@@ -144,7 +206,12 @@ async function onExport() {
 <template>
   <Transition name="drawer">
     <div v-if="open" class="drawer-mask" @click.self="$emit('close')">
-      <aside class="drawer" role="dialog" aria-modal="true" :aria-label="`题目配置：${video?.title ?? ''}`">
+      <aside
+        class="drawer"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="`题目配置：${video?.title ?? ''}`"
+      >
         <header class="drawer__head">
           <div class="drawer__intro">
             <h2 class="drawer__title">{{ video?.title }}</h2>
@@ -176,7 +243,10 @@ async function onExport() {
             @click="activeStage = stage.value"
           >
             {{ stage.label }}
-            <span class="stage-tab__count" :class="`stage-tab__count--${countTone(counts[stage.value])}`">
+            <span
+              class="stage-tab__count"
+              :class="`stage-tab__count--${countTone(counts[stage.value])}`"
+            >
               {{ counts[stage.value] }}/{{ REQUIRED_PER_STAGE }}
             </span>
           </button>
@@ -184,14 +254,33 @@ async function onExport() {
 
         <div class="drawer__actions">
           <button type="button" class="btn btn--primary" @click="openCreate">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
               <path d="M12 5v14M5 12h14" />
             </svg>
             新增题目
           </button>
 
-          <a class="btn btn--secondary" :href="TEMPLATE_PATH" download="科普视频题目_批量导入模板.xlsx">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <a
+            class="btn btn--secondary"
+            :href="TEMPLATE_PATH"
+            download="科普视频题目_批量导入模板.xlsx"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5" />
               <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
             </svg>
@@ -199,7 +288,15 @@ async function onExport() {
           </a>
 
           <button type="button" class="btn btn--secondary" @click="importOpen = true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5" />
               <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
             </svg>
@@ -212,7 +309,15 @@ async function onExport() {
             :disabled="!questions.length || exporting"
             @click="onExport"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
               <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
               <path d="M14 3v5h5" />
               <path d="M12 11v6m0 0 2.5-2.5M12 17l-2.5-2.5" />
@@ -224,14 +329,23 @@ async function onExport() {
         <hr class="drawer__divider" />
 
         <div class="drawer__body">
-          <template v-if="questions.length">
+          <div v-if="loading" class="drawer-loading">正在加载题目…</div>
+          <div v-else-if="loadError" class="drawer-loading drawer-loading--error">
+            <span>{{ loadError }}</span>
+            <button type="button" class="link-btn" @click="load">重试</button>
+          </div>
+          <template v-else-if="questions.length">
             <article v-for="question in questions" :key="question.id" class="q-card">
               <div class="q-card__head">
                 <span class="q-card__type">{{ QUESTION_TYPE_LABEL[question.type] }}</span>
                 <span class="q-card__order">第 {{ question.order }} 题</span>
                 <div class="q-card__actions">
                   <button type="button" class="link-btn" @click="openEdit(question)">编辑</button>
-                  <button type="button" class="link-btn link-btn--danger" @click="askDelete(question)">
+                  <button
+                    type="button"
+                    class="link-btn link-btn--danger"
+                    @click="askDelete(question)"
+                  >
                     删除
                   </button>
                 </div>
@@ -252,13 +366,15 @@ async function onExport() {
                 </li>
               </ul>
 
-              <p v-if="question.analysis" class="q-card__analysis">
-                解析：{{ question.analysis }}
-              </p>
+              <p v-if="question.analysis" class="q-card__analysis">解析：{{ question.analysis }}</p>
 
               <div v-if="deletingId === question.id" class="q-card__confirm">
                 <span>确定删除这道题吗？</span>
-                <button type="button" class="link-btn link-btn--danger" @click="confirmDelete(question)">
+                <button
+                  type="button"
+                  class="link-btn link-btn--danger"
+                  @click="confirmDelete(question)"
+                >
                   确认删除
                 </button>
                 <button type="button" class="link-btn" @click="cancelDelete">取消</button>
@@ -286,7 +402,14 @@ async function onExport() {
               建议配 {{ REQUIRED_PER_STAGE }} 道题，也可以用 Excel 批量导入。
             </p>
             <button type="button" class="btn btn--primary" @click="openCreate">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
                 <path d="M12 5v14M5 12h14" />
               </svg>
               新增题目
@@ -302,6 +425,7 @@ async function onExport() {
     :mode="editingQuestion ? 'edit' : 'create'"
     :stage="activeStage"
     :question="editingQuestion"
+    :saving="saving"
     @close="editorOpen = false"
     @save="onSave"
   />
@@ -531,6 +655,21 @@ async function onExport() {
   min-height: 0;
   padding: var(--sp-4) var(--sp-6) var(--sp-6);
   overflow-y: auto;
+}
+
+.drawer-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: 140px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.drawer-loading--error {
+  flex-direction: column;
+  color: var(--danger-text);
 }
 
 .q-card {

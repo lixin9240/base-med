@@ -31,9 +31,9 @@ class TopicController extends Controller
 
     public function update(TopicUpdateRequest $request): JsonResponse
     {
-        $id = $this->topicService->update($request->validated());
+        $this->topicService->update($request->validated());
 
-        return $this->success(['id' => $id]);
+        return $this->success(['success' => true]);
     }
 
     public function delete(TopicDeleteRequest $request): JsonResponse

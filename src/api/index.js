@@ -11,3 +11,11 @@ export {
   updateAdminVideoStatus,
 } from './video'
 export { listAdminCategories } from './category'
+export {
+  createPublicDr,
+  getExamResult,
+  getPublicVideoDetail,
+  listPublicQuestions,
+  listPublicVideos,
+  submitPreExam,
+} from './public'

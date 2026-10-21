@@ -202,4 +202,53 @@ enum ResponseCode: int
             self::SYSTEM_SERVER_ERROR => '服务器内部错误',
         };
     }
+
+    /**
+     * 获取错误码对应的 HTTP 状态码
+     *
+     * 与码段划分对应，供 Result::error() 设置非 200 的响应状态：
+     *  0       成功            → 200
+     *  0~9     通用响应码        → 按语义映射（404/409/403/429/503，其余 500）
+     *  1xxxxx  参数相关          → 422
+     *  2xxxxx  认证授权          → 401（无访问权限 20005 → 403）
+     *  3xxxxx  数据相关          → 404（重复/关联冲突 → 409）
+     *  4xxxxx  业务相关          → 400
+     *  5xxxxx  第三方服务        → 502
+     *  6xxxxx  数据库异常        → 500
+     *  9xxxxx  系统异常          → 500
+     */
+    public function httpStatus(): int
+    {
+        if ($this === self::SUCCESS) {
+            return 200;
+        }
+
+        // 通用响应码（0~9）
+        if ($this->value < 10000) {
+            return match ($this) {
+                self::COMMON_DATA_NOT_FOUND => 404,
+                self::COMMON_DATA_EXISTS,
+                self::COMMON_CONFLICT => 409,
+                self::COMMON_FORBIDDEN => 403,
+                self::COMMON_TOO_MANY_REQUESTS => 429,
+                self::COMMON_SERVICE_UNAVAILABLE => 503,
+                default => 500,
+            };
+        }
+
+        return match (intdiv($this->value, 10000)) {
+            1 => 422, // 参数相关
+            2 => $this === self::PERMISSION_DENIED ? 403 : 401, // 认证授权
+            3 => in_array($this, [
+                    self::DATA_DUPLICATE,
+                    self::DATA_RELATION_EXISTS,
+                    self::DATA_VERSION_CONFLICT,
+                ], true) ? 409 : 404, // 数据相关
+            4 => 400, // 业务相关
+            5 => 502, // 第三方服务
+            6 => 500, // 数据库异常
+            9 => 500, // 系统异常
+            default => 500,
+        };
+    }
 }

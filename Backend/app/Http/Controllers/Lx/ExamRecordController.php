@@ -8,7 +8,6 @@ use App\Http\Requests\Lx\ExamRecordExportRequest;
 use App\Http\Requests\Lx\ExamRecordListRequest;
 use App\Services\Lx\ExamRecordService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Response;
 
 class ExamRecordController extends Controller
 {
@@ -42,13 +41,10 @@ class ExamRecordController extends Controller
     /**
      * 导出答题记录
      */
-    public function export(ExamRecordExportRequest $request): Response
+    public function export(ExamRecordExportRequest $request): JsonResponse
     {
-        $result = $this->examRecordService->export($request->validated());
+        $data = $this->examRecordService->export($request->validated());
 
-        return response($result['content'], 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"exam_records.csv\"; filename*=UTF-8''" . rawurlencode($result['filename']),
-        ]);
+        return $this->success($data);
     }
 }

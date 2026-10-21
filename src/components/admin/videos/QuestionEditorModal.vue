@@ -29,6 +29,10 @@ const props = defineProps({
     type: Object,
     default: null,
   },
+  saving: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['close', 'save'])
@@ -41,12 +45,8 @@ const errors = ref({})
 
 const isJudge = computed(() => draft.value.type === 'judge')
 const title = computed(() => (props.mode === 'edit' ? '编辑题目' : '新增题目'))
-const canAddOption = computed(
-  () => !isJudge.value && draft.value.options.length < MAX_OPTIONS,
-)
-const canRemoveOption = computed(
-  () => !isJudge.value && draft.value.options.length > MIN_OPTIONS,
-)
+const canAddOption = computed(() => !isJudge.value && draft.value.options.length < MAX_OPTIONS)
+const canRemoveOption = computed(() => !isJudge.value && draft.value.options.length > MIN_OPTIONS)
 
 watch(
   () => props.open,
@@ -98,6 +98,7 @@ function toggleCorrect(index) {
 }
 
 function save() {
+  if (props.saving) return
   const found = validateQuestionDraft(draft.value)
   errors.value = found
   if (Object.keys(found).length) return
@@ -171,20 +172,14 @@ function save() {
         <div class="field field--row">
           <span class="field__label"><i class="field__req">*</i>选项</span>
           <div class="field__control">
-            <div
-              v-for="(option, index) in draft.options"
-              :key="index"
-              class="option-row"
-            >
+            <div v-for="(option, index) in draft.options" :key="index" class="option-row">
               <span class="option-row__letter">{{ optionLetter(index) }}</span>
               <input
                 v-model="draft.options[index]"
                 class="input"
                 :disabled="isJudge"
                 :placeholder="
-                  isJudge
-                    ? ''
-                    : `选项 ${optionLetter(index)}${index < 2 ? '（必填）' : '（选填）'}`
+                  isJudge ? '' : `选项 ${optionLetter(index)}${index < 2 ? '（必填）' : '（选填）'}`
                 "
               />
               <button
@@ -258,7 +253,9 @@ function save() {
 
       <footer class="editor__foot">
         <button type="button" class="btn btn--secondary" @click="$emit('close')">取消</button>
-        <button type="button" class="btn btn--primary" @click="save">保存</button>
+        <button type="button" class="btn btn--primary" :disabled="saving" @click="save">
+          {{ saving ? '保存中…' : '保存' }}
+        </button>
       </footer>
     </div>
   </div>
