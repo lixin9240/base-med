@@ -1,4 +1,4 @@
-import { get, post } from './http'
+import { get, post } from '../http'
 
 const LIST_PATH = '/api/admin/video/list'
 const DETAIL_PATH = '/api/admin/video/detail'
