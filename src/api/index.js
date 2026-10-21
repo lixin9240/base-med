@@ -22,10 +22,9 @@ export {
   updateAdminVideoStatus,
 } from './video'
 export {
-  createAdminShareLink,
-  deleteAdminShareLink,
-  listAdminShareLinks,
-  updateAdminShareLinkStatus,
+  generateAdminShareLink,
+  getAdminShareLinkDetail,
+  revokeAdminShareLink,
 } from './video/shareLink'
 export { listAdminCategories } from './category'
 export { exportAdminRecords, getAdminRecordDetail, listAdminRecords } from './record'

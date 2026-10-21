@@ -1,48 +1,21 @@
 import { get, post } from '../http'
 
-// 访问链接模块接口（接口文档 2.4）
-const CREATE_PATH = '/api/admin/share-link/create'
-const LIST_PATH = '/api/admin/share-link/list'
-const UPDATE_STATUS_PATH = '/api/admin/share-link/update-status'
-const DELETE_PATH = '/api/admin/share-link/delete'
+// 视频分享链接模块接口（《视频分享链接模块接口文档》2.x）
+const GENERATE_PATH = '/api/admin/share-link/generate'
+const DETAIL_PATH = '/api/admin/share-link/detail'
+const REVOKE_PATH = '/api/admin/share-link/revoke'
 
 /**
- * 2.4.2 链接列表。
- * @param {{ page?: number, pageSize?: number, videoId?: number|string, status?: 0|1 }} params
- * @returns {Promise<{ list: Array, total: number }>} list 内字段保持后端命名
+ * 2.1 生成 / 重新生成视频分享链接。
+ * 同一视频已有生效链接时，后端会先自动失效旧链接再创建新链接。
+ * @param {{ videoId: number|string, expireDays: 1|3|5|7 }} params
+ * @returns {Promise<{ id: number, video_id: number, url: string, token: string, expire_type: string, expire_at: string, visit_count: number, status: number, created_at: string }>}
  */
-export async function listAdminShareLinks({ page = 1, pageSize = 20, videoId, status } = {}) {
-  const query = new URLSearchParams({
-    page: String(page),
-    page_size: String(pageSize),
+export async function generateAdminShareLink({ videoId, expireDays }) {
+  const body = await post(GENERATE_PATH, {
+    video_id: videoId,
+    expire_days: expireDays,
   })
-  if (videoId !== undefined && videoId !== null) query.set('video_id', String(videoId))
-  if (status !== undefined && status !== null) query.set('status', String(status))
-
-  const body = await get(`${LIST_PATH}?${query.toString()}`)
-
-  if (!body || typeof body !== 'object' || !('data' in body)) {
-    throw new Error('链接列表加载失败：服务未返回标准数据')
-  }
-
-  const data = body.data ?? {}
-  return {
-    list: Array.isArray(data.list) ? data.list : [],
-    total: Number(data.total) || 0,
-  }
-}
-
-/**
- * 2.4.1 生成访问链接。
- * expire_type：permanent 永久 / 7d / 30d / custom 自定义；custom 时必须传 expire_at。
- * @returns {Promise<{ id: number, video_id: number, token: string, url: string, expire_type: string, expire_at: string|null }>}
- */
-export async function createAdminShareLink({ video_id, org_id, expire_type, expire_at }) {
-  const payload = { video_id, expire_type }
-  if (org_id !== undefined && org_id !== null) payload.org_id = org_id
-  if (expire_type === 'custom') payload.expire_at = expire_at
-
-  const body = await post(CREATE_PATH, payload)
 
   if (!body || typeof body !== 'object' || !('data' in body) || !body.data) {
     throw new Error('链接生成失败：服务未返回标准数据')
@@ -51,30 +24,29 @@ export async function createAdminShareLink({ video_id, org_id, expire_type, expi
 }
 
 /**
- * 2.4.3 启用/失效链接。status：0 失效，1 启用；历史访问计数保留。
- * @param {{ id: number|string, status: 0|1 }} params
+ * 2.2 获取当前生效链接详情。无生效链接时后端返回 data: null。
+ * @param {{ videoId: number|string }} params
+ * @returns {Promise<object|null>}
  */
-export async function updateAdminShareLinkStatus({ id, status }) {
-  const body = await post(UPDATE_STATUS_PATH, { id, status })
+export async function getAdminShareLinkDetail({ videoId }) {
+  const query = new URLSearchParams({ video_id: String(videoId) })
+  const body = await get(`${DETAIL_PATH}?${query.toString()}`)
 
-  if (!body || typeof body !== 'object' || body.success === false) {
-    throw new Error(
-      status === 1 ? '链接启用失败：服务未返回成功结果' : '链接失效失败：服务未返回成功结果',
-    )
+  if (!body || typeof body !== 'object' || !('data' in body)) {
+    throw new Error('链接详情加载失败：服务未返回标准数据')
   }
-  return true
+  return body.data ?? null
 }
 
 /**
- * 2.4.4 删除链接（软删除）。已产生的访问记录与答题数据保留。
- * @param {{ id: number|string }} params
+ * 2.3 撤回当前生效链接（status 置 0），撤回后用户无法再通过它访问。
+ * @param {{ videoId: number|string }} params
  */
-export async function deleteAdminShareLink({ id }) {
-  const body = await post(DELETE_PATH, { id })
+export async function revokeAdminShareLink({ videoId }) {
+  const body = await post(REVOKE_PATH, { video_id: videoId })
 
-  // 文档未约定返回体；HTTP 失败 / code!==0 已在 http 层抛错，这里只拦显式失败
   if (!body || typeof body !== 'object' || body.success === false) {
-    throw new Error('链接删除失败：服务未返回成功结果')
+    throw new Error('链接撤回失败：服务未返回成功结果')
   }
   return true
 }
