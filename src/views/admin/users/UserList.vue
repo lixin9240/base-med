@@ -440,7 +440,7 @@ async function submitForm() {
 .users-page {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-5);
+  gap: var(--sp-6);
 }
 
 /* ===== 页头 ===== */
@@ -474,7 +474,7 @@ async function submitForm() {
 .users-page__stat {
   display: flex;
   align-items: center;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
 }
 
 .chip {
@@ -499,11 +499,15 @@ async function submitForm() {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  flex-wrap: wrap;
 }
 
 .toolbar__label {
   font-size: var(--fs-sm);
   color: var(--text-secondary);
+  margin-left: auto;
+  padding-left: var(--sp-4);
+  border-left: 1px solid var(--border);
 }
 
 .seg {
@@ -552,8 +556,8 @@ async function submitForm() {
 .users-row {
   display: flex;
   align-items: center;
-  gap: var(--sp-4);
-  padding: var(--sp-3) var(--sp-5);
+  gap: var(--sp-5);
+  padding: var(--sp-4) var(--sp-6);
 }
 
 .users-table__head {
@@ -586,7 +590,7 @@ async function submitForm() {
 
 .col--name {
   flex: 1.1;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
   font-weight: var(--fw-medium);
   white-space: nowrap;
 }
@@ -620,6 +624,7 @@ async function submitForm() {
 
 .col--ops {
   flex: 0.7;
+  gap: var(--sp-3);
   justify-content: flex-end;
 }
 
@@ -694,7 +699,7 @@ async function submitForm() {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--sp-4);
+  gap: var(--sp-5);
 }
 
 .pager {
