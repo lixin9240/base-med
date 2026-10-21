@@ -36,3 +36,7 @@ export const VIDEO_MAX_SIZE_MB = 500
 
 /** 封面图片大小上限（MB） */
 export const COVER_MAX_SIZE_MB = 2
+
+/** 题目阶段：前端内部值 ↔ 接口值 */
+export const STAGE_TO_API = { pre: 'pretest', post: 'posttest' }
+export const STAGE_FROM_API = { pretest: 'pre', posttest: 'post' }

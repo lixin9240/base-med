@@ -1,8 +1,14 @@
-export { request, get, post, put, del } from './http'
+export { request, requestBlob, get, post, put, del } from './http'
 export { adminLogin, adminProfile, adminLogout } from './auth'
 export {
+  confirmAdminImportTask,
   createAdminVideoQuestion,
+  downloadQuestionTemplate,
+  exportAdminVideoQuestions,
+  getAdminImportTaskDetail,
+  importAdminVideoQuestions,
   listAdminVideoQuestions,
+  removeAdminVideoQuestion,
   updateAdminVideoQuestion,
 } from './question'
 export {
