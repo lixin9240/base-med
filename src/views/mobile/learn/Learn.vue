@@ -6,7 +6,7 @@ import PageNav from '@/components/mobile/PageNav.vue'
 import { formatArticleHtml } from '@/utils/article'
 import { toast } from '@/utils/toast'
 import { getPublicVideoDetail, reportVideoProgress } from '@/api/public'
-import { currentDrId } from '@/store/mobile/session'
+import { currentDrId, setSkipWatch } from '@/store/mobile/session'
 
 const route = useRoute()
 const router = useRouter()
@@ -133,6 +133,7 @@ function onEnded() {
 function onVideoError() {
   noVideoMode.value = true
   canQuiz.value = true
+  setSkipWatch(videoId)
 }
 
 function goQuiz() {

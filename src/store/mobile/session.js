@@ -23,3 +23,26 @@ export function currentDrId() {
     return ''
   }
 }
+
+const SKIP_WATCH_KEY = 'pv.skipWatch'
+
+/** 标记某视频跳过观看门槛（视频损坏/不可播放时） */
+export function setSkipWatch(videoId) {
+  try {
+    const set = JSON.parse(sessionStorage.getItem(SKIP_WATCH_KEY) || '{}')
+    set[String(videoId)] = true
+    sessionStorage.setItem(SKIP_WATCH_KEY, JSON.stringify(set))
+  } catch {
+    // 忽略存储失败
+  }
+}
+
+/** 该视频是否已标记跳过观看门槛 */
+export function isSkipWatch(videoId) {
+  try {
+    const set = JSON.parse(sessionStorage.getItem(SKIP_WATCH_KEY) || '{}')
+    return Boolean(set[String(videoId)])
+  } catch {
+    return false
+  }
+}
