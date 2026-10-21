@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
@@ -68,6 +68,8 @@ onMounted(async () => {
       canQuiz.value = wp.is_unlocked === 1
       maxTime = Number(wp.watched_seconds) || 0
       reportTimer = window.setInterval(reportProgress, 3000)
+      await nextTick()
+      await tryAutoPlay()
     }
     document.addEventListener('visibilitychange', onVisibility)
   } catch (e) {
@@ -152,6 +154,17 @@ function onEnded() {
   }
 }
 
+// 自动播放；若被浏览器自动播放策略拦截，则提示用户手动播放
+async function tryAutoPlay() {
+  const el = videoEl.value
+  if (!el) return
+  try {
+    await el.play()
+  } catch {
+    toast('浏览器已限制自动播放，请点击播放按钮手动播放')
+  }
+}
+
 function onVideoError() {
   noVideoMode.value = true
   canQuiz.value = true
@@ -198,6 +211,7 @@ function goQuiz() {
           class="player__el"
           :src="video.videoUrl"
           controls
+          autoplay
           playsinline
           webkit-playsinline
           preload="metadata"
