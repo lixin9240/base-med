@@ -108,7 +108,7 @@
 
 > 说明：验证码错误或过期返回 422（msg：验证码错误或已过期）；重置成功后验证码立即失效，需用新密码重新登录。
 
-## 2.2 WJC-管理员用户管理模块（admin_user，后台账号增删改）
+## 2.2 LX-管理员用户管理模块（admin_user，后台账号增删改）
 
 对应路由 `admin/admin-user`，均需 `auth:admin`（Bearer token）。
 
@@ -785,130 +785,11 @@
 
 > 说明：软删除；存在关联视频（video.category_id）时不允许删除。
 
-## 2.8 LX-题库管理模块（question 题目表）
 
-### 2.8.1 题目列表
-- 路径：`GET /api/admin/question/list`
-- Method：GET
 
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| page | int | 否 | 默认 1 |
-| page_size | int | 否 | 默认 20 |
-| type | string | 否 | single/multiple/judge |
-| knowledge_point | string | 否 | 知识点标签 |
-| stem | string | 否 | 题干关键词 |
+## 2.8 GYZ-批量导入任务模块
 
-返回：
-
-```json
-{
-    "list": [
-        {
-            "id": 101,
-            "type": "single",
-            "stem": "成人基础生命支持中，按压与通气的比例应为？",
-            "option_count": 4,
-            "difficulty": 2,
-            "knowledge_point": "心肺复苏",
-            "created_at": "2026-10-19 10:00:00"
-        }
-    ],
-    "total": 30
-}
-```
-
-### 2.8.2 编辑题目
-- 路径：`POST /api/admin/question/update`
-- Method：POST
-- 参数同 2.4.2（题目字段），**增加 id（bigint，必填）**；另支持题库扩展字段 `image_url`（配图URL）/`difficulty`（难度1-3）/`knowledge_point`（知识点标签）；不影响已有 video_question 绑定关系。
-
-### 2.8.3 删除题目
-- 路径：`POST /api/admin/question/delete`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 |
-| ---- | ---- | ---- |
-| id | bigint | 是 |
-
-> 说明：软删除；被 video_question 引用（仍绑定在视频上）时前置校验不通过，需先通过 2.4.5 从相关视频移除后才可删除。
-
-## 2.9 LX-课程管理模块（topic 课程表）
-
-对应路由 `admin/topic`，均需 `auth:admin`（Bearer token）。
-
-### 2.9.1 课程列表
-- 路径：`GET /api/admin/topic/list`
-- Method：GET
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| page | int | 否 | 默认 1 |
-| page_size | int | 否 | 默认 20 |
-| keyword | string | 否 | 课程名称模糊搜索 |
-| status | tinyint | 否 | 0禁用 1启用 |
-
-返回：
-
-```json
-{
-    "list": [
-        {
-            "id": 1,
-            "name": "心肺复苏基础操作",
-            "cover_url": "https://oss.example.com/cover/xxx.png",
-            "intro": "面向基层医生的成人心肺复苏规范操作课程",
-            "sort_order": 1,
-            "status": 1,
-            "created_at": "2026-10-20 10:00:00"
-        }
-    ],
-    "total": 1
-}
-```
-
-### 2.9.2 新增课程
-- 路径：`POST /api/admin/topic/create`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| name | string | 是 | 课程名称 |
-| cover_url | string | 否 | 封面图 URL |
-| intro | string | 否 | 课程简介 |
-| sort_order | int | 否 | 排序号，默认 0 |
-| status | tinyint | 否 | 0禁用 1启用，默认 1 |
-
-返回：`{ "id": 1 }`（课程 ID）。
-
-### 2.9.3 编辑课程
-- 路径：`POST /api/admin/topic/update`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| id | bigint | 是 | 课程 ID |
-| name | string | 否 | |
-| cover_url | string | 否 | |
-| intro | string | 否 | |
-| sort_order | int | 否 | |
-| status | tinyint | 否 | |
-
-返回：`{ "success": true }`。
-
-### 2.9.4 删除课程
-- 路径：`POST /api/admin/topic/delete`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 |
-| ---- | ---- | ---- |
-| id | bigint | 是 |
-
-> 说明：软删除；该课程下存在关联视频（video.topic_id）时不允许删除。返回 `{ "success": true }`。
-
-## 2.10 GYZ-批量导入任务模块
-
-### 2.10.1 任务列表
+### 2.8.1 任务列表
 - 路径：`GET /api/admin/import/task-list`
 - Method：GET
 
@@ -948,7 +829,7 @@
 | 4 | 已完成 |
 | 5 | 失败 |
 
-### 2.10.2 任务详情（校验结果与错误报告）
+### 2.8.2 任务详情（校验结果与错误报告）
 - 路径：`GET /api/admin/import/task-detail`
 - Method：GET
 
@@ -975,7 +856,7 @@
 }
 ```
 
-### 2.10.3 确认导入
+### 2.8.3 确认导入
 - 路径：`POST /api/admin/import/confirm`
 - Method：POST
 
@@ -987,9 +868,9 @@
 
 > 说明：执行后任务进入「3 导入中」，写入 question 与 video_question（G4：Excel 一次导入课程+视频+图文+前测3+后测3），完成转为「4 已完成」，异常转为「5 失败」；仅有效行（valid_rows）入库。
 
-## 2.11 GYZ-操作日志模块（operation_log，后台留痕）
+## 2.9 GYZ-操作日志模块（operation_log，后台留痕）
 
-### 2.11.1 操作日志列表
+### 2.9.1 操作日志列表
 - 路径：`GET /api/admin/operation-log/list`
 - Method：GET
 
@@ -998,7 +879,7 @@
 | page | int | 否 | 默认 1 |
 | page_size | int | 否 | 默认 20 |
 | module | string | 否 | video/question/exam/category/share/admin_user/topic |
-| action | string | 否 | create/update/delete/import/export/generate_link/revoke |
+| action | string | 否 | create/update/delete/import/export/generate_link |
 | admin_id | bigint | 否 | 操作人筛选 |
 
 返回：
@@ -1021,57 +902,6 @@
     "total": 1
 }
 ```
-
-## 2.12 GYZ-链接模块（公众号分享链接，video_share_link）
-
-对应路由 `admin/share-link`，均需 `auth:admin`（Bearer token）。链接用于发布到公众号，用户无需登录即可观看视频并答题；时效仅支持 1/3/5/7 天，重新生成会自动失效旧链接。
-
-### 2.12.1 生成 / 重新生成链接
-- 路径：`POST /api/admin/share-link/generate`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 | 备注 |
-| ---- | ---- | ---- | ---- |
-| video_id | bigint | 是 | 视频 ID |
-| expire_days | int | 是 | 链接时效（天），仅支持 1/3/5/7 |
-
-返回：
-
-```json
-{
-    "id": 1,
-    "video_id": 2,
-    "url": "https://wjc1127.oss-cn-chengdu.aliyuncs.com/mobile/learn?video_id=2&share=xxxx",
-    "token": "xxxx",
-    "expire_type": "1d",
-    "expire_at": "2026-10-22 09:10:30",
-    "visit_count": 0,
-    "status": 1,
-    "created_at": "2026-10-21 09:10:30"
-}
-```
-
-> 说明：重新生成时，该视频已有生效链接会被自动置为失效（status=0）。
-
-### 2.12.2 获取生效链接详情
-- 路径：`GET /api/admin/share-link/detail`
-- Method：GET
-
-| 参数 | 类型 | 是否必须 |
-| ---- | ---- | ---- |
-| video_id | bigint | 是 |
-
-返回：与 2.12.1 相同的链接结构；无生效链接（未生成、已撤回或已过期）时返回 `data` 为 `null`。
-
-### 2.12.3 撤回生效链接
-- 路径：`POST /api/admin/share-link/revoke`
-- Method：POST
-
-| 参数 | 类型 | 是否必须 |
-| ---- | ---- | ---- |
-| video_id | bigint | 是 |
-
-> 说明：将当前生效链接置为失效（status=0），用户端入口随即隐藏。返回 `{ "success": true }`。
 
 ---
 
@@ -1400,7 +1230,6 @@
 | 题库管理 | 2.8 | `question`、`video_question` |
 | 课程管理 | 2.9 | `topic`、`video` |
 | 操作日志 | 2.11 | `operation_log` |
-| 链接模块（公众号分享链接） | 2.12 | `video_share_link`、`video` |
 | 用户端入口 | 3.1 | `visit_record`（点击视频时绑定video_id并签发dr_id）、`video` |
 | 用户端视频/题目 | 3.2、3.3、3.6 | `video`、`category`、`video_question`、`question` |
 | 观看进度 | 3.4 | `video_progress`（进度上报、90%门槛计算） |

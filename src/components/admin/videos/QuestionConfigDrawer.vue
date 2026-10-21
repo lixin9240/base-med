@@ -1,12 +1,19 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { QUESTION_TYPE_LABEL, optionLetter } from '@/utils/question'
-import { TEMPLATE_PATH } from '@/utils/video/questionImport'
-import { exportQuestionGroup } from '@/utils/video/questionExport'
+import { STAGE_TO_API } from '@/utils/video/constants'
 import { questionToApiPayload } from '@/utils/video/questionDraft'
+import { downloadBlob, safeFileName } from '@/utils/download'
 import { toast } from '@/utils/toast'
-import { createAdminVideoQuestion, listAdminVideoQuestions, updateAdminVideoQuestion } from '@/api'
-import { REQUIRED_PER_STAGE, removeVideoQuestion } from '@/store/video/video'
+import {
+  createAdminVideoQuestion,
+  downloadQuestionTemplate,
+  exportAdminVideoQuestions,
+  listAdminVideoQuestions,
+  removeAdminVideoQuestion,
+  updateAdminVideoQuestion,
+} from '@/api'
+import { REQUIRED_PER_STAGE } from '@/store/video/video'
 import QuestionEditorModal from './QuestionEditorModal.vue'
 import QuestionImportModal from './QuestionImportModal.vue'
 
@@ -32,7 +39,9 @@ const activeStage = ref('pre')
 const counts = ref({ pre: 0, post: 0 })
 const questions = ref([])
 const deletingId = ref('')
+const deleting = ref(false)
 const exporting = ref(false)
+const downloadingTemplate = ref(false)
 const saving = ref(false)
 const loading = ref(false)
 const loadError = ref('')
@@ -56,7 +65,7 @@ watch(activeStage, () => {
   load()
 })
 
-const STAGE_TO_API = { pre: 'pretest', post: 'posttest' }
+const STAGE_NAME = { pre: '前测', post: '后测' }
 
 function mapAnswer(correctAnswer, type, options) {
   const raw = String(correctAnswer ?? '')
@@ -175,12 +184,24 @@ function cancelDelete() {
   deletingId.value = ''
 }
 
-function confirmDelete(question) {
-  if (!props.video) return
-  removeVideoQuestion(props.video.id, activeStage.value, question.id)
-  deletingId.value = ''
-  load()
-  emit('changed')
+async function confirmDelete(question) {
+  if (!props.video || deleting.value) return
+
+  deleting.value = true
+  try {
+    await removeAdminVideoQuestion({
+      video_id: props.video.id,
+      stage: STAGE_TO_API[activeStage.value],
+      question_id: question.questionId ?? question.id,
+    })
+    deletingId.value = ''
+    load()
+    emit('changed')
+  } catch (error) {
+    toast(error?.message || '删除失败，请重试')
+  } finally {
+    deleting.value = false
+  }
 }
 
 function onImported() {
@@ -188,15 +209,35 @@ function onImported() {
   emit('changed')
 }
 
+async function onDownloadTemplate() {
+  if (downloadingTemplate.value) return
+
+  downloadingTemplate.value = true
+  try {
+    const blob = await downloadQuestionTemplate({
+      stage: STAGE_TO_API[activeStage.value],
+    })
+    downloadBlob(blob, '科普视频题目_批量导入模板.xlsx')
+  } catch (error) {
+    toast(error?.message || '模板下载失败，请重试')
+  } finally {
+    downloadingTemplate.value = false
+  }
+}
+
 async function onExport() {
-  if (!props.video || !questions.value.length || exporting.value) return
+  if (!props.video || exporting.value) return
+
   exporting.value = true
   try {
-    await exportQuestionGroup({
-      videoTitle: props.video.title,
-      stage: activeStage.value,
-      questions: questions.value,
+    const blob = await exportAdminVideoQuestions({
+      videoId: props.video.id,
+      stage: STAGE_TO_API[activeStage.value],
     })
+    const name = `${safeFileName(props.video.title)}_${STAGE_NAME[activeStage.value] ?? ''}_题目.xlsx`
+    downloadBlob(blob, name)
+  } catch (error) {
+    toast(error?.message || '导出失败，请重试')
   } finally {
     exporting.value = false
   }
@@ -267,10 +308,11 @@ async function onExport() {
             新增题目
           </button>
 
-          <a
+          <button
+            type="button"
             class="btn btn--secondary"
-            :href="TEMPLATE_PATH"
-            download="科普视频题目_批量导入模板.xlsx"
+            :disabled="downloadingTemplate"
+            @click="onDownloadTemplate"
           >
             <svg
               viewBox="0 0 24 24"
@@ -284,8 +326,8 @@ async function onExport() {
               <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5" />
               <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
             </svg>
-            下载模板
-          </a>
+            {{ downloadingTemplate ? '下载中…' : '下载模板' }}
+          </button>
 
           <button type="button" class="btn btn--secondary" @click="importOpen = true">
             <svg
@@ -322,7 +364,7 @@ async function onExport() {
               <path d="M14 3v5h5" />
               <path d="M12 11v6m0 0 2.5-2.5M12 17l-2.5-2.5" />
             </svg>
-            导出本组
+            {{ exporting ? '导出中…' : '导出本组' }}
           </button>
         </div>
 
@@ -373,11 +415,14 @@ async function onExport() {
                 <button
                   type="button"
                   class="link-btn link-btn--danger"
+                  :disabled="deleting"
                   @click="confirmDelete(question)"
                 >
-                  确认删除
+                  {{ deleting ? '删除中…' : '确认删除' }}
                 </button>
-                <button type="button" class="link-btn" @click="cancelDelete">取消</button>
+                <button type="button" class="link-btn" :disabled="deleting" @click="cancelDelete">
+                  取消
+                </button>
               </div>
             </article>
           </template>
