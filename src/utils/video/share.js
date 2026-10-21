@@ -1,22 +1,3 @@
-/** 生成分享链接 token */
-export function generateShareToken() {
-  if (globalThis.crypto?.randomUUID) {
-    return `s_${globalThis.crypto.randomUUID().replace(/-/g, '')}`
-  }
-  return `s_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`
-}
-
-/**
- * 拼分享链接。使用当前域名 + 路由 base，避免域名变更后旧链接失效。
- */
-export function buildShareUrl({ courseId, token }) {
-  const base = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
-  const url = new URL(`${base}mobile/learn`, window.location.origin)
-  if (courseId) url.searchParams.set('courseId', courseId)
-  if (token) url.searchParams.set('share', token)
-  return url.toString()
-}
-
 /** 分享链接是否已过期 */
 export function isShareExpired(link, now = Date.now()) {
   return !link?.expiresAt || now >= link.expiresAt

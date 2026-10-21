@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
 class VideoShareLinkService
 {
     /**
-     * H5 答题页路径（拼接在前端域名之后）
+     * H5 分享链接入口路径（答题页，拼接在前端域名之后）
      */
     private const QUIZ_PATH = '/mobile/quiz';
 
@@ -78,7 +78,7 @@ class VideoShareLinkService
             'expire_type' => $link->expire_type,
         ]);
 
-        return $this->formatLink($link);
+        return $this->formatLink($link, $video);
     }
 
     /**
@@ -97,7 +97,7 @@ class VideoShareLinkService
 
         $link = $this->activeLink($video->id);
 
-        return $link ? $this->formatLink($link) : null;
+        return $link ? $this->formatLink($link, $video) : null;
     }
 
     /**
@@ -158,7 +158,7 @@ class VideoShareLinkService
      * 拼装完整 H5 链接
      *
      * base 优先取 system_config.h5_base_url（后台可配置），
-     * 缺省回退前端本地开发地址 http://localhost:5173，避免拼到后端或 OSS 域名。
+     * 缺省回退生产前端地址 http://47.114.49.68:4537。
      */
     private function buildUrl(VideoShareLink $link): string
     {
@@ -166,7 +166,7 @@ class VideoShareLinkService
         $base = rtrim($base, '/');
 
         if ($base === '') {
-            $base = 'http://localhost:5173';
+            $base = 'http://47.114.49.68:4537';
         }
 
         return $base . self::QUIZ_PATH . '?videoId=' . $link->video_id . '&share=' . $link->token;
@@ -175,13 +175,16 @@ class VideoShareLinkService
     /**
      * 统一对外结构
      *
+     * @param  Video  $video  关联视频（用于返回其 OSS 直链）
      * @return array<string, mixed>
      */
-    private function formatLink(VideoShareLink $link): array
+    private function formatLink(VideoShareLink $link, Video $video): array
     {
         return [
             'id' => (int) $link->id,
             'video_id' => (int) $link->video_id,
+            // 视频的 OSS 直链（本地上传 source_type=2 完成后回填；填写链接 source_type=1 为手工填写的 OSS 地址）
+            'video_url' => $video->video_url ?? '',
             'url' => $this->buildUrl($link),
             'token' => $link->token,
             'expire_type' => $link->expire_type,

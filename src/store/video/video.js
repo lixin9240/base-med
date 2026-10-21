@@ -9,7 +9,6 @@ import {
   saveCourse,
 } from '@/store'
 import { toCourse, videoSpeakerLabel } from '@/utils/video/videoForm'
-import { clearShareLink } from './shareLink'
 
 /** 每个视频建议的题目数量（前后测共用一套） */
 export const REQUIRED_QUESTION_COUNT = 3
@@ -187,7 +186,7 @@ export function setVideoPublished(videoId, published) {
   return videos[index]
 }
 
-/** 删除视频：同时清理课程、题目和分享链接 */
+/** 删除视频：同时清理课程和题目 */
 export function removeVideo(videoId) {
   ensureCoreStoreSeed()
   const videos = seedVideos()
@@ -201,7 +200,6 @@ export function removeVideo(videoId) {
   replaceCoreQuestions(courseId, 'pre', [])
   replaceCoreQuestions(courseId, 'post', [])
   removeCourse(courseId)
-  clearShareLink(video.id)
   return true
 }
 

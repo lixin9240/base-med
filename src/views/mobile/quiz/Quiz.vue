@@ -5,7 +5,7 @@ import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
 import { toast } from '@/utils/toast'
-import { currentDrId, isSkipWatch } from '@/store/mobile/session'
+import { currentDrId, isSkipWatch, issueDrId } from '@/store/mobile/session'
 import { getPublicVideoDetail, listPublicQuestions, submitPostExam, submitPreExam } from '@/api/public'
 
 const route = useRoute()
@@ -41,6 +41,10 @@ function categoryTone(category) {
 onMounted(async () => {
   try {
     drId.value = currentDrId()
+    // 分享链接入口：直接打开 /mobile/quiz?videoId=X 时无 dr_id，先签发匿名编号再答题
+    if (!drId.value && videoId) {
+      drId.value = await issueDrId(videoId)
+    }
     if (!drId.value || !videoId) {
       router.replace('/mobile/home')
       return
