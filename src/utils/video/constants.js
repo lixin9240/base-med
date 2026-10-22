@@ -28,9 +28,6 @@ export const SHARE_TTL_OPTIONS = [
   { days: 7, label: '7 天' },
 ]
 
-/** 分享链接默认时效（天） */
-export const DEFAULT_SHARE_TTL = 1
-
 /** 视频文件大小上限（MB） */
 export const VIDEO_MAX_SIZE_MB = 500
 

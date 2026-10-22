@@ -71,7 +71,7 @@ class QuestionService
         $data = [
             'type' => $type,
             'stem' => $params['stem'],
-            'correct_answer' => $params['correct_answer'],
+            'correct_answer' => Question::normalizeCorrectAnswer($type, (string) $params['correct_answer']),
             'analysis' => $params['analysis'] ?? null,
             'image_url' => $params['image_url'] ?? null,
             'difficulty' => $params['difficulty'] ?? $question->difficulty,
