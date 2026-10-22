@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
@@ -22,6 +22,7 @@ const required = ref(90) // 解锁门槛
 const canQuiz = ref(false) // 是否已解锁后测
 const badRate = ref(false)
 const noVideoMode = ref(false)
+const loading = ref(true)
 
 let maxTime = 0 // 最大观看位置（秒）
 let reportTimer = null
@@ -66,12 +67,16 @@ onMounted(async () => {
       watched.value = wp.progress_percent ?? 0
       required.value = wp.watch_required_percent ?? 90
       canQuiz.value = wp.is_unlocked === 1
-      if (canQuiz.value) maxTime = Number(wp.watched_seconds) || 0
+      maxTime = Number(wp.watched_seconds) || 0
       reportTimer = window.setInterval(reportProgress, 3000)
+      await nextTick()
+      await tryAutoPlay()
     }
     document.addEventListener('visibilitychange', onVisibility)
   } catch (e) {
     error.value = e?.message || '加载失败'
+  } finally {
+    loading.value = false
   }
 })
 
@@ -89,11 +94,11 @@ async function reportProgress() {
     const res = await reportVideoProgress({
       dr_id: drId,
       video_id: videoId,
-      watched_seconds: Math.floor(maxTime || el.currentTime || 0),
+      watched_seconds: maxTime || el.currentTime || 0,
       duration: Math.round(el.duration) || undefined,
     })
     if (res) {
-      watched.value = res.progress_percent ?? watched.value
+      watched.value = Math.max(watched.value, res.progress_percent ?? 0)
       required.value = res.watch_required_percent ?? required.value
       if (res.is_unlocked === 1 && !canQuiz.value) {
         canQuiz.value = true
@@ -109,12 +114,24 @@ function onVisibility() {
   if (document.visibilityState === 'hidden') reportProgress()
 }
 
+function syncProgress() {
+  const el = videoEl.value
+  if (!el || !el.duration) return
+  const percent = Math.min(100, Math.round((maxTime / el.duration) * 100))
+  if (percent > watched.value) watched.value = percent
+  if (percent >= required.value && !canQuiz.value) {
+    canQuiz.value = true
+    toast('已看完，可以去答题了')
+  }
+}
+
 function onTimeUpdate() {
   const el = videoEl.value
   if (!el || !el.duration) return
   if (!el.paused && !el.seeking && Number(el.playbackRate) === 1 && document.visibilityState === 'visible') {
     if (el.currentTime > maxTime) maxTime = el.currentTime
   }
+  syncProgress()
 }
 
 function onSeeking() {
@@ -135,7 +152,19 @@ function onEnded() {
   const el = videoEl.value
   if (el?.duration) {
     maxTime = el.duration
+    syncProgress()
     reportProgress()
+  }
+}
+
+// 自动播放；若被浏览器自动播放策略拦截，则提示用户手动播放
+async function tryAutoPlay() {
+  const el = videoEl.value
+  if (!el) return
+  try {
+    await el.play()
+  } catch {
+    toast('浏览器已限制自动播放，请点击播放按钮手动播放')
   }
 }
 
@@ -166,6 +195,11 @@ function goQuiz() {
       </div>
     </div>
 
+    <div v-else-if="loading" class="empty">
+      <div class="loading-spinner" role="status" aria-label="加载中" />
+      <p class="empty__text">加载中…</p>
+    </div>
+
     <div v-else-if="!video" class="empty">
       <div class="empty__icon">
         <AppIcon name="alert" :size="44" />
@@ -185,6 +219,7 @@ function goQuiz() {
           class="player__el"
           :src="video.videoUrl"
           controls
+          autoplay
           playsinline
           webkit-playsinline
           preload="metadata"
@@ -253,6 +288,23 @@ function goQuiz() {
   margin-top: calc(-1 * var(--sp-4));
   margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
   margin-right: calc(-1 * max(var(--sp-4), env(safe-area-inset-right, 0px)));
+}
+
+/* 加载中的旋转缓冲圈 */
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  margin: 0 auto var(--sp-3);
+  border: 3px solid var(--border);
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .player {

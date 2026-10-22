@@ -22,41 +22,31 @@ export function validateCoverFile(file) {
   return ''
 }
 
-function readAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result ?? ''))
-    reader.onerror = () => reject(new Error('读取图片失败'))
-    reader.readAsDataURL(file)
-  })
-}
-
-async function uploadFile(file, kind) {
+/**
+ * 上传视频。
+ * 未配置 VITE_UPLOAD_ENDPOINT 时返回本地 objectURL，仅供演示预览。
+ */
+export async function uploadVideoFile(file) {
   const endpoint = import.meta.env.VITE_UPLOAD_ENDPOINT
-  if (!endpoint) {
-    return kind === 'cover' ? readAsDataUrl(file) : URL.createObjectURL(file)
-  }
+  if (!endpoint) return URL.createObjectURL(file)
 
   const form = new FormData()
   form.append('file', file)
-  form.append('kind', kind)
+  form.append('kind', 'video')
   const result = await post(endpoint, form)
   if (!result?.url) throw new Error('上传失败：服务未返回文件地址')
   return result.url
 }
 
 /**
- * 上传视频。
- * 未配置 VITE_UPLOAD_ENDPOINT 时返回本地 objectURL，仅供演示预览。
+ * 上传封面（POST /api/admin/video/upload/cover）。
+ * 返回 OSS 地址；失败抛出异常。
  */
-export function uploadVideoFile(file) {
-  return uploadFile(file, 'video')
-}
-
-/**
- * 上传封面。
- * 未配置 VITE_UPLOAD_ENDPOINT 时转成 dataURL，刷新后仍可显示。
- */
-export function uploadCoverFile(file) {
-  return uploadFile(file, 'cover')
+export async function uploadCoverFile(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const body = await post('/api/admin/video/upload/cover', form)
+  const url = body?.data?.url
+  if (!url) throw new Error('封面上传失败：服务未返回地址')
+  return url
 }

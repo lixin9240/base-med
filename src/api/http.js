@@ -1,4 +1,4 @@
-import { getAdminToken } from '@/store/admin/auth'
+import { clearAdminAuth, getAdminToken } from '@/store/admin/auth'
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -45,6 +45,14 @@ export async function request(path, options = {}) {
   const data = await parseBody(response)
 
   if (!response.ok) {
+    // 401 未授权：清 token 跳登录
+    if (response.status === 401) {
+      clearAdminAuth()
+      const current = window.location.pathname + window.location.search
+      if (!current.startsWith('/admin/login')) {
+        window.location.replace(`/admin/login?redirect=${encodeURIComponent(current)}`)
+      }
+    }
     const error = new Error(data?.msg || data?.message || response.statusText || '请求失败')
     error.status = response.status
     error.code = data?.code
