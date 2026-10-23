@@ -94,6 +94,18 @@ function optionTag(item, opt) {
   if (picked) return '您的选择 · 错误'
   return ''
 }
+
+// 正确答案展示文案：单选/判断直接展示，多选用「、」连接
+function correctAnswerLabel(item) {
+  if (item.type === 'multiple') {
+    return String(item.answer || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join('、')
+  }
+  return item.answer || ''
+}
 </script>
 
 <template>
@@ -158,6 +170,7 @@ function optionTag(item, opt) {
               <span v-if="optionTag(item, opt)" class="rop__tag">{{ optionTag(item, opt) }}</span>
             </li>
           </ul>
+          <p class="rv__answer"><b>正确答案：</b>{{ correctAnswerLabel(item) }}</p>
           <p v-if="item.analysis" class="rv__analysis">
             <b>解析：</b>{{ item.analysis }}
           </p>
@@ -368,6 +381,13 @@ function optionTag(item, opt) {
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   line-height: 1.65;
+}
+
+.rv__answer {
+  margin: var(--sp-2) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--success-text);
 }
 
 .rv__opts {
