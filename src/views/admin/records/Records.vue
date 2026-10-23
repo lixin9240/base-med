@@ -157,14 +157,14 @@ async function exportRecords() {
 }
 
 // ===== 查看作答（2.5.2）=====
-/** 正确答案 / 用户选择：多选的 "A,B,C" 渲染为 "A、B、C"；未作答返回空串 */
-function formatAnswer(value) {
+/** 多选的 "A,B,C" 渲染为 "A、B、C"（可自定义分隔符）；未作答返回空串 */
+function formatAnswer(value, separator = '、') {
   if (value === null || value === undefined || value === '') return ''
   return String(value)
     .split(',')
     .map((part) => part.trim())
     .filter(Boolean)
-    .join('、')
+    .join(separator)
 }
 
 function toAnswerItem(item) {
@@ -174,7 +174,7 @@ function toAnswerItem(item) {
     stem: item.stem || '',
     correct: Number(item.is_correct) === 1,
     correctAnswer: formatAnswer(item.correct_answer),
-    userAnswer: formatAnswer(item.user_answer),
+    userAnswer: formatAnswer(item.user_answer, ''), // 用户选择去掉顿号
   }
 }
 
