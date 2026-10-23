@@ -72,11 +72,7 @@ function toVideoRow(item) {
     id: item.id,
     title: item.title,
     category: item.category_name ?? '',
-<<<<<<< Updated upstream
-    cover: item.cover_url ?? '',
-=======
     cover: item.cover_url || '',
->>>>>>> Stashed changes
     speakerLabel: item.speaker
       ? [item.speaker, item.speaker_title].filter(Boolean).join(' · ')
       : '未指定',
@@ -270,11 +266,7 @@ async function togglePublished(video) {
         <div class="col col--video">
           <div class="video-cell">
             <span class="video-cell__thumb">
-<<<<<<< Updated upstream
-              <img v-if="video.cover" :src="video.cover" :alt="video.title" />
-=======
               <img v-if="video.cover" :src="video.cover" :alt="video.title" loading="lazy" />
->>>>>>> Stashed changes
               <svg
                 v-else
                 viewBox="0 0 24 24"
@@ -633,12 +625,6 @@ async function togglePublished(video) {
   background: var(--brand-tint);
   border-radius: var(--r-md);
   overflow: hidden;
-}
-
-.video-cell__thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .video-cell__thumb svg {
