@@ -26,6 +26,8 @@ const loading = ref(false)
 const loadError = ref('')
 const switchingId = ref(null)
 const editLoadingId = ref(null)
+const keyword = ref('')
+const searchInput = ref('')
 
 /** 分类列表（视频表单下拉用），来自 2.7.1；保存时用它把分类名换成 category_id */
 const categories = ref([])
@@ -90,7 +92,11 @@ async function refreshVideos() {
   loading.value = true
   loadError.value = ''
   try {
-    const data = await listAdminVideos({ page: page.value, pageSize: PAGE_SIZE })
+    const data = await listAdminVideos({
+      page: page.value,
+      pageSize: PAGE_SIZE,
+      keyword: keyword.value,
+    })
     videos.value = data.list.map(toVideoRow)
     total.value = data.total
   } catch (error) {
@@ -104,6 +110,19 @@ async function refreshVideos() {
 
 function goPage(next) {
   page.value = next
+  refreshVideos()
+}
+
+function doSearch() {
+  keyword.value = searchInput.value.trim()
+  page.value = 1
+  refreshVideos()
+}
+
+function clearSearch() {
+  searchInput.value = ''
+  keyword.value = ''
+  page.value = 1
   refreshVideos()
 }
 
@@ -243,6 +262,36 @@ async function togglePublished(video) {
         </button>
       </div>
     </header>
+
+    <!-- 搜索栏 -->
+    <div class="video-filter">
+      <label class="search-box">
+        <svg class="search-box__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <input
+          v-model="searchInput"
+          type="search"
+          class="search-box__input"
+          placeholder="搜索视频标题、讲师、分类…"
+          @keyup.enter="doSearch"
+        />
+        <button
+          v-if="keyword"
+          type="button"
+          class="search-box__clear"
+          @click="clearSearch"
+          aria-label="清除搜索"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </label>
+      <button type="button" class="btn btn--primary btn--sm" @click="doSearch">搜索</button>
+      <button v-if="keyword" type="button" class="link-btn" @click="clearSearch">清除</button>
+    </div>
 
     <!-- 加载中 / 加载失败提示 -->
     <div v-if="loading" class="video-banner">正在加载视频列表…</div>
@@ -829,6 +878,86 @@ async function togglePublished(video) {
 
 .link-btn--danger:hover {
   color: var(--danger);
+}
+
+/* ===== 搜索栏 ===== */
+.video-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 1;
+  max-width: 360px;
+  height: 40px;
+  padding: 0 var(--sp-3);
+  background: var(--bg-surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+
+.search-box:focus-within {
+  border-color: var(--brand-primary-hover);
+  box-shadow: 0 0 0 3px var(--brand-tint);
+}
+
+.search-box__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.search-box__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+}
+
+.search-box__input::placeholder {
+  color: var(--text-muted);
+}
+
+.search-box__clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.search-box__clear:hover {
+  color: var(--text-primary);
+  background: var(--bg-muted);
+}
+
+.search-box__clear svg {
+  width: 14px;
+  height: 14px;
+}
+
+.btn--sm {
+  height: 36px;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-xs);
 }
 
 /* ===== 窄屏横向滚动 ===== */
