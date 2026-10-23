@@ -104,10 +104,11 @@
 .brand-panel {
   position: relative;
   flex: 1.1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 72px 80px;
+  padding: clamp(36px, 7vh, 72px) clamp(24px, 6vw, 80px);
   background: var(--bg-surface-solid);
   border-right: 1px solid var(--border);
   color: var(--text-primary);
@@ -167,8 +168,8 @@
 
 /* 主标题 */
 .brand-heading {
-  margin: 56px 0 0;
-  font-size: 52px;
+  margin: clamp(28px, 6vh, 56px) 0 0;
+  font-size: clamp(28px, 4vw, 52px);
   line-height: 1.28;
   font-weight: 800;
   letter-spacing: 1px;
@@ -186,11 +187,11 @@
 /* 功能列表 */
 .feature-list {
   list-style: none;
-  margin: 48px 0 0;
+  margin: clamp(24px, 5vh, 48px) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: clamp(16px, 3vh, 28px);
 }
 
 .feature-item {
