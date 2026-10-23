@@ -72,7 +72,7 @@ function toVideoRow(item) {
     id: item.id,
     title: item.title,
     category: item.category_name ?? '',
-    cover: item.cover_url ?? '',
+    cover: item.cover_url || '',
     speakerLabel: item.speaker
       ? [item.speaker, item.speaker_title].filter(Boolean).join(' · ')
       : '未指定',
@@ -266,7 +266,7 @@ async function togglePublished(video) {
         <div class="col col--video">
           <div class="video-cell">
             <span class="video-cell__thumb">
-              <img v-if="video.cover" :src="video.cover" :alt="video.title" />
+              <img v-if="video.cover" :src="video.cover" :alt="video.title" loading="lazy" />
               <svg
                 v-else
                 viewBox="0 0 24 24"
@@ -627,15 +627,16 @@ async function togglePublished(video) {
   overflow: hidden;
 }
 
+.video-cell__thumb svg {
+  width: 22px;
+  height: 22px;
+}
+
 .video-cell__thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.video-cell__thumb svg {
-  width: 22px;
-  height: 22px;
+  border-radius: inherit;
 }
 
 .video-cell__info {

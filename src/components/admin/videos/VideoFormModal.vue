@@ -1,10 +1,10 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import {
-  completeAdminVideoUpload,
   createAdminVideo,
-  initAdminVideoUpload,
+  getAdminVideoDetail,
   updateAdminVideo,
+  uploadAdminVideoCover,
 } from '@/api'
 import {
   COVER_MAX_SIZE_MB,
@@ -16,7 +16,6 @@ import {
 } from '@/utils/video/constants'
 import { createVideoDraft, validateVideoDraft } from '@/utils/video/videoForm'
 import {
-  uploadCoverFile,
   uploadVideoFile,
   validateCoverFile,
   validateVideoFile,
@@ -46,18 +45,17 @@ const errors = ref({})
 const saving = ref(false)
 const uploadingVideo = ref(false)
 const uploadingCover = ref(false)
+const uploadPercent = ref(0)
 const uploadError = ref('')
 const videoFileName = ref('')
-/** 2.2.7 初始化返回的上传任务（oss_upload_id 等），传输完成后用于 2.2.8 完成上传 */
-const uploadTask = ref(null)
+/** 已选择、待保存时上传的视频文件；上传完成后清空 */
+const videoFile = ref(null)
 const videoInput = ref(null)
 const coverInput = ref(null)
 
 const isEdit = computed(() => Boolean(props.video?.id))
 const modalTitle = computed(() => (isEdit.value ? '编辑视频' : '新增视频'))
 const isUpload = computed(() => draft.source === VIDEO_SOURCE.UPLOAD)
-/** 分片传输通道尚未就绪（文档未定义分片端点）：新增时禁用本地上传，编辑重选文件走 2.2.7 初始化 + 2.2.8 完成上传 */
-const canUpload = computed(() => isEdit.value)
 const titleCount = computed(() => draft.title.length)
 const introCount = computed(() => draft.intro.length)
 const submitLabel = computed(() => (saving.value ? '保存中…' : '保存'))
@@ -95,8 +93,9 @@ function reset() {
   Object.assign(draft, next)
   errors.value = {}
   uploadError.value = ''
+  uploadPercent.value = 0
   videoFileName.value = ''
-  uploadTask.value = null
+  videoFile.value = null
   saving.value = false
   uploadingVideo.value = false
   uploadingCover.value = false
@@ -112,22 +111,17 @@ function clearError(key) {
 }
 
 function selectSource(source) {
-  if (source === VIDEO_SOURCE.UPLOAD && !canUpload.value) return
   if (draft.source === source) return
   draft.source = source
   uploadError.value = ''
-
-  if (source === VIDEO_SOURCE.UPLOAD && !draft.videoUrl.startsWith('blob:')) {
-    draft.videoUrl = ''
-    videoFileName.value = ''
-  }
-  if (source === VIDEO_SOURCE.URL && draft.videoUrl.startsWith('blob:')) {
-    draft.videoUrl = ''
-    videoFileName.value = ''
-  }
+  // 切换来源时清掉另一种来源的输入，避免提交错的字段
+  draft.videoUrl = ''
+  videoFileName.value = ''
+  videoFile.value = null
+  clearError('videoUrl')
 }
 
-async function onVideoFile(event) {
+function onVideoFile(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
   if (!file) return
@@ -138,27 +132,38 @@ async function onVideoFile(event) {
     return
   }
 
+  // 选择后先本地暂存，保存时再走 2.3.7 / 2.3.2 / 2.3.8 上传并回填视频链接
+  videoFile.value = file
+  videoFileName.value = file.name
+  draft.videoUrl = ''
+  uploadError.value = ''
+  clearError('videoUrl')
+}
+
+/** 保存时上传视频：完成后后端回写 video_url，这里同步回填到表单 */
+async function uploadPendingVideo(videoId) {
   uploadingVideo.value = true
+  uploadPercent.value = 0
   uploadError.value = ''
   try {
-    // 2.2.7 初始化分片上传：编辑重新上传带 video_id；已有未完成任务时后端返回原 oss_upload_id（断点续传）
-    uploadTask.value = await initAdminVideoUpload({
-      file_name: file.name,
-      file_size: file.size,
-      video_id: isEdit.value ? props.video.id : undefined,
+    const data = await uploadVideoFile(videoFile.value, {
+      videoId,
+      onProgress: (percent) => {
+        uploadPercent.value = percent
+      },
     })
-    draft.videoUrl = await uploadVideoFile(file)
-    videoFileName.value = file.name
-    clearError('videoUrl')
-    // 2.2.8 完成上传：通知后端合并分片并触发转码；转码异步，状态经列表/详情的 transcode_status 查看
-    if (uploadTask.value?.oss_upload_id) {
-      await completeAdminVideoUpload({
-        oss_upload_id: uploadTask.value.oss_upload_id,
-        video_id: props.video.id,
-      })
+
+    let url = data?.video_url || ''
+    // 兼容旧后端：完成上传只在库里回写、响应不返回地址时，从详情回查
+    if (!url) {
+      const detail = await getAdminVideoDetail(videoId)
+      url = detail?.video_url || ''
     }
-  } catch (error) {
-    uploadError.value = error?.message || '视频上传失败，请重试'
+    if (!url) throw new Error('视频上传完成，但未获取到视频链接')
+
+    draft.videoUrl = url
+    videoFile.value = null
+    clearError('videoUrl')
   } finally {
     uploadingVideo.value = false
   }
@@ -178,7 +183,7 @@ async function onCoverFile(event) {
   uploadingCover.value = true
   uploadError.value = ''
   try {
-    draft.cover = await uploadCoverFile(file)
+    draft.cover = await uploadAdminVideoCover(file)
   } catch (error) {
     uploadError.value = error?.message || '封面上传失败，请重试'
   } finally {
@@ -194,18 +199,20 @@ function stepOrder(delta) {
 function clearVideoFile() {
   draft.videoUrl = ''
   videoFileName.value = ''
+  videoFile.value = null
   clearError('videoUrl')
 }
 
 async function submit() {
   if (saving.value || uploadingVideo.value || uploadingCover.value) return
 
-  const result = validateVideoDraft(draft)
+  const result = validateVideoDraft(draft, { hasUploadFile: Boolean(videoFile.value) })
   errors.value = result.errors
   if (!result.valid) return
 
   saving.value = true
   uploadError.value = ''
+  let createdId = null
   try {
     // 新增和编辑都要提交真实的 category_id
     const categoryId = categoryIdOf(draft.category)
@@ -224,6 +231,7 @@ async function submit() {
       brief_intro: draft.intro.trim(),
       source_type: draft.source === VIDEO_SOURCE.UPLOAD ? 2 : 1,
       video_url: draft.videoUrl.trim(),
+      // 封面单次上传，用户端封面与管理端列表缩略图共用 cover_url
       cover_url: draft.cover,
       text_key_points: draft.articleBody,
       status: draft.published ? 1 : 0,
@@ -231,16 +239,30 @@ async function submit() {
     }
 
     if (isEdit.value) {
+      // 编辑重传：先上传新文件，完成接口会回写 video_url，再随表单一起保存
+      if (isUpload.value && videoFile.value) {
+        await uploadPendingVideo(props.video.id)
+        payload.video_url = draft.videoUrl.trim()
+      }
       await updateAdminVideo({ id: props.video.id, ...payload })
     } else {
-      await createAdminVideo(payload)
+      // 新增：先创建记录拿到 video_id（本地模拟 uploadComplete 需要它），
+      // 再上传分片并在完成后把后端返回的 video_url 回填到表单 / 编辑弹窗
+      const created = await createAdminVideo(payload)
+      createdId = created.id
+      if (isUpload.value && videoFile.value) {
+        await uploadPendingVideo(createdId)
+      }
     }
 
     // 不再写本地记录，列表以接口为准，由父组件重新拉取
     emit('saved', null)
     emit('close')
   } catch (error) {
-    uploadError.value = error?.message || '保存失败，请重试'
+    const message = error?.message || '保存失败，请重试'
+    uploadError.value = createdId
+      ? `${message}（视频已创建，可重新打开编辑弹窗上传视频）`
+      : message
   } finally {
     saving.value = false
   }
@@ -351,37 +373,37 @@ async function submit() {
               <span class="radio__dot"></span>
               填写视频链接
             </label>
-            <label class="radio" :class="{ 'radio--on': isUpload, 'radio--disabled': !canUpload }">
+            <label class="radio" :class="{ 'radio--on': isUpload }">
               <input
                 type="radio"
                 name="video-source"
                 :value="VIDEO_SOURCE.UPLOAD"
                 :checked="isUpload"
-                :disabled="!canUpload"
                 @change="selectSource(VIDEO_SOURCE.UPLOAD)"
               />
               <span class="radio__dot"></span>
               本地上传
             </label>
           </div>
-          <p v-if="!canUpload" class="field__hint">
-            分片传输通道尚未就绪，新增视频暂只支持填写视频链接。
-          </p>
         </div>
 
-        <!-- 视频链接 -->
-        <label v-if="!isUpload" class="field">
-          <span class="field__label"><em class="req">*</em>视频链接</span>
+        <!-- 视频链接：本地上传时由后端上传完成后自动回填，只读展示 -->
+        <label class="field">
+          <span class="field__label">
+            <em v-if="!isUpload" class="req">*</em>视频链接
+            <span v-if="isUpload" class="field__hint">上传完成后自动生成</span>
+          </span>
           <input
             v-model="draft.videoUrl"
             type="text"
-            placeholder="https://.../video.mp4（正式环境填 OSS 直链）"
+            :readonly="isUpload"
+            :placeholder="isUpload ? '选择本地视频并保存后自动回填' : 'https://.../video.mp4（正式环境填 OSS 直链）'"
           />
           <p v-if="errors.videoUrl" class="field__error">{{ errors.videoUrl }}</p>
         </label>
 
         <!-- 本地视频上传 -->
-        <div v-else class="field">
+        <div v-if="isUpload" class="field">
           <span class="field__label"><em class="req">*</em>上传视频</span>
           <input
             ref="videoInput"
@@ -391,7 +413,7 @@ async function submit() {
             @change="onVideoFile"
           />
 
-          <div v-if="!draft.videoUrl" class="dropzone">
+          <div v-if="!videoFileName" class="dropzone">
             <svg
               class="dropzone__icon"
               viewBox="0 0 24 24"
@@ -408,10 +430,10 @@ async function submit() {
             <button
               type="button"
               class="dropzone__btn"
-              :disabled="uploadingVideo"
+              :disabled="saving"
               @click="videoInput?.click()"
             >
-              {{ uploadingVideo ? '上传中…' : '选择视频文件' }}
+              选择视频文件
             </button>
             <span class="dropzone__hint">
               支持 mp4 / webm / ogg / mov，单个不超过 {{ VIDEO_MAX_SIZE_MB }}MB
@@ -433,11 +455,27 @@ async function submit() {
               <path d="m15 10.5 6-3.2v9.4l-6-3.2" />
             </svg>
             <span class="file-chip__name">{{ videoFileName || '已选择视频' }}</span>
-            <button type="button" class="link-btn" @click="clearVideoFile">重新选择</button>
+            <button
+              type="button"
+              class="link-btn"
+              :disabled="uploadingVideo"
+              @click="videoInput?.click()"
+            >
+              重新选择
+            </button>
+            <button
+              v-if="!uploadingVideo"
+              type="button"
+              class="link-btn link-btn--muted"
+              @click="clearVideoFile"
+            >
+              移除
+            </button>
           </div>
 
-          <p class="field__hint">
-            未配置上传服务时仅生成浏览器本地预览地址，正式环境请配置 VITE_UPLOAD_ENDPOINT。
+          <p v-if="uploadingVideo" class="field__hint">正在上传视频 {{ uploadPercent }}%…</p>
+          <p v-else class="field__hint">
+            选择文件后点击保存，系统会自动上传并回填后端生成的视频链接。
           </p>
           <p v-if="errors.videoUrl" class="field__error">{{ errors.videoUrl }}</p>
         </div>
@@ -713,11 +751,23 @@ async function submit() {
   color: var(--text-disabled);
 }
 
+/* 本地上传时视频链接由后端生成，只读展示 */
+.field input[readonly] {
+  color: var(--text-secondary);
+  background: var(--bg-muted);
+  cursor: default;
+}
+
 .field input:focus,
 .field select:focus,
 .field textarea:focus {
   border-color: var(--brand-primary-hover);
   box-shadow: 0 0 0 3px var(--brand-tint);
+}
+
+.field input[readonly]:focus {
+  border-color: var(--border);
+  box-shadow: none;
 }
 
 .field__control input {
