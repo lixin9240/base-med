@@ -148,7 +148,12 @@ async function exportRecords() {
       videoId: filterVideo.value,
       resultStatus: filterResult.value,
     })
-    window.open(data.url, '_blank', 'noopener')
+    // 用隐藏 iframe 触发下载，不新开标签、不跳转页面
+    const iframe = document.createElement('iframe')
+    iframe.style.display = 'none'
+    iframe.src = data.url
+    document.body.appendChild(iframe)
+    window.setTimeout(() => iframe.remove(), 5000)
   } catch (error) {
     loadError.value = error?.message || '导出失败，请稍后重试'
   } finally {
