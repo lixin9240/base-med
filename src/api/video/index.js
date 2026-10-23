@@ -10,8 +10,12 @@ const UPLOAD_INIT_PATH = '/api/admin/video/upload/init'
 const UPLOAD_COMPLETE_PATH = '/api/admin/video/upload/complete'
 
 /** 视频列表（管理端）。返回 { list, total, page, pageSize }，list 内字段保持后端命名。 */
-export async function listAdminVideos({ page = 1, pageSize = 20 } = {}) {
-  const body = await get(`${LIST_PATH}?page=${page}&page_size=${pageSize}`)
+export async function listAdminVideos({ page = 1, pageSize = 20, keyword = '' } = {}) {
+  const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) })
+  if (keyword && keyword.trim()) {
+    params.set('keyword', keyword.trim())
+  }
+  const body = await get(`${LIST_PATH}?${params.toString()}`)
 
   // 后端未就绪时可能拿到 HTML 等非信封响应，这种情况必须报错，不能当成「暂无数据」
   if (!body || typeof body !== 'object' || !('data' in body)) {
