@@ -72,6 +72,7 @@ class VideoService
                 'id' => (int) $video->id,
                 'title' => $video->title,
                 'category_name' => $video->category->name ?? null,
+                'cover_url' => $video->cover_url ?? '',
                 'speaker' => $video->speaker,
                 'speaker_title' => $video->speaker_title,
                 'question_count' => $questionCount,
@@ -499,6 +500,7 @@ class VideoService
 
         return [
             'video_id' => (int) $video->id,
+            'video_url' => $video->video_url,
             'transcode_status' => (int) $video->transcode_status,
         ];
     }
