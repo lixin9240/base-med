@@ -120,6 +120,7 @@ const form = ref({
   id: null,
   username: '',
   password: '',
+  confirmPassword: '',
   name: '',
   email: '',
   role: 'admin',
@@ -130,6 +131,7 @@ const FORM_DEFAULT = {
   id: null,
   username: '',
   password: '',
+  confirmPassword: '',
   name: '',
   email: '',
   role: 'admin',
@@ -149,6 +151,7 @@ function openEdit(user) {
     id: user.id,
     username: user.username,
     password: '',
+    confirmPassword: '',
     name: user.name,
     email: user.email,
     role: user.role || 'admin',
@@ -167,12 +170,11 @@ function closeForm() {
 function validateForm() {
   const f = form.value
   if (!f.username.trim()) return '请输入用户名'
-  if (formMode.value === 'create' && !f.password) return '请输入密码'
-  if (formMode.value === 'create' && (f.password.length < 6 || f.password.length > 32))
-    return '密码长度需 6~32 位'
+  if (!f.password) return '请输入密码'
+  if (f.password.length < 6 || f.password.length > 32) return '密码长度需 6~32 位'
+  if (!f.confirmPassword) return '请再次输入密码'
+  if (f.password !== f.confirmPassword) return '两次输入的密码不一致'
   if (!f.name.trim()) return '请输入姓名'
-  if (f.password && (f.password.length < 6 || f.password.length > 32))
-    return '密码长度需 6~32 位'
   return ''
 }
 
@@ -198,13 +200,12 @@ async function submitForm() {
       const payload = {
         id: form.value.id,
         username: form.value.username.trim(),
+        password: form.value.password,
         name: form.value.name.trim(),
         email: form.value.email.trim() || undefined,
         role: form.value.role,
         status: form.value.status,
       }
-      // 编辑时只有传了 password 才重置密码
-      if (form.value.password) payload.password = form.value.password
       await updateAdminUser(payload)
     }
     closeForm()
@@ -384,12 +385,19 @@ async function submitForm() {
           </label>
 
           <label class="field">
-            <span class="field__label">
-              密码
-              <span v-if="formMode === 'create'" class="req">*</span>
-              <span v-else class="hint">留空则不修改</span>
-            </span>
+            <span class="field__label">密码 <span class="req">*</span></span>
             <input v-model="form.password" class="input" type="password" autocomplete="new-password" />
+            <span class="field__hint">密码长度至少六位</span>
+          </label>
+
+          <label class="field">
+            <span class="field__label">再次输入密码 <span class="req">*</span></span>
+            <input
+              v-model="form.confirmPassword"
+              class="input"
+              type="password"
+              autocomplete="new-password"
+            />
           </label>
 
           <label class="field">
@@ -920,6 +928,11 @@ async function submitForm() {
   font-size: var(--fs-xs);
   color: var(--text-secondary);
   font-weight: var(--fw-regular);
+}
+
+.field__hint {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
 }
 
 .field .input,

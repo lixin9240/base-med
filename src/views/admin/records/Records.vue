@@ -23,6 +23,56 @@ const detail = ref(null)
 /** 「全部视频」下拉选项：复用已接入的视频列表接口（文档 2.5.1 注明选项来自视频列表） */
 const videoOptions = ref([])
 
+// ===== 视频筛选：可输入搜索的组合框 =====
+const videoPickerOpen = ref(false)
+const videoSearch = ref('')
+
+/** 当前选中的视频标题，输入框失焦/关闭下拉时回填 */
+const selectedVideoTitle = computed(() => {
+  const found = videoOptions.value.find((item) => String(item.id) === String(filterVideo.value))
+  return found?.title || ''
+})
+
+/** 按输入关键字过滤视频选项（不区分大小写） */
+const filteredVideoOptions = computed(() => {
+  const keyword = videoSearch.value.trim().toLowerCase()
+  if (!keyword) return videoOptions.value
+  return videoOptions.value.filter((item) => item.title.toLowerCase().includes(keyword))
+})
+
+function openVideoPicker() {
+  videoPickerOpen.value = true
+}
+
+function onVideoFocus(event) {
+  videoPickerOpen.value = true
+  // 已选视频时全选标题，方便直接输入覆盖搜索
+  event.target.select?.()
+}
+
+function closeVideoPicker() {
+  videoPickerOpen.value = false
+  videoSearch.value = selectedVideoTitle.value
+}
+
+function selectVideo(item) {
+  filterVideo.value = item?.id ?? ''
+  videoSearch.value = item?.title ?? ''
+  videoPickerOpen.value = false
+  onFilterChange()
+}
+
+function clearVideoFilter() {
+  selectVideo(null)
+}
+
+/** 回车直接选中第一条匹配项 */
+function onVideoEnter() {
+  if (!videoPickerOpen.value) return
+  const first = filteredVideoOptions.value[0]
+  if (first) selectVideo(first)
+}
+
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
 /** 把 2.5.1 接口返回的一条记录转成列表页展示需要的字段 */
@@ -179,12 +229,81 @@ function closeDetail() {
       </div>
 
       <div class="records-page__actions">
-        <select v-model="filterVideo" class="select" aria-label="按视频筛选" @change="onFilterChange">
-          <option value="">全部视频</option>
-          <option v-for="item in videoOptions" :key="item.id" :value="item.id">
-            {{ item.title }}
-          </option>
-        </select>
+        <div class="vselect">
+          <div class="vselect__control" :class="{ 'is-open': videoPickerOpen }">
+            <svg
+              class="vselect__icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              v-model="videoSearch"
+              class="vselect__input"
+              type="text"
+              role="combobox"
+              aria-label="按视频筛选"
+              aria-controls="video-filter-options"
+              :aria-expanded="videoPickerOpen"
+              :placeholder="filterVideo ? '' : '全部视频'"
+              autocomplete="off"
+              @focus="onVideoFocus"
+              @input="openVideoPicker"
+              @keydown.enter.prevent="onVideoEnter"
+              @keydown.esc="closeVideoPicker"
+              @blur="closeVideoPicker"
+            />
+            <button
+              v-if="filterVideo"
+              type="button"
+              class="vselect__clear"
+              aria-label="清除视频筛选"
+              @mousedown.prevent
+              @click="clearVideoFilter"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
+
+          <ul v-if="videoPickerOpen" id="video-filter-options" class="vselect__menu" role="listbox">
+            <li>
+              <button
+                type="button"
+                class="vselect__option"
+                :class="{ 'is-active': !filterVideo }"
+                role="option"
+                :aria-selected="!filterVideo"
+                @mousedown.prevent
+                @click="selectVideo(null)"
+              >
+                全部视频
+              </button>
+            </li>
+            <li v-for="item in filteredVideoOptions" :key="item.id">
+              <button
+                type="button"
+                class="vselect__option"
+                :class="{ 'is-active': String(filterVideo) === String(item.id) }"
+                role="option"
+                :aria-selected="String(filterVideo) === String(item.id)"
+                @mousedown.prevent
+                @click="selectVideo(item)"
+              >
+                {{ item.title }}
+              </button>
+            </li>
+            <li v-if="!filteredVideoOptions.length" class="vselect__empty">没有匹配的视频</li>
+          </ul>
+        </div>
 
         <select v-model="filterResult" class="select" aria-label="按结果筛选" @change="onFilterChange">
           <option value="">全部结果</option>
@@ -454,6 +573,121 @@ function closeDetail() {
   border-radius: var(--r-md);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
+}
+
+/* ===== 视频筛选（可输入搜索） ===== */
+.vselect {
+  position: relative;
+  width: 260px;
+  max-width: 100%;
+}
+
+.vselect__control {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 40px;
+  padding: 0 var(--sp-3);
+  background: var(--bg-surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--t-fast);
+}
+
+.vselect__control:focus-within,
+.vselect__control.is-open {
+  border-color: var(--brand-primary-hover);
+}
+
+.vselect__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.vselect__input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  outline: none;
+}
+
+.vselect__clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  background: var(--bg-muted);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.vselect__clear:hover {
+  color: var(--text-primary);
+  background: var(--border);
+}
+
+.vselect__clear svg {
+  width: 10px;
+  height: 10px;
+}
+
+.vselect__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  max-height: 280px;
+  margin: 0;
+  padding: var(--sp-1);
+  overflow-y: auto;
+  list-style: none;
+  background: var(--bg-surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.vselect__option {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+
+.vselect__option:hover,
+.vselect__option.is-active {
+  color: var(--brand-primary-hover);
+  background: var(--brand-tint);
+}
+
+.vselect__empty {
+  padding: var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--text-disabled);
+  text-align: center;
 }
 
 .btn {

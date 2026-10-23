@@ -166,7 +166,8 @@ function submit() {
 
 <style scoped>
 .quiz {
-  padding: var(--sp-4) var(--sp-4) var(--sp-8);
+  /* 底部留出固定操作栏的高度，避免最后一道题被遮挡 */
+  padding: var(--sp-4) var(--sp-4) calc(var(--sp-10) + 64px);
 }
 
 .quiz__progress-top {
@@ -382,9 +383,18 @@ function submit() {
 }
 
 .quiz__actions {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
   display: flex;
   gap: var(--sp-3);
-  margin-top: var(--sp-5);
+  width: 100%;
+  max-width: var(--mobile-max, 480px);
+  padding: var(--sp-3) var(--sp-4)
+    calc(var(--sp-3) + var(--safe-bottom, env(safe-area-inset-bottom, 0px)));
+  background: transparent;
 }
 
 .quiz__btn {
