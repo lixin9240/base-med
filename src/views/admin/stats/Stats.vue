@@ -38,10 +38,14 @@ function toVideoRow(item) {
     category: item.category_name || '',
     published: Number(item.status) === 1,
     attempts: Number(item.answer_times) || 0,
-    avgPercent:
-      item.avg_accuracy === null || item.avg_accuracy === undefined
+    pretestPercent:
+      item.pretest_accuracy === null || item.pretest_accuracy === undefined
         ? null
-        : Number(item.avg_accuracy),
+        : Number(item.pretest_accuracy),
+    posttestPercent:
+      item.posttest_accuracy === null || item.posttest_accuracy === undefined
+        ? null
+        : Number(item.posttest_accuracy),
     passRate:
       item.pass_rate === null || item.pass_rate === undefined ? null : Number(item.pass_rate),
   }
@@ -278,7 +282,8 @@ async function exportStatistics() {
           <span class="col col--video">视频</span>
           <span class="col col--status">状态</span>
           <span class="col col--num">答题次数</span>
-          <span class="col col--num">平均正确率</span>
+          <span class="col col--num">题前正确率</span>
+          <span class="col col--num">题后正确率</span>
           <span class="col col--rate">通过率</span>
         </div>
 
@@ -297,7 +302,10 @@ async function exportStatistics() {
           </span>
           <span class="col col--num">{{ video.attempts }}</span>
           <span class="col col--num">
-            {{ video.avgPercent === null ? '—' : `${video.avgPercent}%` }}
+            {{ video.pretestPercent === null ? '—' : `${video.pretestPercent}%` }}
+          </span>
+          <span class="col col--num">
+            {{ video.posttestPercent === null ? '—' : `${video.posttestPercent}%` }}
           </span>
           <span class="col col--rate">
             <template v-if="video.passRate !== null">

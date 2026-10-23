@@ -62,7 +62,7 @@ class StatisticsService
             ->get();
 
         $stats = ExamRecord::query()
-            ->selectRaw('video_id, COUNT(*) AS answer_times, ROUND(AVG(accuracy_rate)) AS avg_accuracy, SUM(result_status = ?) AS pass_times', ['pass'])
+            ->selectRaw('video_id, COUNT(*) AS answer_times, ROUND(AVG(accuracy_rate)) AS avg_accuracy, ROUND(AVG(pretest_score)) AS pretest_accuracy, ROUND(AVG(posttest_score)) AS posttest_accuracy, SUM(result_status = ?) AS pass_times', ['pass'])
             ->groupBy('video_id')
             ->get()
             ->keyBy('video_id');
@@ -78,6 +78,8 @@ class StatisticsService
                 'answer_times' => $stat ? (int) $stat->answer_times : 0,
                 // 无人答题时为 null，前端显示「—」
                 'avg_accuracy' => $stat ? (int) $stat->avg_accuracy : null,
+                'pretest_accuracy' => $stat ? (int) $stat->pretest_accuracy : null,
+                'posttest_accuracy' => $stat ? (int) $stat->posttest_accuracy : null,
                 'pass_rate' => $stat ? (int) round($stat->pass_times / $stat->answer_times * 100) : null,
             ];
         })->values()->all();
@@ -177,7 +179,7 @@ class StatisticsService
         $videoSheet = $spreadsheet->createSheet();
         $videoSheet->setTitle('各视频答题情况');
 
-        $headers = ['视频', '分类', '状态', '答题次数', '平均正确率(%)', '通过率(%)', '最容易答错题', '错误率(%)'];
+        $headers = ['视频', '分类', '状态', '答题次数', '题前正确率(%)', '题后正确率(%)', '通过率(%)', '最容易答错题', '错误率(%)'];
 
         foreach ($headers as $index => $header) {
             $videoSheet->setCellValue([$index + 1, 1], $header);
@@ -192,23 +194,23 @@ class StatisticsService
             $videoSheet->setCellValue([2, $row], $videoRow['category_name'] ?? '');
             $videoSheet->setCellValue([3, $row], (int) $videoRow['status'] === 1 ? '已上架' : '已下架');
             $videoSheet->setCellValue([4, $row], $videoRow['answer_times']);
-            $videoSheet->setCellValue([5, $row], $videoRow['avg_accuracy'] ?? '—');
-            $videoSheet->setCellValue([6, $row], $videoRow['pass_rate'] ?? '—');
-            $videoSheet->setCellValue([7, $row], $mostWrong['stem'] ?? '—');
-            $videoSheet->setCellValue([8, $row], $mostWrong['wrong_rate'] ?? '—');
+            $videoSheet->setCellValue([5, $row], $videoRow['pretest_accuracy'] ?? '—');
+            $videoSheet->setCellValue([6, $row], $videoRow['posttest_accuracy'] ?? '—');
+            $videoSheet->setCellValue([7, $row], $videoRow['pass_rate'] ?? '—');
+            $videoSheet->setCellValue([8, $row], $mostWrong['stem'] ?? '—');
+            $videoSheet->setCellValue([9, $row], $mostWrong['wrong_rate'] ?? '—');
             $row++;
         }
 
         // 汇总行：总答题次数、总平均正确率、总通过率
         $videoSheet->setCellValue([1, $row], '合计');
         $videoSheet->setCellValue([4, $row], $overview['answer_total_times']);
-        $videoSheet->setCellValue([5, $row], $overview['avg_accuracy'] ?? '—');
-        $videoSheet->setCellValue([6, $row], $overview['pass_rate'] ?? '—');
+        $videoSheet->setCellValue([7, $row], $overview['pass_rate'] ?? '—');
 
-        foreach (range('A', 'H') as $column) {
+        foreach (range('A', 'I') as $column) {
             $videoSheet->getColumnDimension($column)->setWidth(18);
         }
-        $videoSheet->getColumnDimension('G')->setWidth(40);
+        $videoSheet->getColumnDimension('H')->setWidth(40);
 
         // ③ 最容易答错的题
         $wrongSheet = $spreadsheet->createSheet();
