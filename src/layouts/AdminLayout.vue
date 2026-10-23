@@ -36,8 +36,9 @@ import '@/styles/tokens.css'
 
 <style scoped>
 .admin-layout {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
+  overflow: hidden;
   background: var(--bg-page-gradient);
   color: var(--text-primary);
 }
@@ -47,6 +48,7 @@ import '@/styles/tokens.css'
   min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .admin-layout__header {
@@ -83,6 +85,8 @@ import '@/styles/tokens.css'
 
 .admin-layout__main {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: var(--sp-5);
 }
 </style>
