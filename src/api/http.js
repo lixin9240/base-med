@@ -71,11 +71,34 @@ export async function request(path, options = {}) {
   return data
 }
 
+/** 从 Content-Disposition 解析文件名，优先 RFC 5987 的 filename*，兼容百分号编码 */
+function parseFileName(disposition) {
+  if (!disposition) return ''
+
+  const encoded = /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i.exec(disposition)
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded[1].trim().replace(/^"|"$/g, ''))
+    } catch {
+      // 编码异常时退回下面的 filename 解析
+    }
+  }
+
+  const plain = /filename\s*=\s*(?:"([^"]+)"|([^;]+))/i.exec(disposition)
+  const name = (plain?.[1] ?? plain?.[2] ?? '').trim()
+  if (!name) return ''
+  try {
+    return decodeURIComponent(name)
+  } catch {
+    return name
+  }
+}
+
 /**
- * 下载文件流（Excel 等）。返回 Blob。
+ * 下载文件流（Excel 等）。返回 { blob, filename }，filename 取自 Content-Disposition（可能为空）。
  * 服务端出错时会返回 JSON 信封，这里按同一规则解析并抛错。
  */
-export async function requestBlob(path, options = {}) {
+export async function requestDownload(path, options = {}) {
   const response = await fetch(resolveUrl(path), {
     ...options,
     headers: buildHeaders(options),
@@ -103,7 +126,16 @@ export async function requestBlob(path, options = {}) {
     throw new Error('下载失败：服务未返回文件')
   }
 
-  return response.blob()
+  return {
+    blob: await response.blob(),
+    filename: parseFileName(response.headers.get('Content-Disposition')),
+  }
+}
+
+/** 下载文件流（Excel 等）。只返回 Blob */
+export async function requestBlob(path, options = {}) {
+  const { blob } = await requestDownload(path, options)
+  return blob
 }
 
 export function get(path, options) {

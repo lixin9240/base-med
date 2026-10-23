@@ -84,24 +84,37 @@ async function refreshStatistics() {
 onMounted(refreshStatistics)
 
 // ===== 导出统计（2.6.4）=====
+/** 后端文件名形如 数据统计_YYYYMMDD_HHMMSS.xlsx；未下发时前端按同一格式兜底 */
+function fallbackFileName() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  const date = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`
+  const time = `${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+  return `数据统计_${date}_${time}.xlsx`
+}
+
 async function exportStatistics() {
   if (exporting.value) return
 
   exporting.value = true
   loadError.value = ''
+  let url = ''
   try {
-    const blob = await exportAdminStatistics()
-    const url = URL.createObjectURL(blob)
+    const { blob, filename } = await exportAdminStatistics()
+    url = URL.createObjectURL(blob)
+
     const a = document.createElement('a')
-    const d = new Date()
-    const p = (n) => String(n).padStart(2, '0')
     a.href = url
-    a.download = `数据统计_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.xlsx`
+    a.download = filename || fallbackFileName()
+    a.style.display = 'none'
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    a.remove()
   } catch (error) {
     loadError.value = error?.message || '导出失败，请稍后重试'
   } finally {
+    // 立即 revoke 会让部分浏览器取消下载，延后释放
+    if (url) window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     exporting.value = false
   }
 }

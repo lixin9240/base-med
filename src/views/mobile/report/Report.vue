@@ -79,6 +79,33 @@ function isPicked(item, opt) {
   }
   return item.userAnswer === token
 }
+
+// 多选题：选项有「是否为正确答案」「是否被用户选中」两个独立维度，四种组合分别标注
+function optionTag(item, opt) {
+  const right = isRight(item, opt)
+  const picked = isPicked(item, opt)
+  if (item.type !== 'multiple') {
+    if (right) return '正确答案'
+    if (picked) return '您的选择'
+    return ''
+  }
+  if (right && picked) return '您选择了 · 正确'
+  if (right) return '正确答案 · 您未选'
+  if (picked) return '您的选择 · 错误'
+  return ''
+}
+
+// 正确答案展示文案：单选/判断直接展示，多选用「、」连接
+function correctAnswerLabel(item) {
+  if (item.type === 'multiple') {
+    return String(item.answer || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join('、')
+  }
+  return item.answer || ''
+}
 </script>
 
 <template>
@@ -140,10 +167,10 @@ function isPicked(item, opt) {
             >
               <span class="rop__letter">{{ opt.key }}</span>
               <span class="rop__text">{{ opt.content }}</span>
-              <span v-if="isRight(item, opt)" class="rop__tag">正确答案</span>
-              <span v-else-if="isPicked(item, opt)" class="rop__tag rop__tag--wrong">您的选择</span>
+              <span v-if="optionTag(item, opt)" class="rop__tag">{{ optionTag(item, opt) }}</span>
             </li>
           </ul>
+          <p class="rv__answer"><b>正确答案：</b>{{ correctAnswerLabel(item) }}</p>
           <p v-if="item.analysis" class="rv__analysis">
             <b>解析：</b>{{ item.analysis }}
           </p>
@@ -154,7 +181,7 @@ function isPicked(item, opt) {
         <button
           type="button"
           class="btn btn--primary btn--lg btn--block"
-          @click="router.replace({ name: 'mobile-quiz', query: { videoId: record.videoId, stage: 'post' } })"
+          @click="router.replace({ name: 'mobile-quiz', query: { videoId: record.videoId, stage: 'retake' } })"
         >
           再答一次
         </button>
@@ -354,6 +381,13 @@ function isPicked(item, opt) {
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   line-height: 1.65;
+}
+
+.rv__answer {
+  margin: var(--sp-2) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--success-text);
 }
 
 .rv__opts {

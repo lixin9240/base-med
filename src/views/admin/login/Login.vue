@@ -140,13 +140,15 @@ function togglePassword() {
 /* ===== 整体布局 ===== */
 .login-page {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--bg-page-gradient);
 }
 
 /* ===== 右侧表单区 ===== */
 .form-panel {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
