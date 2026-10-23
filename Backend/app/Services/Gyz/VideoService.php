@@ -51,7 +51,13 @@ class VideoService
             ]);
 
         if ($keyword !== '') {
-            $query->where('title', 'like', "%{$keyword}%");
+            $query->where(function ($q) use ($keyword) {
+                $q->where('title', 'like', "%{$keyword}%")
+                  ->orWhere('speaker', 'like', "%{$keyword}%")
+                  ->orWhereHas('category', function ($cq) use ($keyword) {
+                      $cq->where('name', 'like', "%{$keyword}%");
+                  });
+            });
         }
 
         $paginator = $query
