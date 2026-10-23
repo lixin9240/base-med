@@ -148,6 +148,104 @@ class ExamService
     }
 
     /**
+     * 再次答题（后测重答）：复用最近一次答题记录的前测结果，仅重评后测并生成新的一条答题记录
+     *
+     * @param  array<int, array<string, mixed>>  $answers
+     * @return array<string, mixed>
+     */
+    public function retake(string $drId, int $videoId, array $answers): array
+    {
+        $visit = $this->videoService->resolveVisit($drId);
+        $video = $this->videoService->onShelfVideo($videoId);
+        $this->videoService->assertVisitVideo($visit, $video->id);
+
+        $prior = ExamRecord::query()
+            ->where('user_id', $visit->id)
+            ->where('video_id', $video->id)
+            ->orderByDesc('attempt_no')
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $prior) {
+            throw new BusinessException(ResponseCode::STATUS_NOT_OPERABLE, '请先完成一遍答题后再重答');
+        }
+
+        $postQuestions = $this->videoService->questionSet($videoId);
+
+        if ($postQuestions->isEmpty()) {
+            throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '该视频尚未配置题目');
+        }
+
+        $this->validateAnswers($postQuestions, $answers);
+
+        $record = DB::transaction(function () use ($visit, $video, $drId, $prior, $postQuestions, $answers) {
+            $postGraded = $this->grade($postQuestions, collect($answers));
+
+            $postCorrect = $postGraded->where('is_correct', 1)->count();
+            $postTotal = $postGraded->count();
+
+            $accuracy = $postTotal > 0 ? (int) round($postCorrect / $postTotal * 100) : 0;
+            $passAccuracy = $this->passAccuracy();
+
+            $attemptNo = ExamRecord::query()
+                ->where('user_id', $visit->id)
+                ->where('video_id', $video->id)
+                ->count() + 1;
+
+            $record = ExamRecord::create([
+                'user_id' => $visit->id,
+                'dr_id' => $drId,
+                'video_id' => $video->id,
+                'attempt_no' => $attemptNo,
+                'pretest_correct' => $prior->pretest_correct,
+                'posttest_correct' => $postCorrect,
+                'pretest_score' => $prior->pretest_score,
+                'posttest_score' => $postTotal > 0 ? round($postCorrect / $postTotal * 100, 2) : 0,
+                'accuracy_rate' => $accuracy,
+                'result_status' => $accuracy >= $passAccuracy ? 'pass' : 'fail',
+                'total_duration' => (int) $postGraded->sum('duration'),
+                'submit_at' => now(),
+                'ip' => request()->ip(),
+            ]);
+
+            $this->copyPretestAnswers($record->id, $prior->id);
+            $this->createAnswers($record->id, 'posttest', $postGraded, $postTotal);
+
+            return $record;
+        });
+
+        Log::channel('business')->info('再次答题提交', [
+            'exam_record_id' => $record->id,
+            'dr_id' => $drId,
+            'video_id' => $video->id,
+            'attempt_no' => $record->attempt_no,
+            'result_status' => $record->result_status,
+        ]);
+
+        return $this->buildResult($record);
+    }
+
+    /**
+     * 复制前测作答明细：再次答题沿用首次答题的前测结果，仅重答后测
+     */
+    private function copyPretestAnswers(int $newRecordId, int $priorRecordId): void
+    {
+        ExamAnswer::query()
+            ->where('exam_record_id', $priorRecordId)
+            ->where('stage', 'pretest')
+            ->get()
+            ->each(fn (ExamAnswer $answer) => ExamAnswer::create([
+                'exam_record_id' => $newRecordId,
+                'question_id' => $answer->question_id,
+                'stage' => 'pretest',
+                'user_answer' => $answer->user_answer,
+                'is_correct' => $answer->is_correct,
+                'score' => $answer->score,
+                'duration' => $answer->duration,
+            ]));
+    }
+
+    /**
      * 获取答题结果（结果页首次进入/刷新/回看）
      *
      * @return array<string, mixed>

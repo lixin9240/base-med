@@ -6,12 +6,28 @@ import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
 import { toast } from '@/utils/toast'
 import { currentDrId, isSkipWatch, issueDrId } from '@/store/mobile/session'
-import { getPublicVideoDetail, listPublicQuestions, submitPostExam, submitPreExam } from '@/api/public'
+import {
+  getPublicVideoDetail,
+  listPublicQuestions,
+  submitPostExam,
+  submitPreExam,
+  submitRetakeExam,
+} from '@/api/public'
 
 const route = useRoute()
 const router = useRouter()
-const videoId = String(route.query.videoId || '')
-const stage = String(route.query.stage) === 'post' ? 'post' : 'pre'
+// 分享链接（后端生成）形如 /mobile/quiz?videoId=5&share=xxx，兼容 video_id 写法
+const videoId = String(route.query.videoId ?? route.query.video_id ?? '')
+const stageParam = String(route.query.stage || '')
+const isRetake = stageParam === 'retake'
+/**
+ * 只有显式带 stage=post / stage=retake 才进入后测（看完答题）；
+ * 其余情况（分享链接入口、参数丢失）一律从「学前答题」开始。
+ * 页面内跳转（首页 / 学习页 / 报告页）都会显式带上 stage。
+ */
+const stage = computed(() =>
+  stageParam === 'post' || stageParam === 'retake' ? 'post' : 'pre',
+)
 
 const course = ref(null)
 const drId = ref('')
@@ -21,8 +37,10 @@ const error = ref('')
 const answeredCount = ref(0)
 const submitting = ref(false)
 
-const isPre = computed(() => stage === 'pre')
-const stageTitle = computed(() => (isPre.value ? '学前答题' : '看完答题'))
+const isPre = computed(() => stage.value === 'pre')
+const stageTitle = computed(() =>
+  isRetake ? '再次答题' : isPre.value ? '学前答题' : '看完答题',
+)
 
 function categoryIcon(category) {
   if (category === '影像检查') return 'monitor'
@@ -67,7 +85,8 @@ onMounted(async () => {
       return
     }
 
-    if (!isPre.value) {
+    // 再次答题（3.9）不校验学前答题与观看进度：用户已完整走过一遍
+    if (!isPre.value && !isRetake) {
       if (!course.value.examState?.pre_submitted) {
         toast('请先完成学前答题')
         router.replace({ name: 'mobile-quiz', query: { videoId, stage: 'pre' } })
@@ -111,7 +130,9 @@ async function onSubmit(answers) {
       return
     }
 
-    const data = await submitPostExam({
+    // 再次答题走 3.9：只重评后测，前测沿用最近一条记录
+    const submit = isRetake ? submitRetakeExam : submitPostExam
+    const data = await submit({
       dr_id: drId.value,
       video_id: videoId,
       answers: questions.value.map((q, i) => ({
@@ -159,7 +180,13 @@ async function onSubmit(answers) {
       <div v-if="course" class="qp__head" :class="isPre ? 'qp__head--pre' : 'qp__head--post'">
         <AppIcon :name="isPre ? 'info' : 'shield'" :size="17" class="qp__head-icon" />
         <div>
-          <b>{{ isPre ? '先答 3 道题，看看您的基础认知' : '再看 3 道题，检验一下有没有记住' }}</b>
+          <b>{{
+            isRetake
+              ? '再答一遍后测题目，看看这次能不能提分'
+              : isPre
+                ? '先答 3 道题，看看您的基础认知'
+                : '再看 3 道题，检验一下有没有记住'
+          }}</b>
           <span>《{{ course.title }}》· 提交后可以看到每道题的对错与解析</span>
         </div>
       </div>

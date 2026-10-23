@@ -1,4 +1,4 @@
-import { get, requestBlob } from './http'
+import { get, requestDownload } from './http'
 
 const OVERVIEW_PATH = '/api/admin/statistics/overview'
 const VIDEO_LIST_PATH = '/api/admin/statistics/video-list'
@@ -35,7 +35,11 @@ export async function listAdminStatisticsWrongQuestions() {
   return unwrapList(body, '最容易答错的题加载失败：服务未返回标准数据')
 }
 
-/** 导出统计（2.6.4）：返回 Excel 文件流（Blob） */
+/**
+ * 导出统计（2.6.4）：返回 Excel 文件流。
+ * 后端导出单 Sheet「数据统计」（8 列 + 末行合计），文件名由 Content-Disposition 给出。
+ * @returns {Promise<{ blob: Blob, filename: string }>}
+ */
 export async function exportAdminStatistics() {
-  return requestBlob(EXPORT_PATH)
+  return requestDownload(EXPORT_PATH)
 }

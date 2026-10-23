@@ -174,7 +174,9 @@ function onVideoError() {
   setSkipWatch(videoId)
 }
 
-function goQuiz() {
+async function goQuiz() {
+  // 跳转前先把进度同步到后端，确保后端 is_unlocked 已更新（否则长视频到 90% 点去答题会被后测门槛弹回）
+  await reportProgress()
   router.push({ name: 'mobile-quiz', query: { videoId, stage: 'post' } })
 }
 </script>

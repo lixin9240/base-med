@@ -199,6 +199,9 @@ Route::prefix('public')->group(function () {
     // 3.7 提交看完答题（后测，需观看进度达到门槛）
     Route::post(uri: '/exam/submit-post', action: [ExamController::class, 'submitPost']);
 
+    // 3.9 再次答题（重答后测，复用最近一次前测结果提高正确率）
+    Route::post(uri: '/exam/retake', action: [ExamController::class, 'retake']);
+
     // 3.8 获取答题结果
     Route::get(uri: '/exam/result', action: [ExamController::class, 'result']);
 });

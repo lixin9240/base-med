@@ -1,4 +1,4 @@
-export { request, requestBlob, get, post, put, del } from './http'
+export { request, requestBlob, requestDownload, get, post, put, del } from './http'
 export {
   adminLogin,
   adminProfile,
@@ -27,6 +27,8 @@ export {
   listAdminVideos,
   updateAdminVideo,
   updateAdminVideoStatus,
+  uploadAdminVideoChunk,
+  uploadAdminVideoCover,
 } from './video'
 export {
   generateAdminShareLink,
@@ -50,4 +52,5 @@ export {
   reportVideoProgress,
   submitPostExam,
   submitPreExam,
+  submitRetakeExam,
 } from './public'

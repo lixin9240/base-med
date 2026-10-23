@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Fmy;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Fmy\ExamResultRequest;
+use App\Http\Requests\Fmy\RetakeRequest;
 use App\Http\Requests\Fmy\SubmitPostRequest;
 use App\Http\Requests\Fmy\SubmitPreRequest;
 use App\Services\Fmy\ExamService;
@@ -36,6 +37,20 @@ class ExamController extends Controller
     public function submitPost(SubmitPostRequest $request): JsonResponse
     {
         $data = $this->examService->submitPost(
+            (string) $request->validated('dr_id'),
+            (int) $request->validated('video_id'),
+            $request->validated('answers')
+        );
+
+        return $this->success($data);
+    }
+
+    /**
+     * 再次答题（后测重答，3.9，需已完成一遍前测+后测）
+     */
+    public function retake(RetakeRequest $request): JsonResponse
+    {
+        $data = $this->examService->retake(
             (string) $request->validated('dr_id'),
             (int) $request->validated('video_id'),
             $request->validated('answers')

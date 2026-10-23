@@ -18,6 +18,9 @@ coverage
 .env.development
 .env.production
 
+# Archives (avoid committing packaged secrets)
+*.zip
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

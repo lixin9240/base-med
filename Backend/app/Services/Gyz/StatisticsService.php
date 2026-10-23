@@ -6,6 +6,7 @@ use App\Models\ExamAnswer;
 use App\Models\ExamRecord;
 use App\Models\SystemConfig;
 use App\Models\Video;
+use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -109,6 +110,34 @@ class StatisticsService
     }
 
     /**
+     * 每个视频最容易答错的题（前测+后测合并，取错误率最高的一题）
+     *
+     * @return Collection<int, array{stem: string, wrong_rate: int}>  键为 video_id
+     */
+    private function mostWrongQuestionByVideo(): Collection
+    {
+        $rows = ExamAnswer::query()
+            ->join('exam_record', 'exam_answer.exam_record_id', '=', 'exam_record.id')
+            ->join('question', 'exam_answer.question_id', '=', 'question.id')
+            ->selectRaw('exam_record.video_id, question.stem, COUNT(*) AS answer_times, SUM(exam_answer.is_correct = 0) AS wrong_times')
+            ->groupBy('exam_record.video_id', 'question.stem')
+            ->get();
+
+        return $rows
+            ->groupBy(fn ($row) => (int) $row->video_id)
+            ->map(function (Collection $group) {
+                $top = $group
+                    ->sortByDesc(fn ($row) => (float) $row->wrong_times / (float) $row->answer_times)
+                    ->first();
+
+                return [
+                    'stem' => (string) $top->stem,
+                    'wrong_rate' => (int) round((float) $top->wrong_times / (float) $top->answer_times * 100),
+                ];
+            });
+    }
+
+    /**
      * 2.5.4 导出统计（Excel 文件流：大盘指标 + 各视频答题情况 + 最容易答错的题）
      */
     public function export(): StreamedResponse
@@ -116,6 +145,7 @@ class StatisticsService
         $overview = $this->overview();
         $videoRows = $this->videoList();
         $wrongRows = $this->wrongQuestion();
+        $mostWrongByVideo = $this->mostWrongQuestionByVideo();
 
         $spreadsheet = new Spreadsheet();
 
@@ -143,11 +173,11 @@ class StatisticsService
         $sheet->getColumnDimension('A')->setWidth(20);
         $sheet->getColumnDimension('B')->setWidth(16);
 
-        // ② 各视频答题情况
+        // ② 各视频答题情况（含每视频最容易答错的题与汇总行）
         $videoSheet = $spreadsheet->createSheet();
         $videoSheet->setTitle('各视频答题情况');
 
-        $headers = ['视频', '分类', '状态', '答题次数', '平均正确率(%)', '通过率(%)'];
+        $headers = ['视频', '分类', '状态', '答题次数', '平均正确率(%)', '通过率(%)', '最容易答错题', '错误率(%)'];
 
         foreach ($headers as $index => $header) {
             $videoSheet->setCellValue([$index + 1, 1], $header);
@@ -156,18 +186,29 @@ class StatisticsService
         $row = 2;
 
         foreach ($videoRows as $videoRow) {
+            $mostWrong = $mostWrongByVideo->get($videoRow['video_id']);
+
             $videoSheet->setCellValue([1, $row], $videoRow['title']);
             $videoSheet->setCellValue([2, $row], $videoRow['category_name'] ?? '');
             $videoSheet->setCellValue([3, $row], (int) $videoRow['status'] === 1 ? '已上架' : '已下架');
             $videoSheet->setCellValue([4, $row], $videoRow['answer_times']);
             $videoSheet->setCellValue([5, $row], $videoRow['avg_accuracy'] ?? '—');
             $videoSheet->setCellValue([6, $row], $videoRow['pass_rate'] ?? '—');
+            $videoSheet->setCellValue([7, $row], $mostWrong['stem'] ?? '—');
+            $videoSheet->setCellValue([8, $row], $mostWrong['wrong_rate'] ?? '—');
             $row++;
         }
 
-        foreach (range('A', 'F') as $column) {
-            $videoSheet->getColumnDimension($column)->setWidth(20);
+        // 汇总行：总答题次数、总平均正确率、总通过率
+        $videoSheet->setCellValue([1, $row], '合计');
+        $videoSheet->setCellValue([4, $row], $overview['answer_total_times']);
+        $videoSheet->setCellValue([5, $row], $overview['avg_accuracy'] ?? '—');
+        $videoSheet->setCellValue([6, $row], $overview['pass_rate'] ?? '—');
+
+        foreach (range('A', 'H') as $column) {
+            $videoSheet->getColumnDimension($column)->setWidth(18);
         }
+        $videoSheet->getColumnDimension('G')->setWidth(40);
 
         // ③ 最容易答错的题
         $wrongSheet = $spreadsheet->createSheet();

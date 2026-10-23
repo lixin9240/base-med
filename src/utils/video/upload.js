@@ -1,4 +1,8 @@
-import { post } from '@/api'
+import {
+  completeAdminVideoUpload,
+  initAdminVideoUpload,
+  uploadAdminVideoChunk,
+} from '@/api'
 import { COVER_MAX_SIZE_MB, VIDEO_MAX_SIZE_MB } from './constants'
 
 const VIDEO_TYPES = /^video\/(mp4|webm|ogg|quicktime)$/i
@@ -23,30 +27,37 @@ export function validateCoverFile(file) {
 }
 
 /**
- * 上传视频。
- * 未配置 VITE_UPLOAD_ENDPOINT 时返回本地 objectURL，仅供演示预览。
+ * 本地上传视频（2.3.7 初始化 → 2.3.2 分片上传 → 2.3.8 完成上传）。
+ * 完成后后端会把 OSS 地址回写到 video.video_url，并在返回体里带 video_url。
+ *
+ * @param {File} file 视频文件
+ * @param {{ videoId: number, onProgress?: (percent: number) => void }} options
+ *   新增视频需先创建记录拿到 id 再上传；编辑时传当前视频 id
+ * @returns {Promise<{ video_id: number, video_url?: string, transcode_status?: number }>}
  */
-export async function uploadVideoFile(file) {
-  const endpoint = import.meta.env.VITE_UPLOAD_ENDPOINT
-  if (!endpoint) return URL.createObjectURL(file)
+export async function uploadVideoFile(file, { videoId, onProgress } = {}) {
+  const task = await initAdminVideoUpload({
+    file_name: file.name,
+    file_size: file.size,
+    video_id: videoId,
+  })
 
-  const form = new FormData()
-  form.append('file', file)
-  form.append('kind', 'video')
-  const result = await post(endpoint, form)
-  if (!result?.url) throw new Error('上传失败：服务未返回文件地址')
-  return result.url
-}
+  const partSize = Number(task.part_size) || 1024 * 1024
+  const totalParts = Number(task.parts) || Math.max(1, Math.ceil(file.size / partSize))
 
-/**
- * 上传封面（POST /api/admin/video/upload/cover）。
- * 返回 OSS 地址；失败抛出异常。
- */
-export async function uploadCoverFile(file) {
-  const form = new FormData()
-  form.append('file', file)
-  const body = await post('/api/admin/video/upload/cover', form)
-  const url = body?.data?.url
-  if (!url) throw new Error('封面上传失败：服务未返回地址')
-  return url
+  for (let index = 0; index < totalParts; index += 1) {
+    const start = index * partSize
+    const chunk = file.slice(start, Math.min(start + partSize, file.size))
+    await uploadAdminVideoChunk({
+      oss_upload_id: task.oss_upload_id,
+      part_number: index + 1,
+      file: chunk,
+    })
+    onProgress?.(Math.round(((index + 1) / totalParts) * 100))
+  }
+
+  return completeAdminVideoUpload({
+    oss_upload_id: task.oss_upload_id,
+    video_id: videoId,
+  })
 }
