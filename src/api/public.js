@@ -8,6 +8,7 @@ const VIDEO_PROGRESS_PATH = '/api/public/video/progress'
 const QUESTION_LIST_PATH = '/api/public/video/question-list'
 const EXAM_SUBMIT_PRE_PATH = '/api/public/exam/submit-pre'
 const EXAM_SUBMIT_POST_PATH = '/api/public/exam/submit-post'
+const EXAM_RETAKE_PATH = '/api/public/exam/retake'
 const EXAM_RESULT_PATH = '/api/public/exam/result'
 
 /** 3.1 获取匿名 DR 编号（点击视频时签发）。参数 video_id。返回 dr_id 字符串 */
@@ -68,6 +69,18 @@ export async function submitPreExam(payload) {
 /** 3.7 提交看完答题。返回结构与 3.8 一致（含 result_status / accuracy_rate / question_detail） */
 export async function submitPostExam(payload) {
   const body = await post(EXAM_SUBMIT_POST_PATH, payload)
+  if (!body || typeof body !== 'object' || !body.data) {
+    throw new Error('提交失败：服务未返回标准数据')
+  }
+  return body.data
+}
+
+/**
+ * 3.9 提交再次答题（仅重评后测，复用最近一次学前结果）。
+ * 返回结构与 3.8 一致，可直接跳转结果页。
+ */
+export async function submitRetakeExam(payload) {
+  const body = await post(EXAM_RETAKE_PATH, payload)
   if (!body || typeof body !== 'object' || !body.data) {
     throw new Error('提交失败：服务未返回标准数据')
   }

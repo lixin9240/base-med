@@ -27,9 +27,11 @@ function isPlayableUrl(value) {
 
 /**
  * 校验视频草稿。
+ * @param {object} draft 表单草稿
+ * @param {{ hasUploadFile?: boolean }} options 本地上传时是否已选待上传文件
  * @returns {{ valid: boolean, errors: Record<string, string> }}
  */
-export function validateVideoDraft(draft) {
+export function validateVideoDraft(draft, { hasUploadFile = false } = {}) {
   const errors = {}
 
   const title = String(draft.title ?? '').trim()
@@ -46,7 +48,12 @@ export function validateVideoDraft(draft) {
 
   const videoUrl = String(draft.videoUrl ?? '').trim()
   if (!videoUrl) {
-    errors.videoUrl = draft.source === VIDEO_SOURCE.UPLOAD ? '请上传视频文件' : '请填写视频链接'
+    // 本地上传：已选文件则在保存时上传，保存后才回填链接；未选文件才算缺失
+    if (draft.source === VIDEO_SOURCE.UPLOAD) {
+      if (!hasUploadFile) errors.videoUrl = '请上传视频文件'
+    } else {
+      errors.videoUrl = '请填写视频链接'
+    }
   } else if (draft.source === VIDEO_SOURCE.URL && !isPlayableUrl(videoUrl)) {
     errors.videoUrl = '链接需以 http:// 或 https:// 开头'
   }

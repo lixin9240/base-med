@@ -27,6 +27,8 @@ export {
   listAdminVideos,
   updateAdminVideo,
   updateAdminVideoStatus,
+  uploadAdminVideoChunk,
+  uploadAdminVideoCover,
 } from './video'
 export {
   generateAdminShareLink,
@@ -50,4 +52,5 @@ export {
   reportVideoProgress,
   submitPostExam,
   submitPreExam,
+  submitRetakeExam,
 } from './public'

@@ -154,7 +154,7 @@ function isPicked(item, opt) {
         <button
           type="button"
           class="btn btn--primary btn--lg btn--block"
-          @click="router.replace({ name: 'mobile-quiz', query: { videoId: record.videoId, stage: 'post' } })"
+          @click="router.replace({ name: 'mobile-quiz', query: { videoId: record.videoId, stage: 'retake' } })"
         >
           再答一次
         </button>
