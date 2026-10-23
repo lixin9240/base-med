@@ -21,7 +21,7 @@ class StatisticsService
     /**
      * 环节展示名
      */
-    private const STAGE_LABELS = ['pretest' => '前测', 'posttest' => '后测'];
+    private const STAGE_LABELS = ['pretest' => '前测', 'posttest' => '后测', 'both' => '前测/后测'];
 
     /**
      * 2.5.1 统计大盘（5 张指标卡）
@@ -90,7 +90,9 @@ class StatisticsService
     }
 
     /**
-     * 2.5.3 最容易答错的题（按错误率从高到低排序）
+     * 2.5.3 最容易答错的题（每个视频取前测/后测错误率最高的一题，按错误率从高到低排序）
+     *
+     * 前后测错误率最高的是同一道题时合并为一条（stage=both），否则各返回一条。
      *
      * @return array<int, array<string, mixed>>
      */
@@ -100,19 +102,78 @@ class StatisticsService
             ->join('exam_record', 'exam_answer.exam_record_id', '=', 'exam_record.id')
             ->join('question', 'exam_answer.question_id', '=', 'question.id')
             ->join('video', 'exam_record.video_id', '=', 'video.id')
-            ->selectRaw('exam_answer.question_id, exam_answer.stage, question.stem, video.title AS video_title, COUNT(*) AS answer_times, SUM(exam_answer.is_correct = 0) AS wrong_times')
-            ->groupBy('exam_answer.question_id', 'exam_answer.stage', 'question.stem', 'video.title')
-            ->orderByRaw('SUM(exam_answer.is_correct = 0) / COUNT(*) DESC, COUNT(*) DESC')
+            ->selectRaw('exam_record.video_id, video.title AS video_title, exam_answer.question_id, question.stem, exam_answer.stage, COUNT(*) AS answer_times, SUM(exam_answer.is_correct = 0) AS wrong_times')
+            ->groupBy('exam_record.video_id', 'video.title', 'exam_answer.question_id', 'question.stem', 'exam_answer.stage')
             ->get();
 
-        return $rows->map(fn ($row) => [
+        $result = collect();
+
+        foreach ($rows->groupBy(fn ($row) => (int) $row->video_id) as $videoRows) {
+            $topPre = $this->topWrongQuestion($videoRows->where('stage', 'pretest'));
+            $topPost = $this->topWrongQuestion($videoRows->where('stage', 'posttest'));
+
+            // 前后测错误率最高的是同一道题：合并为一条
+            if ($topPre !== null && $topPost !== null && (int) $topPre->question_id === (int) $topPost->question_id) {
+                $result->push($this->mergeWrongQuestion($topPre, $topPost));
+                continue;
+            }
+
+            if ($topPre !== null) {
+                $result->push($this->toWrongQuestionRow($topPre));
+            }
+
+            if ($topPost !== null) {
+                $result->push($this->toWrongQuestionRow($topPost));
+            }
+        }
+
+        return $result
+            ->sortByDesc(fn ($row) => [$row['wrong_rate'], $row['answer_times']])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * 取某一环节（前测/后测）中错误率最高的一题；无作答数据时返回 null
+     */
+    private function topWrongQuestion(Collection $rows): ?object
+    {
+        return $rows
+            ->sortByDesc(fn ($row) => (float) $row->wrong_times / (float) $row->answer_times)
+            ->first();
+    }
+
+    /**
+     * 组装单条「最容易答错的题」记录
+     */
+    private function toWrongQuestionRow(object $row, ?string $stage = null): array
+    {
+        return [
             'question_id' => (int) $row->question_id,
             'stem' => $row->stem,
             'video_title' => $row->video_title,
-            'stage' => $row->stage,
+            'stage' => $stage ?? $row->stage,
             'answer_times' => (int) $row->answer_times,
-            'wrong_rate' => (int) round($row->wrong_times / $row->answer_times * 100),
-        ])->values()->all();
+            'wrong_rate' => (int) round((float) $row->wrong_times / (float) $row->answer_times * 100),
+        ];
+    }
+
+    /**
+     * 前后测最高错误率为同一道题时合并为一条（作答/答错次数累加，环节记为 both）
+     */
+    private function mergeWrongQuestion(object $pre, object $post): array
+    {
+        $answerTimes = (int) $pre->answer_times + (int) $post->answer_times;
+        $wrongTimes = (int) $pre->wrong_times + (int) $post->wrong_times;
+
+        return [
+            'question_id' => (int) $pre->question_id,
+            'stem' => $pre->stem,
+            'video_title' => $pre->video_title,
+            'stage' => 'both',
+            'answer_times' => $answerTimes,
+            'wrong_rate' => $answerTimes > 0 ? (int) round($wrongTimes / $answerTimes * 100) : 0,
+        ];
     }
 
     /**
