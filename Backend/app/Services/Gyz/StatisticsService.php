@@ -19,11 +19,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class StatisticsService
 {
     /**
-     * 环节展示名
-     */
-    private const STAGE_LABELS = ['pretest' => '前测', 'posttest' => '后测'];
-
-    /**
      * 2.5.1 统计大盘（4 张指标卡）
      *
      * @return array<string, mixed>
@@ -138,49 +133,23 @@ class StatisticsService
     }
 
     /**
-     * 2.5.4 导出统计（Excel 文件流：大盘指标 + 各视频答题情况 + 最容易答错的题）
+     * 2.5.4 导出统计（Excel 文件流：单表，每视频一行 + 末行合计）
      */
     public function export(): StreamedResponse
     {
         $overview = $this->overview();
         $videoRows = $this->videoList();
-        $wrongRows = $this->wrongQuestion();
         $mostWrongByVideo = $this->mostWrongQuestionByVideo();
 
         $spreadsheet = new Spreadsheet();
 
-        // ① 统计大盘
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('统计大盘');
-
-        $metricRows = [
-            ['视频总数', $overview['video_total']],
-            ['其中已上架', $overview['video_online']],
-            ['答题次数', $overview['answer_total_times']],
-            ['平均正确率(%)', $overview['avg_accuracy'] ?? '—'],
-            ['通过率(%)', $overview['pass_rate'] ?? '—'],
-            ['通过线(%)', $overview['pass_score']],
-        ];
-
-        $row = 1;
-
-        foreach ($metricRows as $metricRow) {
-            $sheet->setCellValue([1, $row], $metricRow[0]);
-            $sheet->setCellValue([2, $row], $metricRow[1]);
-            $row++;
-        }
-
-        $sheet->getColumnDimension('A')->setWidth(20);
-        $sheet->getColumnDimension('B')->setWidth(16);
-
-        // ② 各视频答题情况（含每视频最容易答错的题与汇总行）
-        $videoSheet = $spreadsheet->createSheet();
-        $videoSheet->setTitle('各视频答题情况');
+        $sheet->setTitle('数据统计');
 
         $headers = ['视频', '分类', '状态', '答题次数', '平均正确率(%)', '通过率(%)', '最容易答错题', '错误率(%)'];
 
         foreach ($headers as $index => $header) {
-            $videoSheet->setCellValue([$index + 1, 1], $header);
+            $sheet->setCellValue([$index + 1, 1], $header);
         }
 
         $row = 2;
@@ -188,52 +157,27 @@ class StatisticsService
         foreach ($videoRows as $videoRow) {
             $mostWrong = $mostWrongByVideo->get($videoRow['video_id']);
 
-            $videoSheet->setCellValue([1, $row], $videoRow['title']);
-            $videoSheet->setCellValue([2, $row], $videoRow['category_name'] ?? '');
-            $videoSheet->setCellValue([3, $row], (int) $videoRow['status'] === 1 ? '已上架' : '已下架');
-            $videoSheet->setCellValue([4, $row], $videoRow['answer_times']);
-            $videoSheet->setCellValue([5, $row], $videoRow['avg_accuracy'] ?? '—');
-            $videoSheet->setCellValue([6, $row], $videoRow['pass_rate'] ?? '—');
-            $videoSheet->setCellValue([7, $row], $mostWrong['stem'] ?? '—');
-            $videoSheet->setCellValue([8, $row], $mostWrong['wrong_rate'] ?? '—');
+            $sheet->setCellValue([1, $row], $videoRow['title']);
+            $sheet->setCellValue([2, $row], $videoRow['category_name'] ?? '');
+            $sheet->setCellValue([3, $row], (int) $videoRow['status'] === 1 ? '已上架' : '已下架');
+            $sheet->setCellValue([4, $row], $videoRow['answer_times']);
+            $sheet->setCellValue([5, $row], $videoRow['avg_accuracy'] ?? '—');
+            $sheet->setCellValue([6, $row], $videoRow['pass_rate'] ?? '—');
+            $sheet->setCellValue([7, $row], $mostWrong['stem'] ?? '—');
+            $sheet->setCellValue([8, $row], $mostWrong['wrong_rate'] ?? '—');
             $row++;
         }
 
-        // 汇总行：总答题次数、总平均正确率、总通过率
-        $videoSheet->setCellValue([1, $row], '合计');
-        $videoSheet->setCellValue([4, $row], $overview['answer_total_times']);
-        $videoSheet->setCellValue([5, $row], $overview['avg_accuracy'] ?? '—');
-        $videoSheet->setCellValue([6, $row], $overview['pass_rate'] ?? '—');
+        // 末行合计：总答题次数、总平均正确率、总通过率
+        $sheet->setCellValue([1, $row], '合计');
+        $sheet->setCellValue([4, $row], $overview['answer_total_times']);
+        $sheet->setCellValue([5, $row], $overview['avg_accuracy'] ?? '—');
+        $sheet->setCellValue([6, $row], $overview['pass_rate'] ?? '—');
 
         foreach (range('A', 'H') as $column) {
-            $videoSheet->getColumnDimension($column)->setWidth(18);
+            $sheet->getColumnDimension($column)->setWidth(18);
         }
-        $videoSheet->getColumnDimension('G')->setWidth(40);
-
-        // ③ 最容易答错的题
-        $wrongSheet = $spreadsheet->createSheet();
-        $wrongSheet->setTitle('最容易答错的题');
-
-        $headers = ['题干', '所属视频', '环节', '作答次数', '错误率(%)'];
-
-        foreach ($headers as $index => $header) {
-            $wrongSheet->setCellValue([$index + 1, 1], $header);
-        }
-
-        $row = 2;
-
-        foreach ($wrongRows as $wrongRow) {
-            $wrongSheet->setCellValue([1, $row], $wrongRow['stem']);
-            $wrongSheet->setCellValue([2, $row], $wrongRow['video_title']);
-            $wrongSheet->setCellValue([3, $row], self::STAGE_LABELS[$wrongRow['stage']] ?? $wrongRow['stage']);
-            $wrongSheet->setCellValue([4, $row], $wrongRow['answer_times']);
-            $wrongSheet->setCellValue([5, $row], $wrongRow['wrong_rate']);
-            $row++;
-        }
-
-        foreach (range('A', 'E') as $column) {
-            $wrongSheet->getColumnDimension($column)->setWidth(24);
-        }
+        $sheet->getColumnDimension('G')->setWidth(40);
 
         return $this->streamXlsx($spreadsheet, '数据统计_' . now()->format('Ymd_His') . '.xlsx');
     }
