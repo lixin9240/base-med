@@ -1,4 +1,4 @@
-export { request, requestBlob, get, post, put, del } from './http'
+export { request, requestBlob, requestDownload, get, post, put, del } from './http'
 export {
   adminLogin,
   adminProfile,

@@ -16,10 +16,18 @@ import {
 
 const route = useRoute()
 const router = useRouter()
-const videoId = String(route.query.videoId || '')
+// 分享链接（后端生成）形如 /mobile/quiz?videoId=5&share=xxx，兼容 video_id 写法
+const videoId = String(route.query.videoId ?? route.query.video_id ?? '')
 const stageParam = String(route.query.stage || '')
 const isRetake = stageParam === 'retake'
-const stage = stageParam === 'pre' ? 'pre' : 'post'
+/**
+ * 只有显式带 stage=post / stage=retake 才进入后测（看完答题）；
+ * 其余情况（分享链接入口、参数丢失）一律从「学前答题」开始。
+ * 页面内跳转（首页 / 学习页 / 报告页）都会显式带上 stage。
+ */
+const stage = computed(() =>
+  stageParam === 'post' || stageParam === 'retake' ? 'post' : 'pre',
+)
 
 const course = ref(null)
 const drId = ref('')
@@ -29,7 +37,7 @@ const error = ref('')
 const answeredCount = ref(0)
 const submitting = ref(false)
 
-const isPre = computed(() => stage === 'pre')
+const isPre = computed(() => stage.value === 'pre')
 const stageTitle = computed(() =>
   isRetake ? '再次答题' : isPre.value ? '学前答题' : '看完答题',
 )
@@ -143,7 +151,7 @@ async function onSubmit(answers) {
 
 <template>
   <div class="qp">
-    <PageNav :title="stageTitle">
+    <PageNav :title="stageTitle" :show-back="false">
       <template #right>
         <span class="qp__progress">{{ answeredCount }}/{{ questions.length }}</span>
       </template>

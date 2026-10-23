@@ -148,7 +148,12 @@ async function exportRecords() {
       videoId: filterVideo.value,
       resultStatus: filterResult.value,
     })
-    window.open(data.url, '_blank', 'noopener')
+    // 用隐藏 iframe 触发下载，不新开标签、不跳转页面
+    const iframe = document.createElement('iframe')
+    iframe.style.display = 'none'
+    iframe.src = data.url
+    document.body.appendChild(iframe)
+    window.setTimeout(() => iframe.remove(), 5000)
   } catch (error) {
     loadError.value = error?.message || '导出失败，请稍后重试'
   } finally {
@@ -157,14 +162,14 @@ async function exportRecords() {
 }
 
 // ===== 查看作答（2.5.2）=====
-/** 正确答案 / 用户选择：多选的 "A,B,C" 渲染为 "A、B、C"；未作答返回空串 */
-function formatAnswer(value) {
+/** 多选的 "A,B,C" 渲染为 "A、B、C"（可自定义分隔符）；未作答返回空串 */
+function formatAnswer(value, separator = '、') {
   if (value === null || value === undefined || value === '') return ''
   return String(value)
     .split(',')
     .map((part) => part.trim())
     .filter(Boolean)
-    .join('、')
+    .join(separator)
 }
 
 function toAnswerItem(item) {
@@ -174,7 +179,7 @@ function toAnswerItem(item) {
     stem: item.stem || '',
     correct: Number(item.is_correct) === 1,
     correctAnswer: formatAnswer(item.correct_answer),
-    userAnswer: formatAnswer(item.user_answer),
+    userAnswer: formatAnswer(item.user_answer, ''), // 用户选择去掉顿号
   }
 }
 
@@ -343,7 +348,6 @@ function closeDetail() {
         <span class="col col--uid">编号</span>
         <span class="col col--score">前测</span>
         <span class="col col--score">看课答题</span>
-        <span class="col col--percent">正确率</span>
         <span class="col col--result">结果</span>
         <span class="col col--ops">操作</span>
       </div>
@@ -354,9 +358,6 @@ function closeDetail() {
         <span class="col col--uid">{{ record.userId }}</span>
         <span class="col col--score">{{ record.preCorrect }}/{{ record.preTotal }}</span>
         <span class="col col--score">{{ record.postCorrect }}/{{ record.postTotal }}</span>
-        <span class="col col--percent" :class="record.passed ? 'percent--pass' : 'percent--fail'">
-          {{ record.percent }}%
-        </span>
         <span class="col col--result">
           <span class="badge" :class="record.passed ? 'badge--success' : 'badge--warning'">
             <span class="badge__dot"></span>

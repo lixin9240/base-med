@@ -38,22 +38,36 @@ function toVideoRow(item) {
     category: item.category_name || '',
     published: Number(item.status) === 1,
     attempts: Number(item.answer_times) || 0,
-    avgPercent:
-      item.avg_accuracy === null || item.avg_accuracy === undefined
+    pretestPercent:
+      item.pretest_accuracy === null || item.pretest_accuracy === undefined
         ? null
-        : Number(item.avg_accuracy),
+        : Number(item.pretest_accuracy),
+    posttestPercent:
+      item.posttest_accuracy === null || item.posttest_accuracy === undefined
+        ? null
+        : Number(item.posttest_accuracy),
     passRate:
       item.pass_rate === null || item.pass_rate === undefined ? null : Number(item.pass_rate),
   }
 }
 
+/** 环节三值映射：both 表示前后测错误率最高的是同一道题，已合并统计 */
+const STAGE_LABELS = {
+  pretest: '前测',
+  posttest: '后测',
+  both: '前测/后测',
+}
+
 /** 把 2.6.3 接口返回的一条记录转成表格展示字段 */
 function toQuestionRow(item) {
+  const stage = String(item.stage ?? '')
+
   return {
-    key: item.question_id ?? item.stem,
+    // 同一道题可能出现在前后测两条记录里，key 带上环节避免重复
+    key: `${item.question_id ?? item.stem}-${stage}`,
     stem: item.stem || '',
     courseTitle: item.video_title || '',
-    stage: item.stage === 'posttest' ? '后测' : '前测',
+    stage: STAGE_LABELS[stage] ?? stage,
     attempts: Number(item.answer_times) || 0,
     errorRate: Number(item.wrong_rate) || 0,
   }
@@ -84,24 +98,37 @@ async function refreshStatistics() {
 onMounted(refreshStatistics)
 
 // ===== 导出统计（2.6.4）=====
+/** 后端文件名形如 数据统计_YYYYMMDD_HHMMSS.xlsx；未下发时前端按同一格式兜底 */
+function fallbackFileName() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  const date = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`
+  const time = `${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+  return `数据统计_${date}_${time}.xlsx`
+}
+
 async function exportStatistics() {
   if (exporting.value) return
 
   exporting.value = true
   loadError.value = ''
+  let url = ''
   try {
-    const blob = await exportAdminStatistics()
-    const url = URL.createObjectURL(blob)
+    const { blob, filename } = await exportAdminStatistics()
+    url = URL.createObjectURL(blob)
+
     const a = document.createElement('a')
-    const d = new Date()
-    const p = (n) => String(n).padStart(2, '0')
     a.href = url
-    a.download = `数据统计_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}.xlsx`
+    a.download = filename || fallbackFileName()
+    a.style.display = 'none'
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    a.remove()
   } catch (error) {
     loadError.value = error?.message || '导出失败，请稍后重试'
   } finally {
+    // 立即 revoke 会让部分浏览器取消下载，延后释放
+    if (url) window.setTimeout(() => URL.revokeObjectURL(url), 1000)
     exporting.value = false
   }
 }
@@ -265,7 +292,8 @@ async function exportStatistics() {
           <span class="col col--video">视频</span>
           <span class="col col--status">状态</span>
           <span class="col col--num">答题次数</span>
-          <span class="col col--num">平均正确率</span>
+          <span class="col col--num">题前正确率</span>
+          <span class="col col--num">题后正确率</span>
           <span class="col col--rate">通过率</span>
         </div>
 
@@ -284,7 +312,10 @@ async function exportStatistics() {
           </span>
           <span class="col col--num">{{ video.attempts }}</span>
           <span class="col col--num">
-            {{ video.avgPercent === null ? '—' : `${video.avgPercent}%` }}
+            {{ video.pretestPercent === null ? '—' : `${video.pretestPercent}%` }}
+          </span>
+          <span class="col col--num">
+            {{ video.posttestPercent === null ? '—' : `${video.posttestPercent}%` }}
           </span>
           <span class="col col--rate">
             <template v-if="video.passRate !== null">
@@ -328,17 +359,17 @@ async function exportStatistics() {
 
       <div class="qtable">
         <div class="qtable__head">
-          <span class="col col--stem">题干</span>
           <span class="col col--course">所属视频</span>
           <span class="col col--stage">环节</span>
+          <span class="col col--stem">题干</span>
           <span class="col col--attempts">作答次数</span>
           <span class="col col--error">错误率</span>
         </div>
 
         <div v-for="q in errorQuestions" :key="q.key" class="qtable__row">
-          <span class="col col--stem">{{ q.stem }}</span>
           <span class="col col--course">{{ q.courseTitle }}</span>
           <span class="col col--stage">{{ q.stage }}</span>
+          <span class="col col--stem">{{ q.stem }}</span>
           <span class="col col--attempts">{{ q.attempts }}</span>
           <span class="col col--error">{{ q.errorRate }}%</span>
         </div>

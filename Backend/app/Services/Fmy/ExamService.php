@@ -81,7 +81,19 @@ class ExamService
             ->first();
 
         if (! $pretest) {
-            throw new BusinessException(ResponseCode::STATUS_NOT_OPERABLE, '请先完成学前答题');
+            // 首轮提交后学前暂存已并入答题记录并清空：重看视频后再提交
+            // 沿用最近一条记录的前测结果（与「再次答题」一致），
+            // 仅在从未做过学前答题时拦截
+            $hasPriorRecord = ExamRecord::query()
+                ->where('user_id', $visit->id)
+                ->where('video_id', $video->id)
+                ->exists();
+
+            if (! $hasPriorRecord) {
+                throw new BusinessException(ResponseCode::STATUS_NOT_OPERABLE, '请先完成学前答题');
+            }
+
+            return $this->retake($drId, $videoId, $answers);
         }
 
         $postQuestions = $this->videoService->questionSet($videoId);

@@ -11,6 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const record = ref(null)
 const error = ref('')
+const loading = ref(true)
 
 function mapDetailItem(item) {
   return {
@@ -57,6 +58,8 @@ onMounted(async () => {
     }
   } catch (e) {
     error.value = e?.message || '加载失败'
+  } finally {
+    loading.value = false
   }
 })
 
@@ -79,22 +82,48 @@ function isPicked(item, opt) {
   }
   return item.userAnswer === token
 }
+
+// 多选题：选项有「是否为正确答案」「是否被用户选中」两个独立维度，四种组合分别标注
+function optionTag(item, opt) {
+  const right = isRight(item, opt)
+  const picked = isPicked(item, opt)
+  if (item.type !== 'multiple') {
+    if (right) return '正确答案'
+    if (picked) return '您的选择'
+    return ''
+  }
+  if (right && picked) return '您选择了 · 正确'
+  if (right) return '正确答案 · 您未选'
+  if (picked) return '您的选择 · 错误'
+  return ''
+}
+
+// 正确答案展示文案：单选/判断直接展示，多选用「、」连接
+function correctAnswerLabel(item) {
+  if (item.type === 'multiple') {
+    return String(item.answer || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join('、')
+  }
+  return item.answer || ''
+}
 </script>
 
 <template>
   <div class="result">
-    <PageNav title="答题结果" />
+    <PageNav title="答题结果" :show-back="false" />
 
     <div v-if="error" class="empty">
       <div class="empty__icon">
         <AppIcon name="alert" :size="44" />
       </div>
       <p class="empty__text">{{ error }}</p>
-      <div class="empty__actions">
-        <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
-          返回视频列表
-        </button>
-      </div>
+    </div>
+
+    <div v-else-if="loading" class="empty">
+      <p class="empty__text">加载中…</p>
     </div>
 
     <template v-else-if="record">
@@ -140,36 +169,14 @@ function isPicked(item, opt) {
             >
               <span class="rop__letter">{{ opt.key }}</span>
               <span class="rop__text">{{ opt.content }}</span>
-              <span v-if="isRight(item, opt)" class="rop__tag">正确答案</span>
-              <span v-else-if="isPicked(item, opt)" class="rop__tag rop__tag--wrong">您的选择</span>
+              <span v-if="optionTag(item, opt)" class="rop__tag">{{ optionTag(item, opt) }}</span>
             </li>
           </ul>
+          <p class="rv__answer"><b>正确答案：</b>{{ correctAnswerLabel(item) }}</p>
           <p v-if="item.analysis" class="rv__analysis">
             <b>解析：</b>{{ item.analysis }}
           </p>
         </article>
-      </section>
-
-      <section class="actions">
-        <button
-          type="button"
-          class="btn btn--primary btn--lg btn--block"
-          @click="router.replace({ name: 'mobile-quiz', query: { videoId: record.videoId, stage: 'retake' } })"
-        >
-          再答一次
-        </button>
-        <div class="actions__row">
-          <button
-            type="button"
-            class="btn btn--secondary btn--md"
-            @click="router.replace({ name: 'mobile-learn', query: { videoId: record.videoId } })"
-          >
-            重看视频
-          </button>
-          <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
-            返回列表
-          </button>
-        </div>
       </section>
     </template>
 
@@ -178,11 +185,6 @@ function isPicked(item, opt) {
         <AppIcon name="inbox" :size="44" />
       </div>
       <p class="empty__text">未找到这次答题记录</p>
-      <div class="empty__actions">
-        <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
-          返回视频列表
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -277,9 +279,6 @@ function isPicked(item, opt) {
   .review {
     margin: 0 var(--sp-3);
   }
-  .actions {
-    margin: var(--sp-5) var(--sp-3) 0;
-  }
 }
 
 .hero__total {
@@ -356,6 +355,13 @@ function isPicked(item, opt) {
   line-height: 1.65;
 }
 
+.rv__answer {
+  margin: var(--sp-2) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--success-text);
+}
+
 .rv__opts {
   list-style: none;
   margin: 0;
@@ -406,19 +412,5 @@ function isPicked(item, opt) {
 .rop__tag {
   font-size: 11px;
   font-weight: var(--fw-semibold);
-}
-
-.actions {
-  margin: var(--sp-5) var(--sp-4) 0;
-}
-
-.actions__row {
-  display: flex;
-  gap: var(--sp-2);
-  margin-top: var(--sp-3);
-}
-
-.actions__row > .btn {
-  flex: 1;
 }
 </style>

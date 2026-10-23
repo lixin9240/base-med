@@ -197,6 +197,7 @@
 | ---- | ---- | ---- | ---- |
 | page | int | 否 | 默认 1 |
 | page_size | int | 否 | 默认 20 |
+| keyword | string | 否 | 搜索关键字，按视频标题模糊匹配（LIKE %keyword%），最长 64 字符 |
 
 返回 data 结构（对应列表页「视频 / 题目 / 状态 / 答题」列）：
 ```json
@@ -636,11 +637,11 @@
 
 ## 2.6 GYZ-数据统计模块（对应【数据统计】页面）
 
-> 页面构成：①顶部 4 张指标卡（视频 / 答题次数 / 平均正确率 / 通过率）；②「各视频答题情况」表（视频含分类标签、状态、答题次数、平均正确率、通过率+进度条）；③「最容易答错的题」表（题干、所属视频、环节、作答次数、错误率，按错误率从高到低，副标题「可以用来调整讲解重点」）；④右上角「导出统计」按钮。
+> 页面构成：①顶部 5 张指标卡（视频 / 答题次数 / 答题前正确率 / 答题后正确率 / 通过率）；②「各视频答题情况」表（视频含分类标签、状态、答题次数、答题前正确率、答题后正确率、通过率+进度条）；③「最容易答错的题」表（题干、所属视频、环节、作答次数、错误率，按错误率从高到低，副标题「可以用来调整讲解重点」）；④右上角「导出统计」按钮。
 >
 > 页面副标题：只看三件事：有多少人答了、答得怎么样、哪道题最容易错。
 
-### 2.6.1 统计大盘（4 张指标卡）
+### 2.6.1 统计大盘（5 张指标卡）
 - 路径：`/api/admin/statistics/overview`
 - Method：GET
 
@@ -650,6 +651,8 @@
     "video_online": 3,
     "answer_total_times": 37,
     "avg_accuracy": 70,
+    "pre_avg_accuracy": 65,
+    "post_avg_accuracy": 70,
     "pass_rate": 78,
     "pass_score": 60
 }
@@ -660,14 +663,16 @@
 | video_total        | int  | 视频「4 条」                 | 全部视频数（含下架）                                       |
 | video_online       | int  | 视频副文「其中已上架 3 条」  | 上架视频数                                                 |
 | answer_total_times | int  | 答题次数「37 次」            | 用户提交的答题记录合计（exam_record 计数）                 |
-| avg_accuracy       | int  | 平均正确率「70%」            | 所有答题记录正确率的平均值（口径同 2.5.1 accuracy_rate）   |
+| avg_accuracy       | int  | 平均正确率「70%」            | 兼容字段，历史口径（即答题后正确率），供前端未改版时显示   |
+| pre_avg_accuracy   | int  | 答题前正确率「65%」          | 学前答题（前测）得分均值，取自 exam_record.pretest_score  |
+| post_avg_accuracy  | int  | 答题后正确率「70%」          | 学后答题（后测）得分均值，取自 exam_record.posttest_score |
 | pass_rate          | int  | 通过率「78%」                | 通过记录数 / 答题记录总数 × 100                            |
 | pass_score         | int  | 通过率副文「达到 60% 视为通过」 | 通过线，取自 system_config，默认 60                     |
 
 ### 2.6.2 各视频答题情况
 - 路径：`/api/admin/statistics/video-list`
 - Method：GET
-- 返回全量数组（页面无分页/筛选），对应「视频 / 状态 / 答题次数 / 平均正确率 / 通过率」列：
+- 返回全量数组（页面无分页/筛选），对应「视频 / 状态 / 答题次数 / 答题前正确率 / 答题后正确率 / 通过率」列：
 
 ```json
 [
@@ -678,6 +683,8 @@
         "status": 1,
         "answer_times": 12,
         "avg_accuracy": 64,
+        "pre_avg_accuracy": 60,
+        "post_avg_accuracy": 64,
         "pass_rate": 67
     },
     {
@@ -687,6 +694,8 @@
         "status": 1,
         "answer_times": 12,
         "avg_accuracy": 67,
+        "pre_avg_accuracy": 63,
+        "post_avg_accuracy": 67,
         "pass_rate": 75
     },
     {
@@ -696,6 +705,8 @@
         "status": 1,
         "answer_times": 13,
         "avg_accuracy": 80,
+        "pre_avg_accuracy": 77,
+        "post_avg_accuracy": 80,
         "pass_rate": 92
     },
     {
@@ -705,18 +716,22 @@
         "status": 0,
         "answer_times": 0,
         "avg_accuracy": null,
+        "pre_avg_accuracy": null,
+        "post_avg_accuracy": null,
         "pass_rate": null
     }
 ]
 ```
 
-| 字段           | 类型     | 备注                                                         |
-| -------------- | -------- | ------------------------------------------------------------ |
-| title          | string   | 「视频」列，前端在标题旁展示分类标签（category_name）        |
-| status         | tinyint  | 「状态」列：1 已上架（绿点）/ 0 已下架（灰点）               |
-| answer_times   | int      | 「答题次数」列（exam_record 计数）                           |
-| avg_accuracy   | int/null | 「平均正确率」列；无人答题时为 null，前端显示「—」           |
-| pass_rate      | int/null | 「通过率」列，前端附进度条（颜色按高低区分）；无人答题为 null |
+| 字段                | 类型     | 备注                                                       |
+| ------------------- | -------- | ---------------------------------------------------------- |
+| title               | string   | 「视频」列，前端在标题旁展示分类标签（category_name）      |
+| status              | tinyint  | 「状态」列：1 已上架（绿点）/ 0 已下架（灰点）             |
+| answer_times        | int      | 「答题次数」列（exam_record 计数）                         |
+| avg_accuracy        | int/null | 「平均正确率」兼容列（即答题后正确率，历史口径）；无人答题为 null |
+| pre_avg_accuracy    | int/null | 「答题前正确率」列；无人答题时为 null，前端显示「—」       |
+| post_avg_accuracy   | int/null | 「答题后正确率」列；无人答题时为 null，前端显示「—」       |
+| pass_rate           | int/null | 「通过率」列，前端附进度条（颜色按高低区分）；无人答题为 null |
 
 ### 2.6.3 最容易答错的题
 - 路径：`/api/admin/statistics/wrong-question`
@@ -755,7 +770,7 @@
 ### 2.6.4 导出统计（「导出统计」按钮）
 - 路径：`/api/admin/statistics/export`
 - Method：GET
-- 返回 Excel 文件流，内容包含：大盘指标（4 项）+ 各视频答题情况表 + 最容易答错的题表。
+- 返回 Excel 文件流，内容包含：大盘指标（5 项指标，含答题前/答题后正确率）+ 各视频答题情况表（拆为答题前/答题后正确率两列）+ 最容易答错的题表。
 
 ---
 
