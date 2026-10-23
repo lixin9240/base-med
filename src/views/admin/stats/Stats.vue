@@ -51,13 +51,23 @@ function toVideoRow(item) {
   }
 }
 
+/** 环节三值映射：both 表示前后测错误率最高的是同一道题，已合并统计 */
+const STAGE_LABELS = {
+  pretest: '前测',
+  posttest: '后测',
+  both: '前测/后测',
+}
+
 /** 把 2.6.3 接口返回的一条记录转成表格展示字段 */
 function toQuestionRow(item) {
+  const stage = String(item.stage ?? '')
+
   return {
-    key: item.question_id ?? item.stem,
+    // 同一道题可能出现在前后测两条记录里，key 带上环节避免重复
+    key: `${item.question_id ?? item.stem}-${stage}`,
     stem: item.stem || '',
     courseTitle: item.video_title || '',
-    stage: item.stage === 'posttest' ? '后测' : '前测',
+    stage: STAGE_LABELS[stage] ?? stage,
     attempts: Number(item.answer_times) || 0,
     errorRate: Number(item.wrong_rate) || 0,
   }
