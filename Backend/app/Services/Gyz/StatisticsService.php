@@ -24,14 +24,14 @@ class StatisticsService
     private const STAGE_LABELS = ['pretest' => '前测', 'posttest' => '后测'];
 
     /**
-     * 2.5.1 统计大盘（4 张指标卡）
+     * 2.5.1 统计大盘（5 张指标卡）
      *
      * @return array<string, mixed>
      */
     public function overview(): array
     {
         $agg = ExamRecord::query()
-            ->selectRaw('COUNT(*) AS total_times, ROUND(AVG(accuracy_rate)) AS avg_accuracy, SUM(result_status = ?) AS pass_times', ['pass'])
+            ->selectRaw('COUNT(*) AS total_times, ROUND(AVG(pretest_score)) AS pre_avg_accuracy, ROUND(AVG(posttest_score)) AS post_avg_accuracy, SUM(result_status = ?) AS pass_times', ['pass'])
             ->first();
 
         $totalTimes = (int) ($agg->total_times ?? 0);
@@ -40,8 +40,11 @@ class StatisticsService
             'video_total' => Video::count(),
             'video_online' => Video::query()->where('status', 1)->count(),
             'answer_total_times' => $totalTimes,
-            // 无人答题时为 null（口径同 2.4.1 accuracy_rate）
-            'avg_accuracy' => $totalTimes > 0 ? (int) $agg->avg_accuracy : null,
+            // 兼容字段：历史口径（即答题后正确率），供前端未改版时继续显示「平均正确率」
+            'avg_accuracy' => $totalTimes > 0 ? (int) $agg->post_avg_accuracy : null,
+            // 无人答题时为 null；答题前/答题后正确率分别对应学前答题、学后答题的得分
+            'pre_avg_accuracy' => $totalTimes > 0 ? (int) $agg->pre_avg_accuracy : null,
+            'post_avg_accuracy' => $totalTimes > 0 ? (int) $agg->post_avg_accuracy : null,
             'pass_rate' => $totalTimes > 0 ? (int) round($agg->pass_times / $totalTimes * 100) : null,
             // 通过线取自 system_config，默认 60
             'pass_score' => $this->configValue('pass_score', 60),
@@ -62,7 +65,7 @@ class StatisticsService
             ->get();
 
         $stats = ExamRecord::query()
-            ->selectRaw('video_id, COUNT(*) AS answer_times, ROUND(AVG(accuracy_rate)) AS avg_accuracy, SUM(result_status = ?) AS pass_times', ['pass'])
+            ->selectRaw('video_id, COUNT(*) AS answer_times, ROUND(AVG(pretest_score)) AS pre_avg_accuracy, ROUND(AVG(posttest_score)) AS post_avg_accuracy, SUM(result_status = ?) AS pass_times', ['pass'])
             ->groupBy('video_id')
             ->get()
             ->keyBy('video_id');
@@ -76,8 +79,11 @@ class StatisticsService
                 'category_name' => $video->category->name ?? null,
                 'status' => (int) $video->status,
                 'answer_times' => $stat ? (int) $stat->answer_times : 0,
-                // 无人答题时为 null，前端显示「—」
-                'avg_accuracy' => $stat ? (int) $stat->avg_accuracy : null,
+                // 兼容字段：历史口径（即答题后正确率），供前端未改版时继续显示「平均正确率」
+                'avg_accuracy' => $stat ? (int) $stat->post_avg_accuracy : null,
+                // 无人答题时为 null；答题前/答题后正确率分别对应学前答题、学后答题
+                'pre_avg_accuracy' => $stat ? (int) $stat->pre_avg_accuracy : null,
+                'post_avg_accuracy' => $stat ? (int) $stat->post_avg_accuracy : null,
                 'pass_rate' => $stat ? (int) round($stat->pass_times / $stat->answer_times * 100) : null,
             ];
         })->values()->all();
@@ -157,7 +163,8 @@ class StatisticsService
             ['视频总数', $overview['video_total']],
             ['其中已上架', $overview['video_online']],
             ['答题次数', $overview['answer_total_times']],
-            ['平均正确率(%)', $overview['avg_accuracy'] ?? '—'],
+            ['答题前正确率(%)', $overview['pre_avg_accuracy'] ?? '—'],
+            ['答题后正确率(%)', $overview['post_avg_accuracy'] ?? '—'],
             ['通过率(%)', $overview['pass_rate'] ?? '—'],
             ['通过线(%)', $overview['pass_score']],
         ];
@@ -177,7 +184,7 @@ class StatisticsService
         $videoSheet = $spreadsheet->createSheet();
         $videoSheet->setTitle('各视频答题情况');
 
-        $headers = ['视频', '分类', '状态', '答题次数', '平均正确率(%)', '通过率(%)', '最容易答错题', '错误率(%)'];
+        $headers = ['视频', '分类', '状态', '答题次数', '答题前正确率(%)', '答题后正确率(%)', '通过率(%)', '最容易答错题', '错误率(%)'];
 
         foreach ($headers as $index => $header) {
             $videoSheet->setCellValue([$index + 1, 1], $header);
@@ -192,23 +199,25 @@ class StatisticsService
             $videoSheet->setCellValue([2, $row], $videoRow['category_name'] ?? '');
             $videoSheet->setCellValue([3, $row], (int) $videoRow['status'] === 1 ? '已上架' : '已下架');
             $videoSheet->setCellValue([4, $row], $videoRow['answer_times']);
-            $videoSheet->setCellValue([5, $row], $videoRow['avg_accuracy'] ?? '—');
-            $videoSheet->setCellValue([6, $row], $videoRow['pass_rate'] ?? '—');
-            $videoSheet->setCellValue([7, $row], $mostWrong['stem'] ?? '—');
-            $videoSheet->setCellValue([8, $row], $mostWrong['wrong_rate'] ?? '—');
+            $videoSheet->setCellValue([5, $row], $videoRow['pre_avg_accuracy'] ?? '—');
+            $videoSheet->setCellValue([6, $row], $videoRow['post_avg_accuracy'] ?? '—');
+            $videoSheet->setCellValue([7, $row], $videoRow['pass_rate'] ?? '—');
+            $videoSheet->setCellValue([8, $row], $mostWrong['stem'] ?? '—');
+            $videoSheet->setCellValue([9, $row], $mostWrong['wrong_rate'] ?? '—');
             $row++;
         }
 
         // 汇总行：总答题次数、总平均正确率、总通过率
         $videoSheet->setCellValue([1, $row], '合计');
         $videoSheet->setCellValue([4, $row], $overview['answer_total_times']);
-        $videoSheet->setCellValue([5, $row], $overview['avg_accuracy'] ?? '—');
-        $videoSheet->setCellValue([6, $row], $overview['pass_rate'] ?? '—');
+        $videoSheet->setCellValue([5, $row], $overview['pre_avg_accuracy'] ?? '—');
+        $videoSheet->setCellValue([6, $row], $overview['post_avg_accuracy'] ?? '—');
+        $videoSheet->setCellValue([7, $row], $overview['pass_rate'] ?? '—');
 
-        foreach (range('A', 'H') as $column) {
+        foreach (range('A', 'I') as $column) {
             $videoSheet->getColumnDimension($column)->setWidth(18);
         }
-        $videoSheet->getColumnDimension('G')->setWidth(40);
+        $videoSheet->getColumnDimension('H')->setWidth(40);
 
         // ③ 最容易答错的题
         $wrongSheet = $spreadsheet->createSheet();
