@@ -73,11 +73,21 @@ watch(
 
 onUnmounted(stop)
 
-/** 后端时间形如 2026-10-26 10:00:00，统一转成毫秒时间戳 */
+/**
+ * 后端时间形如 2026-10-26 10:00:00，统一转成毫秒时间戳。
+ * 后端时区为 UTC 且不带时区后缀，直接 new Date 会被当成浏览器本地时间（差 8 小时），需补 Z。
+ */
 function parseDateTime(value) {
   if (value === null || value === undefined || value === '') return null
   if (typeof value === 'number') return value
-  const time = new Date(String(value).replace(' ', 'T')).getTime()
+
+  const text = String(value).trim()
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(text)) {
+    const time = new Date(`${text.replace(' ', 'T')}Z`).getTime()
+    return Number.isNaN(time) ? null : time
+  }
+
+  const time = new Date(text).getTime()
   return Number.isNaN(time) ? null : time
 }
 
@@ -176,7 +186,7 @@ async function generate() {
     })
     link.value = decorateLink({
       ...data,
-      created_at: data.created_at ?? formatDateTime(Date.now()),
+      created_at: data.created_at ?? Date.now(),
     })
     now.value = Date.now()
     syncTtl(link.value)
