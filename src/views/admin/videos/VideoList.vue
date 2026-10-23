@@ -400,26 +400,40 @@ async function togglePublished(video) {
     <p v-else-if="!loading && !loadError" class="video-banner">暂无视频</p>
 
     <!-- 分页 -->
-    <div v-if="videos.length" class="video-pager">
-      <span class="video-pager__total">共 {{ total }} 条</span>
-      <button
-        type="button"
-        class="link-btn"
-        :disabled="page <= 1 || loading"
-        @click="goPage(page - 1)"
-      >
-        上一页
-      </button>
-      <span class="video-pager__page">第 {{ page }} / {{ totalPages }} 页</span>
-      <button
-        type="button"
-        class="link-btn"
-        :disabled="page >= totalPages || loading"
-        @click="goPage(page + 1)"
-      >
-        下一页
-      </button>
-    </div>
+    <footer v-if="total" class="video-page__foot">
+      <div class="pager">
+        <button
+          type="button"
+          class="pager__btn"
+          :disabled="page <= 1 || loading"
+          aria-label="上一页"
+          @click="goPage(page - 1)"
+        >
+          ‹
+        </button>
+        <button
+          v-for="n in totalPages"
+          :key="n"
+          type="button"
+          class="pager__btn"
+          :class="{ 'pager__btn--active': n === page }"
+          :disabled="loading"
+          @click="goPage(n)"
+        >
+          {{ n }}
+        </button>
+        <button
+          type="button"
+          class="pager__btn"
+          :disabled="page >= totalPages || loading"
+          aria-label="下一页"
+          @click="goPage(page + 1)"
+        >
+          ›
+        </button>
+      </div>
+      <span class="video-page__total">共 {{ total }} 条</span>
+    </footer>
 
     <QuestionImportModal :open="importOpen" @close="importOpen = false" @imported="refreshVideos" />
 
@@ -477,22 +491,56 @@ async function togglePublished(video) {
 }
 
 /* ===== 分页 ===== */
-.video-pager {
+.video-page__foot {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: var(--sp-3);
-  font-size: var(--fs-sm);
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-1);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pager__btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
   color: var(--text-secondary);
+  background: var(--bg-surface-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition:
+    color var(--t-fast),
+    background var(--t-fast),
+    border-color var(--t-fast);
 }
 
-.video-pager__total {
-  margin-right: auto;
+.pager__btn:hover:not(:disabled) {
+  color: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
 }
 
-.link-btn:disabled {
+.pager__btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.pager__btn--active {
+  color: #fff;
+  background: var(--brand-primary-hover);
+  border-color: var(--brand-primary-hover);
+}
+
+.video-page__total {
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
 }
 
 /* ===== 页头 ===== */

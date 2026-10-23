@@ -349,17 +349,17 @@ async function exportStatistics() {
 
       <div class="qtable">
         <div class="qtable__head">
-          <span class="col col--stem">题干</span>
           <span class="col col--course">所属视频</span>
           <span class="col col--stage">环节</span>
+          <span class="col col--stem">题干</span>
           <span class="col col--attempts">作答次数</span>
           <span class="col col--error">错误率</span>
         </div>
 
         <div v-for="q in errorQuestions" :key="q.key" class="qtable__row">
-          <span class="col col--stem">{{ q.stem }}</span>
           <span class="col col--course">{{ q.courseTitle }}</span>
           <span class="col col--stage">{{ q.stage }}</span>
+          <span class="col col--stem">{{ q.stem }}</span>
           <span class="col col--attempts">{{ q.attempts }}</span>
           <span class="col col--error">{{ q.errorRate }}%</span>
         </div>
