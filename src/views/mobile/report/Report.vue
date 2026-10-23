@@ -11,6 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const record = ref(null)
 const error = ref('')
+const loading = ref(true)
 
 function mapDetailItem(item) {
   return {
@@ -57,6 +58,8 @@ onMounted(async () => {
     }
   } catch (e) {
     error.value = e?.message || '加载失败'
+  } finally {
+    loading.value = false
   }
 })
 
@@ -110,18 +113,17 @@ function correctAnswerLabel(item) {
 
 <template>
   <div class="result">
-    <PageNav title="答题结果" />
+    <PageNav title="答题结果" :show-back="false" />
 
     <div v-if="error" class="empty">
       <div class="empty__icon">
         <AppIcon name="alert" :size="44" />
       </div>
       <p class="empty__text">{{ error }}</p>
-      <div class="empty__actions">
-        <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
-          返回视频列表
-        </button>
-      </div>
+    </div>
+
+    <div v-else-if="loading" class="empty">
+      <p class="empty__text">加载中…</p>
     </div>
 
     <template v-else-if="record">
@@ -176,28 +178,6 @@ function correctAnswerLabel(item) {
           </p>
         </article>
       </section>
-
-      <section class="actions">
-        <button
-          type="button"
-          class="btn btn--primary btn--lg btn--block"
-          @click="router.replace({ name: 'mobile-quiz', query: { videoId: record.videoId, stage: 'retake' } })"
-        >
-          再答一次
-        </button>
-        <div class="actions__row">
-          <button
-            type="button"
-            class="btn btn--secondary btn--md"
-            @click="router.replace({ name: 'mobile-learn', query: { videoId: record.videoId } })"
-          >
-            重看视频
-          </button>
-          <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
-            返回列表
-          </button>
-        </div>
-      </section>
     </template>
 
     <div v-else class="empty">
@@ -205,11 +185,6 @@ function correctAnswerLabel(item) {
         <AppIcon name="inbox" :size="44" />
       </div>
       <p class="empty__text">未找到这次答题记录</p>
-      <div class="empty__actions">
-        <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
-          返回视频列表
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -303,9 +278,6 @@ function correctAnswerLabel(item) {
   }
   .review {
     margin: 0 var(--sp-3);
-  }
-  .actions {
-    margin: var(--sp-5) var(--sp-3) 0;
   }
 }
 
@@ -440,19 +412,5 @@ function correctAnswerLabel(item) {
 .rop__tag {
   font-size: 11px;
   font-weight: var(--fw-semibold);
-}
-
-.actions {
-  margin: var(--sp-5) var(--sp-4) 0;
-}
-
-.actions__row {
-  display: flex;
-  gap: var(--sp-2);
-  margin-top: var(--sp-3);
-}
-
-.actions__row > .btn {
-  flex: 1;
 }
 </style>

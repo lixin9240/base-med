@@ -183,7 +183,7 @@ async function goQuiz() {
 
 <template>
   <div class="learn">
-    <PageNav title="观看视频" />
+    <PageNav title="观看视频" :show-back="false" />
 
     <div v-if="error" class="empty">
       <div class="empty__icon">

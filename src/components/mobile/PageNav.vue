@@ -5,6 +5,8 @@ import AppIcon from '@/components/mobile/AppIcon.vue'
 defineProps({
   title: { type: String, default: '' },
   brand: { type: Boolean, default: false },
+  // 是否显示左侧返回箭头
+  showBack: { type: Boolean, default: true },
 })
 
 const router = useRouter()
@@ -17,9 +19,10 @@ function back() {
 
 <template>
   <header class="pnav" :class="{ 'pnav--brand': brand }">
-    <button type="button" class="pnav__icon-btn" aria-label="返回" @click="back">
+    <button v-if="showBack" type="button" class="pnav__icon-btn" aria-label="返回" @click="back">
       <AppIcon name="chevronLeft" :size="22" />
     </button>
+    <span v-else class="pnav__spacer" />
     <div class="pnav__center">
       <h1 class="pnav__title">{{ title }}</h1>
     </div>
