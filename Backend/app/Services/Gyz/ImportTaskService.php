@@ -585,7 +585,6 @@ class ImportTaskService
             }
 
             $options = ['正确', '错误'];
-            $optionLetters = ['A', 'B'];
         } else {
             // 单选/多选：选项 A 起连续填写，至少两项
             $options = [];
@@ -623,29 +622,36 @@ class ImportTaskService
             return '正确答案不能为空';
         }
 
-        if (! preg_match('/^[A-F]+$/', $answer)) {
-            return '正确答案应填 A~F 的大写字母（多选连写，如 ABC）';
-        }
-
-        $letters = array_values(array_unique(str_split($answer)));
-
-        if ($type === 'multiple') {
-            if (count($letters) < 2) {
-                return '多选题的正确答案至少填 2 个字母';
-            }
-
-            foreach ($letters as $letter) {
-                if (! in_array($letter, $optionLetters, true)) {
-                    return '正确答案包含未填写的选项';
-                }
+        // 判断题按「正确/错误」校验，允许模板里填 A/B（A=正确、B=错误）
+        if ($type === 'judge') {
+            if (! in_array(Question::normalizeCorrectAnswer('judge', $answer), ['正确', '错误'], true)) {
+                return '判断题的正确答案应填「正确」或「错误」';
             }
         } else {
-            if (count($letters) !== 1) {
-                return '单选题 / 判断题的正确答案只能填 1 个字母';
+            if (! preg_match('/^[A-F]+$/', $answer)) {
+                return '正确答案应填 A~F 的大写字母（多选连写，如 ABC）';
             }
 
-            if (! in_array($letters[0], $optionLetters, true)) {
-                return '正确答案不在已填写的选项中';
+            $letters = array_values(array_unique(str_split($answer)));
+
+            if ($type === 'multiple') {
+                if (count($letters) < 2) {
+                    return '多选题的正确答案至少填 2 个字母';
+                }
+
+                foreach ($letters as $letter) {
+                    if (! in_array($letter, $optionLetters, true)) {
+                        return '正确答案包含未填写的选项';
+                    }
+                }
+            } else {
+                if (count($letters) !== 1) {
+                    return '单选题的正确答案只能填 1 个字母';
+                }
+
+                if (! in_array($letters[0], $optionLetters, true)) {
+                    return '正确答案不在已填写的选项中';
+                }
             }
         }
 
@@ -742,7 +748,7 @@ class ImportTaskService
             'stem' => $this->cell($row, 4),
             'options' => $options,
             'option_count' => $optionCount,
-            'correct_answer' => str_replace([' ', '，', '、', ';', '；', '/'], '', $this->cell($row, 11)),
+            'correct_answer' => Question::normalizeCorrectAnswer($type, str_replace([' ', '，', '、', ';', '；', '/'], '', $this->cell($row, 11))),
             'analysis' => $this->cell($row, 12),
             'difficulty' => 1,
             'knowledge_point' => '',
@@ -1006,7 +1012,7 @@ class ImportTaskService
         $valid = match ($type) {
             'single' => (bool) preg_match('/^[A-F]$/', $answer),
             'multiple' => (bool) preg_match('/^[A-F](,[A-F])+$/', $answer),
-            'judge' => in_array($answer, ['正确', '错误'], true),
+            'judge' => in_array(Question::normalizeCorrectAnswer('judge', $answer), ['正确', '错误'], true),
         };
 
         if (! $valid) {
@@ -1048,7 +1054,7 @@ class ImportTaskService
             'stem' => $this->cell($row, 2),
             'options' => $options,
             'option_count' => $optionCount,
-            'correct_answer' => str_replace(' ', '', $this->cell($row, 4)),
+            'correct_answer' => Question::normalizeCorrectAnswer($type, str_replace(' ', '', $this->cell($row, 4))),
             'analysis' => $this->cell($row, 5),
             'difficulty' => 1,
             'knowledge_point' => '',

@@ -178,7 +178,7 @@ class VideoQuestionService
         // 示例行（与官方导入模板一致，前后测共用一套，题目用途按前测示例）
         $examples = [
             ['心肺复苏基础操作', '前测', 1, '单选题', '成人胸外按压的深度至少为？', ['2 厘米', '5 厘米', '7 厘米', '10 厘米'], 'B', '成人胸外按压深度至少 5 厘米、不超过 6 厘米。'],
-            ['心肺复苏基础操作', '前测', 2, '判断题', '每次按压后应让胸廓完全回弹。', ['正确', '错误'], 'A', '胸廓完全回弹是保证有效循环的关键。'],
+            ['心肺复苏基础操作', '前测', 2, '判断题', '每次按压后应让胸廓完全回弹。', ['正确', '错误'], '正确', '胸廓完全回弹是保证有效循环的关键。'],
             ['心肺复苏基础操作', '前测', 3, '多选题', '下列哪些情形可以停止心肺复苏？', ['患者恢复自主呼吸与心跳', '专业急救人员接手', '施救者体力耗尽无法继续', '家属要求停止即立即停止'], 'ABC', '复苏终止需依据客观指征或专业判断。'],
         ];
 
@@ -392,7 +392,7 @@ class VideoQuestionService
             'stem' => $data['stem'],
             'options' => $options,
             'option_count' => $optionCount,
-            'correct_answer' => $data['correct_answer'],
+            'correct_answer' => Question::normalizeCorrectAnswer($type, (string) $data['correct_answer']),
             'analysis' => $data['analysis'] ?? null,
             'difficulty' => 1,
             'knowledge_point' => '',
