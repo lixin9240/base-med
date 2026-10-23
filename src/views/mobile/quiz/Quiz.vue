@@ -151,7 +151,7 @@ async function onSubmit(answers) {
 
 <template>
   <div class="qp">
-    <PageNav :title="stageTitle">
+    <PageNav :title="stageTitle" :show-back="false">
       <template #right>
         <span class="qp__progress">{{ answeredCount }}/{{ questions.length }}</span>
       </template>
