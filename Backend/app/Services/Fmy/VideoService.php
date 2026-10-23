@@ -64,6 +64,10 @@ class VideoService
             ->orderByDesc('id')
             ->first();
 
+        // 学前暂存在首轮提交后并入答题记录被清空，状态只增不降：
+        // 已有答题记录同样视为已完成学前答题，避免重看视频后再答题被误拦
+        $pretestSubmitted = $pretestSubmitted || $examRecord !== null;
+
         $progress = VideoProgress::query()
             ->where('user_id', $visit->id)
             ->where('video_id', $video->id)
