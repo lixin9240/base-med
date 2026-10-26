@@ -651,6 +651,7 @@ async function submit() {
 }
 
 .field--category {
+  display: none;
   flex: 0 0 220px;
 }
 
