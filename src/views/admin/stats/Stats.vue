@@ -30,6 +30,11 @@ function barTone(rate) {
   return 'danger'
 }
 
+/** 百分比字段：null / undefined 统一为 null（模板显示「—」） */
+function toPercent(value) {
+  return value === null || value === undefined ? null : Number(value)
+}
+
 /** 把 2.6.2 接口返回的一条记录转成表格展示字段 */
 function toVideoRow(item) {
   return {
@@ -38,26 +43,30 @@ function toVideoRow(item) {
     category: item.category_name || '',
     published: Number(item.status) === 1,
     attempts: Number(item.answer_times) || 0,
-    pretestPercent:
-      item.pretest_accuracy === null || item.pretest_accuracy === undefined
-        ? null
-        : Number(item.pretest_accuracy),
-    posttestPercent:
-      item.posttest_accuracy === null || item.posttest_accuracy === undefined
-        ? null
-        : Number(item.posttest_accuracy),
-    passRate:
-      item.pass_rate === null || item.pass_rate === undefined ? null : Number(item.pass_rate),
+    // 后端字段名为 pre_avg_accuracy / post_avg_accuracy，兼容旧字段写法
+    pretestPercent: toPercent(item.pre_avg_accuracy ?? item.pretest_accuracy),
+    posttestPercent: toPercent(item.post_avg_accuracy ?? item.posttest_accuracy),
+    passRate: toPercent(item.pass_rate),
   }
+}
+
+/** 环节三值映射：both 表示前后测错误率最高的是同一道题，已合并统计 */
+const STAGE_LABELS = {
+  pretest: '前测',
+  posttest: '后测',
+  both: '前测/后测',
 }
 
 /** 把 2.6.3 接口返回的一条记录转成表格展示字段 */
 function toQuestionRow(item) {
+  const stage = String(item.stage ?? '')
+
   return {
-    key: item.question_id ?? item.stem,
+    // 同一道题可能出现在前后测两条记录里，key 带上环节避免重复
+    key: `${item.question_id ?? item.stem}-${stage}`,
     stem: item.stem || '',
     courseTitle: item.video_title || '',
-    stage: item.stage === 'posttest' ? '后测' : '前测',
+    stage: STAGE_LABELS[stage] ?? stage,
     attempts: Number(item.answer_times) || 0,
     errorRate: Number(item.wrong_rate) || 0,
   }
