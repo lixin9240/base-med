@@ -358,52 +358,10 @@ async function submit() {
           <p v-if="errors.intro" class="field__error">{{ errors.intro }}</p>
         </label>
 
-        <!-- 视频来源 -->
-        <div class="field">
-          <span class="field__label"><em class="req">*</em>视频来源</span>
-          <div class="radio-group">
-            <label class="radio" :class="{ 'radio--on': !isUpload }">
-              <input
-                type="radio"
-                name="video-source"
-                :value="VIDEO_SOURCE.URL"
-                :checked="!isUpload"
-                @change="selectSource(VIDEO_SOURCE.URL)"
-              />
-              <span class="radio__dot"></span>
-              填写视频链接
-            </label>
-            <label class="radio" :class="{ 'radio--on': isUpload }">
-              <input
-                type="radio"
-                name="video-source"
-                :value="VIDEO_SOURCE.UPLOAD"
-                :checked="isUpload"
-                @change="selectSource(VIDEO_SOURCE.UPLOAD)"
-              />
-              <span class="radio__dot"></span>
-              本地上传
-            </label>
-          </div>
-        </div>
-
-        <!-- 视频链接：本地上传时由后端上传完成后自动回填，只读展示 -->
-        <label class="field">
-          <span class="field__label">
-            <em v-if="!isUpload" class="req">*</em>视频链接
-            <span v-if="isUpload" class="field__hint">上传完成后自动生成</span>
-          </span>
-          <input
-            v-model="draft.videoUrl"
-            type="text"
-            :readonly="isUpload"
-            :placeholder="isUpload ? '选择本地视频并保存后自动回填' : 'https://.../video.mp4（正式环境填 OSS 直链）'"
-          />
-          <p v-if="errors.videoUrl" class="field__error">{{ errors.videoUrl }}</p>
-        </label>
+        <!-- 视频来源：固定本地上传，隐藏切换 -->
 
         <!-- 本地视频上传 -->
-        <div v-if="isUpload" class="field">
+        <div class="field">
           <span class="field__label"><em class="req">*</em>上传视频</span>
           <input
             ref="videoInput"
