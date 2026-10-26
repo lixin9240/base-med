@@ -410,7 +410,7 @@ async function submitForm() {
             <input v-model="form.email" class="input" type="email" />
           </label>
 
-          <label class="field">
+          <label class="field field--role">
             <span class="field__label">角色</span>
             <select v-model="form.role" class="select">
               <option value="admin">admin</option>
@@ -911,6 +911,10 @@ async function submitForm() {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
+}
+
+.field--role {
+  display: none;
 }
 
 .field__label {
