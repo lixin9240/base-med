@@ -290,7 +290,6 @@ function goLottery() {
           </div>
         </div>
         <button
-          v-if="video.examState?.pre_submitted === 1"
           type="button"
           class="btn btn--secondary btn--lg btn--block learn__lottery"
           @click="goLottery"

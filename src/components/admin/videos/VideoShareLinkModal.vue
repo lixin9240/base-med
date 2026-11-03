@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { generateAdminShareLink, getAdminShareLinkDetail, revokeAdminShareLink } from '@/api'
 import { SHARE_TTL_OPTIONS } from '@/utils/video/constants'
-import { formatDateTime, isShareExpired } from '@/utils/video/share'
+import { formatDateTime, isShareExpired, rewriteShareOrigin } from '@/utils/video/share'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -91,10 +91,11 @@ function parseDateTime(value) {
   return Number.isNaN(time) ? null : time
 }
 
-/** 补上弹窗展示需要的运行时字段 */
+/** 补上弹窗展示需要的运行时字段，并把链接前缀换成已部署的用户端 */
 function decorateLink(item) {
   return {
     ...item,
+    url: rewriteShareOrigin(item.url),
     status: Number(item.status ?? 1) === 0 ? 0 : 1,
     createdAt: parseDateTime(item.created_at) ?? Date.now(),
     expiresAt: parseDateTime(item.expire_at),

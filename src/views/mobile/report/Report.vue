@@ -34,19 +34,22 @@ onMounted(async () => {
   const videoId = String(route.query.videoId || '')
   const examRecordId = String(route.query.examRecordId || '')
   if (!videoId && !examRecordId) {
-    router.replace('/mobile/home')
+    loading.value = false
+    return
+  }
+  const drId = currentDrId()
+  if (!drId) {
+    loading.value = false
     return
   }
   try {
-    const drId = currentDrId()
-    if (!drId) {
-      router.replace('/mobile/home')
-      return
-    }
-    const data = await getExamResult({
-      dr_id: drId,
-      ...(examRecordId ? { exam_record_id: examRecordId } : { video_id: videoId }),
-    })
+    const data = await getExamResult(
+      {
+        dr_id: drId,
+        ...(examRecordId ? { exam_record_id: examRecordId } : { video_id: videoId }),
+      },
+      { skipAuthRedirect: true },
+    )
     record.value = {
       examRecordId: data.exam_record_id,
       videoId: data.video_id,
@@ -122,13 +125,7 @@ function correctAnswerLabel(item) {
 }
 
 function goLottery() {
-  router.push({
-    name: 'mobile-lottery',
-    query: {
-      videoId: record.value?.videoId,
-      examRecordId: record.value?.examRecordId,
-    },
-  })
+  router.push({ name: 'mobile-lottery' })
 }
 </script>
 
@@ -140,6 +137,13 @@ function goLottery() {
     :answered-people="answeredPeople"
     :winner-people="winnerPeople"
     />
+
+    <section class="lottery-entry">
+      <button type="button" class="btn btn--primary btn--lg btn--block" @click="goLottery">
+        参与抽奖
+      </button>
+      <p class="lottery-entry__hint">每天 3 次机会，中奖后填写手机号领取</p>
+    </section>
 
     <div v-if="error" class="empty">
       <div class="empty__icon">
@@ -172,13 +176,6 @@ function goLottery() {
           <AppIcon name="arrowRight" :size="13" />
           看完答题 {{ record.postCorrect }}/{{ record.postTotal }}
         </p>
-      </section>
-
-      <section class="lottery-entry">
-        <button type="button" class="btn btn--primary btn--lg btn--block" @click="goLottery">
-          参与抽奖
-        </button>
-        <p class="lottery-entry__hint">每天 3 次机会，中奖后填写手机号领取</p>
       </section>
 
       <section class="review">

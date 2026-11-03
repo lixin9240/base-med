@@ -1,11 +1,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import { toast } from '@/utils/toast'
-import { currentDrId } from '@/store/mobile/session'
-import { claimLotteryPrize, drawLottery, getLotteryInfo } from '@/api/public'
+import { claimLocalLottery, drawLocalLottery, getLocalLotteryInfo } from '@/store/mobile/lottery'
 
 const SPIN_DURATION = 4200
 const SECTOR_TONES = [
@@ -22,12 +20,6 @@ const PRIZE_LINE_BREAK = {
   '健康咨询 30 分钟': ['健康咨询', '30 分钟'],
 }
 
-const route = useRoute()
-const router = useRouter()
-const videoId = String(route.query.videoId || '')
-const examRecordId = String(route.query.examRecordId || '')
-
-const drId = ref('')
 const loading = ref(true)
 const error = ref('')
 const prizes = ref([])
@@ -110,12 +102,8 @@ function startTicker() {
   }, 3000)
 }
 
-async function loadInfo() {
-  const data = await getLotteryInfo({
-    dr_id: drId.value,
-    video_id: videoId,
-    exam_record_id: examRecordId,
-  })
+function loadInfo() {
+  const data = getLocalLotteryInfo()
   prizes.value = (Array.isArray(data.prizes) ? [...data.prizes] : []).sort(
     (a, b) => Number(a.sector_index ?? 0) - Number(b.sector_index ?? 0),
   )
@@ -125,15 +113,9 @@ async function loadInfo() {
   if (winners.value.length) winnerIndex.value = 0
 }
 
-onMounted(async () => {
-  const id = currentDrId()
-  if (!id || !videoId) {
-    router.replace('/mobile/home')
-    return
-  }
-  drId.value = id
+onMounted(() => {
   try {
-    await loadInfo()
+    loadInfo()
     if (pendingClaim.value) openClaim(pendingClaim.value)
     startTicker()
   } catch (e) {
@@ -163,11 +145,7 @@ async function startDraw() {
   spinning.value = true
   resultOpen.value = false
   try {
-    const data = await drawLottery({
-      dr_id: drId.value,
-      video_id: videoId,
-      exam_record_id: examRecordId,
-    })
+    const data = drawLocalLottery()
     const sector = Number(data.prize?.sector_index) || 0
     const angle = sectorAngle.value
     const jitter = Math.random() * (angle - 24) - (angle - 24) / 2
@@ -233,15 +211,14 @@ async function submitClaim() {
   }
   claiming.value = true
   try {
-    await claimLotteryPrize({
-      dr_id: drId.value,
+    claimLocalLottery({
       record_id: claimRecord.value.record_id,
       phone: phone.value,
     })
     claimOpen.value = false
     pendingClaim.value = null
     toast('领取成功，请留意工作人员联系')
-    await loadInfo()
+    loadInfo()
   } catch (e) {
     toast(e?.message || '领取失败')
   } finally {
