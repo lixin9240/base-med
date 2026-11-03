@@ -1,7 +1,7 @@
 import { clearAdminAuth, getAdminToken, isSkipAdminAuth } from '@/store/admin/auth'
-import { handleMockDownload, handleMockRequest, isMockEnabled } from '@/mocks/backend'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? ''
+// 生产包读不到 .env.development。未配置时直接请求这台后端，避免打到前端自己的域名。
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://47.108.175.101:6327'
 
 async function parseBody(response) {
   const text = await response.text()
@@ -32,11 +32,6 @@ function buildHeaders(options) {
 }
 
 export async function request(path, options = {}) {
-  if (isMockEnabled()) {
-    const mocked = handleMockRequest(path, options)
-    if (mocked !== undefined) return mocked
-  }
-
   const headers = buildHeaders(options)
 
   const response = await fetch(resolveUrl(path), {
@@ -105,11 +100,6 @@ function parseFileName(disposition) {
  * 服务端出错时会返回 JSON 信封，这里按同一规则解析并抛错。
  */
 export async function requestDownload(path, options = {}) {
-  if (isMockEnabled()) {
-    const mocked = handleMockDownload(path)
-    if (mocked) return mocked
-  }
-
   const response = await fetch(resolveUrl(path), {
     ...options,
     headers: buildHeaders(options),

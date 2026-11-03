@@ -1,0 +1,1 @@
+import{S as e,l as t}from"./runtime-core.esm-bundler-XR1XXNT1.js";import{t as n}from"./_plugin-vue_export-helper-BDNMzG2s.js";var r={};function i(n,r){return e(),t(`p`,null,`巩固答题（待开发）`)}var a=n(r,[[`render`,i]]);export{a as default};

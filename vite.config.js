@@ -16,7 +16,7 @@ export default defineConfig({
     proxy: {
       // 开发环境把 /api 转发到后端内网穿透地址，前端仍请求相对路径
       '/api': {
-        target: 'http://47.114.49.68:7462/',
+        target: 'http://47.108.175.101:6327/',
         changeOrigin: true,
       },
     },
