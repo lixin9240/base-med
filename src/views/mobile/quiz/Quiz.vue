@@ -1,9 +1,11 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
+import QuizSplash from '@/components/mobile/QuizSplash.vue'
+import { speak } from '@/utils/speech'
 import { toast } from '@/utils/toast'
 import { currentDrId, isSkipWatch, issueDrId } from '@/store/mobile/session'
 import {
@@ -36,11 +38,22 @@ const ready = ref(false)
 const error = ref('')
 const answeredCount = ref(0)
 const submitting = ref(false)
+/** 本次进入是否正在播开屏。学前、再次答题会播；看完视频后的那次不播 */
+const showSplash = ref(false)
+
+// TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
+const answeredPeople = 1286
+const winnerPeople = 357
 
 const isPre = computed(() => stage.value === 'pre')
 const stageTitle = computed(() =>
   isRetake ? '再次答题' : isPre.value ? '学前答题' : '看完答题',
 )
+const splashCue = computed(() => {
+  const title = course.value?.title
+  if (!isPre.value || !title) return ''
+  return `即将开始《${title}》的学前答题`
+})
 
 function categoryIcon(category) {
   if (category === '影像检查') return 'monitor'
@@ -54,6 +67,29 @@ function categoryTone(category) {
   if (category === '妇幼保健' || category === '慢病管理') return 'pink'
   if (category === '用药安全') return 'lavender'
   return 'mint'
+}
+
+watch(error, (value) => {
+  if (value) showSplash.value = false
+})
+
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function armSplash() {
+  if (prefersReducedMotion()) return
+  showSplash.value = true
+}
+
+function onSplashFinished() {
+  showSplash.value = false
+}
+
+/** 确认会留在答题页后再开屏。看完视频后的那次答题直接出题 */
+function revealQuiz() {
+  if (isPre.value || isRetake) armSplash()
+  ready.value = true
 }
 
 onMounted(async () => {
@@ -80,8 +116,11 @@ onMounted(async () => {
     questions.value = await listPublicQuestions(videoId)
 
     if (!questions.value.length) {
-      ready.value = true
-      if (!isPre.value) router.replace({ name: 'mobile-learn', query: { videoId } })
+      if (!isPre.value) {
+        router.replace({ name: 'mobile-learn', query: { videoId } })
+        return
+      }
+      revealQuiz()
       return
     }
 
@@ -90,6 +129,7 @@ onMounted(async () => {
       if (!course.value.examState?.pre_submitted) {
         toast('请先完成学前答题')
         router.replace({ name: 'mobile-quiz', query: { videoId, stage: 'pre' } })
+        revealQuiz()
         return
       }
       if (course.value.videoUrl && !isSkipWatch(videoId) && course.value.watchProgress?.is_unlocked !== 1) {
@@ -99,7 +139,7 @@ onMounted(async () => {
       }
     }
 
-    ready.value = true
+    revealQuiz()
   } catch (e) {
     error.value = e?.message || '加载失败'
   }
@@ -126,6 +166,7 @@ async function onSubmit(answers) {
         })),
       })
       toast('前测完成')
+      speak(`学前答题结束。请观看《${course.value?.title || '本视频'}》`)
       router.replace({ name: 'mobile-learn', query: { videoId } })
       return
     }
@@ -151,10 +192,12 @@ async function onSubmit(answers) {
 
 <template>
   <div class="qp">
-    <PageNav :title="stageTitle">
-      <template #right>
-        <span class="qp__progress">{{ answeredCount }}/{{ questions.length }}</span>
-      </template>
+    <PageNav
+      :title="stageTitle"
+      :show-back="false"
+      :answered-people="answeredPeople"
+      :winner-people="winnerPeople"
+    >
     </PageNav>
 
     <div v-if="error" class="empty">
@@ -211,6 +254,8 @@ async function onSubmit(answers) {
         </div>
       </div>
     </template>
+
+    <QuizSplash v-if="showSplash" :can-leave="ready" :cue="splashCue" @finished="onSplashFinished" />
   </div>
 </template>
 

@@ -41,13 +41,26 @@ class VideoService
     {
         $page = (int) ($params['page'] ?? 1);
         $pageSize = (int) ($params['page_size'] ?? 20);
+        $keyword = trim((string) ($params['keyword'] ?? ''));
 
-        $paginator = Video::query()
+        $query = Video::query()
             ->with('category:id,name')
             ->withCount([
                 'videoQuestions as question_count',
                 'examRecords as answer_times',
-            ])
+            ]);
+
+        if ($keyword !== '') {
+            $query->where(function ($q) use ($keyword) {
+                $q->where('title', 'like', "%{$keyword}%")
+                  ->orWhere('speaker', 'like', "%{$keyword}%")
+                  ->orWhereHas('category', function ($cq) use ($keyword) {
+                      $cq->where('name', 'like', "%{$keyword}%");
+                  });
+            });
+        }
+
+        $paginator = $query
             ->orderBy('sort_order')
             ->orderByDesc('id')
             ->paginate($pageSize, ['*'], 'page', $page);

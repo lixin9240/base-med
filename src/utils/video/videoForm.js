@@ -11,7 +11,7 @@ export function createVideoDraft(video) {
     speakerTitle: video?.speakerTitle ?? '',
     speakerOrg: video?.speakerOrg ?? '',
     intro: video?.intro ?? '',
-    source: VIDEO_SOURCE.URL,
+    source: VIDEO_SOURCE.UPLOAD,
     videoUrl: video?.videoUrl ?? '',
     cover: video?.cover ?? '',
     articleBody: video?.articleBody ?? '',

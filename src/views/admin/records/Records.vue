@@ -348,7 +348,6 @@ function closeDetail() {
         <span class="col col--uid">编号</span>
         <span class="col col--score">前测</span>
         <span class="col col--score">看课答题</span>
-        <span class="col col--percent">正确率</span>
         <span class="col col--result">结果</span>
         <span class="col col--ops">操作</span>
       </div>
@@ -359,9 +358,6 @@ function closeDetail() {
         <span class="col col--uid">{{ record.userId }}</span>
         <span class="col col--score">{{ record.preCorrect }}/{{ record.preTotal }}</span>
         <span class="col col--score">{{ record.postCorrect }}/{{ record.postTotal }}</span>
-        <span class="col col--percent" :class="record.passed ? 'percent--pass' : 'percent--fail'">
-          {{ record.percent }}%
-        </span>
         <span class="col col--result">
           <span class="badge" :class="record.passed ? 'badge--success' : 'badge--warning'">
             <span class="badge__dot"></span>

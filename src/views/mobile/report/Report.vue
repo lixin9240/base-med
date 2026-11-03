@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import { QUESTION_TYPE_LABEL } from '@/utils/question'
+import { speak } from '@/utils/speech'
 import { currentDrId } from '@/store/mobile/session'
 import { getExamResult } from '@/api/public'
 
@@ -11,6 +12,10 @@ const route = useRoute()
 const router = useRouter()
 const record = ref(null)
 const error = ref('')
+const loading = ref(true)
+// TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
+const answeredPeople = 1286
+const winnerPeople = 357
 
 function mapDetailItem(item) {
   return {
@@ -53,10 +58,19 @@ onMounted(async () => {
       preTotal: data.pre?.total ?? 0,
       postCorrect: data.post?.correct ?? 0,
       postTotal: data.post?.total ?? 0,
+      // TODO: 后端结果接口暂未返回这两项统计，先使用占位数据
+      answeredCount: 128,
+      winnerCount: 36,
       detail: (data.question_detail || []).map(mapDetailItem),
+    }
+    const percent = Number(record.value.percent)
+    if (Number.isFinite(percent)) {
+      speak(`答题结束。正确率百分之${percent}，${record.value.passed ? '已通过' : '未通过'}`)
     }
   } catch (e) {
     error.value = e?.message || '加载失败'
+  } finally {
+    loading.value = false
   }
 })
 
@@ -106,22 +120,36 @@ function correctAnswerLabel(item) {
   }
   return item.answer || ''
 }
+
+function goLottery() {
+  router.push({
+    name: 'mobile-lottery',
+    query: {
+      videoId: record.value?.videoId,
+      examRecordId: record.value?.examRecordId,
+    },
+  })
+}
 </script>
 
 <template>
   <div class="result">
-    <PageNav title="答题结果" />
+    <PageNav
+     title="答题结果"
+    :show-back="false"
+    :answered-people="answeredPeople"
+    :winner-people="winnerPeople"
+    />
 
     <div v-if="error" class="empty">
       <div class="empty__icon">
         <AppIcon name="alert" :size="44" />
       </div>
       <p class="empty__text">{{ error }}</p>
-      <div class="empty__actions">
-        <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
-          返回视频列表
-        </button>
-      </div>
+    </div>
+
+    <div v-else-if="loading" class="empty">
+      <p class="empty__text">加载中…</p>
     </div>
 
     <template v-else-if="record">
@@ -144,6 +172,13 @@ function correctAnswerLabel(item) {
           <AppIcon name="arrowRight" :size="13" />
           看完答题 {{ record.postCorrect }}/{{ record.postTotal }}
         </p>
+      </section>
+
+      <section class="lottery-entry">
+        <button type="button" class="btn btn--primary btn--lg btn--block" @click="goLottery">
+          参与抽奖
+        </button>
+        <p class="lottery-entry__hint">每天 3 次机会，中奖后填写手机号领取</p>
       </section>
 
       <section class="review">
@@ -176,28 +211,6 @@ function correctAnswerLabel(item) {
           </p>
         </article>
       </section>
-
-      <section class="actions">
-        <button
-          type="button"
-          class="btn btn--primary btn--lg btn--block"
-          @click="router.replace({ name: 'mobile-quiz', query: { videoId: record.videoId, stage: 'retake' } })"
-        >
-          再答一次
-        </button>
-        <div class="actions__row">
-          <button
-            type="button"
-            class="btn btn--secondary btn--md"
-            @click="router.replace({ name: 'mobile-learn', query: { videoId: record.videoId } })"
-          >
-            重看视频
-          </button>
-          <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
-            返回列表
-          </button>
-        </div>
-      </section>
     </template>
 
     <div v-else class="empty">
@@ -205,11 +218,6 @@ function correctAnswerLabel(item) {
         <AppIcon name="inbox" :size="44" />
       </div>
       <p class="empty__text">未找到这次答题记录</p>
-      <div class="empty__actions">
-        <button type="button" class="btn btn--secondary btn--md" @click="router.replace('/mobile/home')">
-          返回视频列表
-        </button>
-      </div>
     </div>
   </div>
 </template>
@@ -304,9 +312,6 @@ function correctAnswerLabel(item) {
   .review {
     margin: 0 var(--sp-3);
   }
-  .actions {
-    margin: var(--sp-5) var(--sp-3) 0;
-  }
 }
 
 .hero__total {
@@ -328,6 +333,17 @@ function correctAnswerLabel(item) {
   padding: 5px 12px;
   background: var(--bg-muted);
   border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.lottery-entry {
+  margin: 0 var(--sp-4) var(--sp-4);
+  text-align: center;
+}
+
+.lottery-entry__hint {
+  margin: var(--sp-2) 0 0;
   font-size: var(--fs-xs);
   color: var(--text-secondary);
 }
@@ -440,19 +456,5 @@ function correctAnswerLabel(item) {
 .rop__tag {
   font-size: 11px;
   font-weight: var(--fw-semibold);
-}
-
-.actions {
-  margin: var(--sp-5) var(--sp-4) 0;
-}
-
-.actions__row {
-  display: flex;
-  gap: var(--sp-2);
-  margin-top: var(--sp-3);
-}
-
-.actions__row > .btn {
-  flex: 1;
 }
 </style>

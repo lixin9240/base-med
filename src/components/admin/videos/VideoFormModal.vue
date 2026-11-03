@@ -75,12 +75,26 @@ function categoryIdOf(name) {
   return matched ? matched.id : null
 }
 
+/** 当前分类没有接口 id 时，改用分类接口返回的第一项，保证保存能带上 category_id */
+function alignCategory() {
+  if (categoryIdOf(draft.category) !== null) return
+  const first = props.categories?.[0]
+  if (first?.name) draft.category = first.name
+}
+
 watch(
   () => props.open,
   (open) => {
     if (open) reset()
   },
   { immediate: true },
+)
+
+watch(
+  () => props.categories,
+  () => {
+    if (props.open) alignCategory()
+  },
 )
 
 function nextOrder() {
@@ -101,6 +115,7 @@ function reset() {
   uploadingCover.value = false
   if (videoInput.value) videoInput.value.value = ''
   if (coverInput.value) coverInput.value.value = ''
+  alignCategory()
 }
 
 function clearError(key) {
@@ -217,7 +232,11 @@ async function submit() {
     // 新增和编辑都要提交真实的 category_id
     const categoryId = categoryIdOf(draft.category)
     if (categoryId === null) {
-      errors.value = { ...errors.value, category: '该分类不在分类列表中，请重新选择' }
+      const message = props.categories?.length
+        ? '该分类不在分类列表中，请重新选择'
+        : '分类列表还没加载成功，请关闭弹窗后重试'
+      errors.value = { ...errors.value, category: message }
+      uploadError.value = message
       return
     }
 
@@ -358,52 +377,10 @@ async function submit() {
           <p v-if="errors.intro" class="field__error">{{ errors.intro }}</p>
         </label>
 
-        <!-- 视频来源 -->
-        <div class="field">
-          <span class="field__label"><em class="req">*</em>视频来源</span>
-          <div class="radio-group">
-            <label class="radio" :class="{ 'radio--on': !isUpload }">
-              <input
-                type="radio"
-                name="video-source"
-                :value="VIDEO_SOURCE.URL"
-                :checked="!isUpload"
-                @change="selectSource(VIDEO_SOURCE.URL)"
-              />
-              <span class="radio__dot"></span>
-              填写视频链接
-            </label>
-            <label class="radio" :class="{ 'radio--on': isUpload }">
-              <input
-                type="radio"
-                name="video-source"
-                :value="VIDEO_SOURCE.UPLOAD"
-                :checked="isUpload"
-                @change="selectSource(VIDEO_SOURCE.UPLOAD)"
-              />
-              <span class="radio__dot"></span>
-              本地上传
-            </label>
-          </div>
-        </div>
-
-        <!-- 视频链接：本地上传时由后端上传完成后自动回填，只读展示 -->
-        <label class="field">
-          <span class="field__label">
-            <em v-if="!isUpload" class="req">*</em>视频链接
-            <span v-if="isUpload" class="field__hint">上传完成后自动生成</span>
-          </span>
-          <input
-            v-model="draft.videoUrl"
-            type="text"
-            :readonly="isUpload"
-            :placeholder="isUpload ? '选择本地视频并保存后自动回填' : 'https://.../video.mp4（正式环境填 OSS 直链）'"
-          />
-          <p v-if="errors.videoUrl" class="field__error">{{ errors.videoUrl }}</p>
-        </label>
+        <!-- 视频来源：固定本地上传，隐藏切换 -->
 
         <!-- 本地视频上传 -->
-        <div v-if="isUpload" class="field">
+        <div class="field">
           <span class="field__label"><em class="req">*</em>上传视频</span>
           <input
             ref="videoInput"

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import { formatArticleHtml } from '@/utils/article'
+import { speak, whenSpeechEnds } from '@/utils/speech'
 import { toast } from '@/utils/toast'
 import { getPublicVideoDetail, reportVideoProgress } from '@/api/public'
 import { currentDrId, issueDrId, setSkipWatch } from '@/store/mobile/session'
@@ -23,6 +24,10 @@ const canQuiz = ref(false) // 是否已解锁后测
 const badRate = ref(false)
 const noVideoMode = ref(false)
 const loading = ref(true)
+
+// TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
+const answeredPeople = 1286
+const winnerPeople = 357
 
 let maxTime = 0 // 最大观看位置（秒）
 let reportTimer = null
@@ -70,6 +75,7 @@ onMounted(async () => {
       maxTime = Number(wp.watched_seconds) || 0
       reportTimer = window.setInterval(reportProgress, 3000)
       await nextTick()
+      await whenSpeechEnds()
       await tryAutoPlay()
     }
     document.addEventListener('visibilitychange', onVisibility)
@@ -177,13 +183,24 @@ function onVideoError() {
 async function goQuiz() {
   // 跳转前先把进度同步到后端，确保后端 is_unlocked 已更新（否则长视频到 90% 点去答题会被后测门槛弹回）
   await reportProgress()
+  const title = video.value?.title
+  speak(title ? `视频已看完，开始《${title}》的看完答题` : '视频已看完，开始看完答题')
   router.push({ name: 'mobile-quiz', query: { videoId, stage: 'post' } })
+}
+
+function goLottery() {
+  router.push({ name: 'mobile-lottery', query: { videoId } })
 }
 </script>
 
 <template>
   <div class="learn">
-    <PageNav title="观看视频" />
+    <PageNav
+      title="观看视频"
+      :show-back="false"
+      :answered-people="answeredPeople"
+      :winner-people="winnerPeople"
+    />
 
     <div v-if="error" class="empty">
       <div class="empty__icon">
@@ -272,6 +289,14 @@ async function goQuiz() {
             <div class="learn__bar-fill" :class="{ 'is-ok': canQuiz }" :style="{ width: `${Math.min(100, watched)}%` }" />
           </div>
         </div>
+        <button
+          v-if="video.examState?.pre_submitted === 1"
+          type="button"
+          class="btn btn--secondary btn--lg btn--block learn__lottery"
+          @click="goLottery"
+        >
+          参与抽奖
+        </button>
         <button type="button" class="btn btn--primary btn--lg btn--block" :disabled="!canQuiz" @click="goQuiz">
           {{ canQuiz ? '去答题' : `请看完视频（${required}% 后可答题）` }}
         </button>
@@ -285,7 +310,7 @@ async function goQuiz() {
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg-page);
-  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(210px + env(safe-area-inset-bottom, 0px));
   margin: calc(-1 * var(--sp-4));
   margin-top: calc(-1 * var(--sp-4));
   margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
@@ -448,6 +473,10 @@ async function goQuiz() {
   .learn__footer {
     background: var(--bg-surface-solid);
   }
+}
+
+.learn__lottery {
+  margin-bottom: var(--sp-2);
 }
 
 .learn__bar-head {

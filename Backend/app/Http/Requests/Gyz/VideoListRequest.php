@@ -27,6 +27,7 @@ class VideoListRequest extends FormRequest
         return [
             'page' => ['nullable', 'integer', 'min:1'],
             'page_size' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'keyword' => ['nullable', 'string', 'max:64'],
         ];
     }
 
@@ -41,6 +42,8 @@ class VideoListRequest extends FormRequest
             'page_size.integer' => '每页条数必须为整数',
             'page_size.min' => '每页条数最小为1',
             'page_size.max' => '每页条数最大为100',
+            'keyword.string' => '搜索关键词必须为字符串',
+            'keyword.max' => '搜索关键词最长64个字符',
         ];
     }
 }

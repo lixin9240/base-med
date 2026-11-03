@@ -1,0 +1,1 @@
+var e={single:`单选题`,multiple:`多选题`,judge:`判断题`};function t(e){return String.fromCharCode(65+e)}function n(e){return e==null||e===``?!1:!Array.isArray(e)||e.length>0}export{n,t as r,e as t};

@@ -104,11 +104,6 @@ async function load() {
   }
 }
 
-function countTone(count) {
-  if (count >= REQUIRED_QUESTION_COUNT) return 'success'
-  return count > 0 ? 'warning' : 'danger'
-}
-
 function isCorrect(question, index) {
   const letter = optionLetter(index)
   return Array.isArray(question.answer)
@@ -229,12 +224,7 @@ async function onExport() {
         <header class="drawer__head">
           <div class="drawer__intro">
             <h2 class="drawer__title">{{ video?.title }}</h2>
-            <p class="drawer__sub">
-              配置题目
-              <span class="drawer__count" :class="`drawer__count--${countTone(questions.length)}`">
-                {{ questions.length }}/{{ REQUIRED_QUESTION_COUNT }}
-              </span>
-            </p>
+            <p class="drawer__sub">配置题目总数：{{ questions.length }}</p>
           </div>
           <button type="button" class="drawer__close" aria-label="关闭" @click="$emit('close')">
             <svg
@@ -516,31 +506,6 @@ async function onExport() {
 .drawer__close svg {
   width: 20px;
   height: 20px;
-}
-
-/* ===== 题目数 ===== */
-.drawer__count {
-  display: inline-flex;
-  margin-left: var(--sp-2);
-  padding: 1px 8px;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  border-radius: var(--r-full);
-}
-
-.drawer__count--success {
-  color: var(--success-text);
-  background: var(--success-bg);
-}
-
-.drawer__count--warning {
-  color: var(--warning-text);
-  background: var(--warning-bg);
-}
-
-.drawer__count--danger {
-  color: var(--danger-text);
-  background: var(--danger-bg);
 }
 
 /* ===== 操作区 ===== */

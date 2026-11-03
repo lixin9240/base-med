@@ -735,7 +735,7 @@
 ### 2.6.3 最容易答错的题
 - 路径：`/api/admin/statistics/wrong-question`
 - Method：GET
-- 返回：按错误率从高到低排序，对应「题干 / 所属视频 / 环节 / 作答次数 / 错误率」列：
+- 返回：每个视频取前测、后测错误率最高的一题（共 1~2 条）；前后测错误率最高的是同一道题时合并为一条（stage=both），否则各返回一条。结果按错误率从高到低排序，对应「题干 / 所属视频 / 环节 / 作答次数 / 错误率」列：
 
 ```json
 [
@@ -751,7 +751,7 @@
         "question_id": 205,
         "stem": "胸片可以完全代替胸部 CT 用于所有肺部疾病的诊断。",
         "video_title": "胸片检查前的准备与配合",
-        "stage": "pretest",
+        "stage": "both",
         "answer_times": 13,
         "wrong_rate": 54
     }
@@ -762,8 +762,8 @@
 | ------------ | ------ | -------------------------------------------------------- |
 | stem         | string | 「题干」列                                               |
 | video_title  | string | 「所属视频」列                                           |
-| stage        | string | 「环节」列：pretest 前测 / posttest 后测                 |
-| answer_times | int    | 「作答次数」列（exam_answer 计数）                       |
+| stage        | string | 「环节」列：pretest 前测 / posttest 后测 / both 前测+后测（前后测错误率最高为同一题时合并） |
+| answer_times | int    | 「作答次数」列（exam_answer 计数；stage=both 时为前后测累计） |
 | wrong_rate   | int    | 「错误率」列：答错次数 / 作答次数 × 100，降序排列        |
 
 ### 2.6.4 导出统计（「导出统计」按钮）
