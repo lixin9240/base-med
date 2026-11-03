@@ -138,12 +138,7 @@ function goLottery() {
     :winner-people="winnerPeople"
     />
 
-    <section class="lottery-entry">
-      <button type="button" class="btn btn--primary btn--lg btn--block" @click="goLottery">
-        参与抽奖
-      </button>
-      <p class="lottery-entry__hint">每天 3 次机会，中奖后填写手机号领取</p>
-    </section>
+
 
     <div v-if="error" class="empty">
       <div class="empty__icon">
@@ -177,7 +172,11 @@ function goLottery() {
           看完答题 {{ record.postCorrect }}/{{ record.postTotal }}
         </p>
       </section>
-
+      <section class="lottery-entry">
+      <button type="button" class="btn btn--primary btn--lg btn--block" @click="goLottery">
+        参与抽奖
+      </button>
+    </section>
       <section class="review">
         <h2 class="review__head">逐题解析</h2>
         <article v-for="(item, index) in record.detail" :key="item.questionId || index" class="rv">
