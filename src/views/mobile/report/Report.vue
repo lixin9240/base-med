@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import { QUESTION_TYPE_LABEL } from '@/utils/question'
+import { speak } from '@/utils/speech'
 import { currentDrId } from '@/store/mobile/session'
 import { getExamResult } from '@/api/public'
 
@@ -55,6 +56,10 @@ onMounted(async () => {
       postCorrect: data.post?.correct ?? 0,
       postTotal: data.post?.total ?? 0,
       detail: (data.question_detail || []).map(mapDetailItem),
+    }
+    const percent = Number(record.value.percent)
+    if (Number.isFinite(percent)) {
+      speak(`答题结束。正确率百分之${percent}，${record.value.passed ? '已通过' : '未通过'}`)
     }
   } catch (e) {
     error.value = e?.message || '加载失败'

@@ -5,6 +5,7 @@ import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
 import QuizSplash from '@/components/mobile/QuizSplash.vue'
+import { speak } from '@/utils/speech'
 import { toast } from '@/utils/toast'
 import { currentDrId, isSkipWatch, issueDrId } from '@/store/mobile/session'
 import {
@@ -44,6 +45,11 @@ const isPre = computed(() => stage.value === 'pre')
 const stageTitle = computed(() =>
   isRetake ? '再次答题' : isPre.value ? '学前答题' : '看完答题',
 )
+const splashCue = computed(() => {
+  const title = course.value?.title
+  if (!isPre.value || !title) return ''
+  return `即将开始《${title}》的学前答题`
+})
 
 function categoryIcon(category) {
   if (category === '影像检查') return 'monitor'
@@ -156,6 +162,7 @@ async function onSubmit(answers) {
         })),
       })
       toast('前测完成')
+      speak(`学前答题结束。请观看《${course.value?.title || '本视频'}》`)
       router.replace({ name: 'mobile-learn', query: { videoId } })
       return
     }
@@ -242,7 +249,7 @@ async function onSubmit(answers) {
       </div>
     </template>
 
-    <QuizSplash v-if="showSplash" :can-leave="ready" @finished="onSplashFinished" />
+    <QuizSplash v-if="showSplash" :can-leave="ready" :cue="splashCue" @finished="onSplashFinished" />
   </div>
 </template>
 

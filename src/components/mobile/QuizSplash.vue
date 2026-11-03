@@ -1,9 +1,12 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { speak } from '@/utils/speech'
 
 const props = defineProps({
   /** 题目已就绪后，进度条才收成「开始答题」 */
   canLeave: { type: Boolean, default: false },
+  /** 点击开始时朗读的句子，没有则不播 */
+  cue: { type: String, default: '' },
 })
 
 const emit = defineEmits(['finished'])
@@ -39,6 +42,7 @@ function beginLeave() {
 }
 
 function onStart() {
+  if (props.cue) speak(props.cue)
   beginLeave()
 }
 

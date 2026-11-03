@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import { formatArticleHtml } from '@/utils/article'
+import { speak, whenSpeechEnds } from '@/utils/speech'
 import { toast } from '@/utils/toast'
 import { getPublicVideoDetail, reportVideoProgress } from '@/api/public'
 import { currentDrId, issueDrId, setSkipWatch } from '@/store/mobile/session'
@@ -70,6 +71,7 @@ onMounted(async () => {
       maxTime = Number(wp.watched_seconds) || 0
       reportTimer = window.setInterval(reportProgress, 3000)
       await nextTick()
+      await whenSpeechEnds()
       await tryAutoPlay()
     }
     document.addEventListener('visibilitychange', onVisibility)
@@ -177,6 +179,8 @@ function onVideoError() {
 async function goQuiz() {
   // 跳转前先把进度同步到后端，确保后端 is_unlocked 已更新（否则长视频到 90% 点去答题会被后测门槛弹回）
   await reportProgress()
+  const title = video.value?.title
+  speak(title ? `视频已看完，开始《${title}》的看完答题` : '视频已看完，开始看完答题')
   router.push({ name: 'mobile-quiz', query: { videoId, stage: 'post' } })
 }
 </script>
