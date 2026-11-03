@@ -141,11 +141,6 @@ function goLottery() {
     :winner-people="winnerPeople"
     />
 
-<<<<<<< Updated upstream
-
-
-=======
->>>>>>> Stashed changes
     <div v-if="error" class="empty">
       <div class="empty__icon">
         <AppIcon name="alert" :size="44" />
@@ -178,13 +173,6 @@ function goLottery() {
           看完答题 {{ record.postCorrect }}/{{ record.postTotal }}
         </p>
       </section>
-<<<<<<< Updated upstream
-      <section class="lottery-entry">
-      <button type="button" class="btn btn--primary btn--lg btn--block" @click="goLottery">
-        参与抽奖
-      </button>
-    </section>
-=======
 
       <section class="lottery-entry">
         <button type="button" class="btn btn--primary btn--lg btn--block" @click="goLottery">
@@ -192,7 +180,6 @@ function goLottery() {
         </button>
       </section>
 
->>>>>>> Stashed changes
       <section class="review">
         <h2 class="review__head">逐题解析</h2>
         <article v-for="(item, index) in record.detail" :key="item.questionId || index" class="rv">
