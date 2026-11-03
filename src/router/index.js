@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { getAdminToken } from '@/store/admin/auth'
-
-const WHITE_LIST = ['/admin/login', '/admin/forget-password']
+// 路由守卫已临时关闭，恢复时一并取消下面两行注释。见 docs/代码修改记录/2026-11-03.md
+// import { getAdminToken, isSkipAdminAuth } from '@/store/admin/auth'
+// const WHITE_LIST = ['/admin/login', '/admin/forget-password']
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -82,28 +82,28 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
-  const token = getAdminToken()
-
-  // 管理端公开页：已登录直接跳首页
-  if (WHITE_LIST.includes(to.path)) {
-    if (token && to.path === '/admin/login') {
-      return { path: '/admin/videos' }
-    }
-    return true
-  }
-
-  // 管理端非公开页：无 token 跳登录，带 redirect
-  if (to.path.startsWith('/admin')) {
-    if (!token) {
-      return {
-        path: '/admin/login',
-        query: to.fullPath !== '/admin/login' ? { redirect: to.fullPath } : {},
-      }
-    }
-  }
-
-  return true
-})
+// 临时关闭管理端登录拦截，保证未登录也能走完页面。
+// 恢复时取消注释，并恢复文件顶部的 getAdminToken / WHITE_LIST。
+// router.beforeEach((to) => {
+//   const signedIn = Boolean(getAdminToken()) || isSkipAdminAuth()
+//
+//   if (WHITE_LIST.includes(to.path)) {
+//     if (signedIn && to.path === '/admin/login') {
+//       return { path: '/admin/videos' }
+//     }
+//     return true
+//   }
+//
+//   if (to.path.startsWith('/admin')) {
+//     if (!signedIn) {
+//       return {
+//         path: '/admin/login',
+//         query: to.fullPath !== '/admin/login' ? { redirect: to.fullPath } : {},
+//       }
+//     }
+//   }
+//
+//   return true
+// })
 
 export default router

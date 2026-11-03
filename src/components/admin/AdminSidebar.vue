@@ -1,10 +1,13 @@
 <script setup>
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { adminLogout } from '@/api'
-import { clearAdminAuth, getAdminToken } from '@/store/admin/auth'
+import { clearAdminAuth, ensureDevAdminProfile, getAdminInfo, getAdminToken, isSkipAdminAuth } from '@/store/admin/auth'
 
 const route = useRoute()
 const router = useRouter()
+const profile = ref(getAdminInfo())
+const adminLabel = computed(() => profile.value?.name || profile.value?.username || '')
 
 const menuItems = [
   { label: '视频管理', name: 'admin-videos' },
@@ -14,13 +17,20 @@ const menuItems = [
 ]
 
 async function handleLogout() {
+  const skipLogin = isSkipAdminAuth()
   try {
-    if (getAdminToken()) await adminLogout()
+    if (!skipLogin && getAdminToken()) await adminLogout()
   } catch (error) {
     console.error('[admin] logout failed', error)
   } finally {
     // 无论接口是否成功，本地登录态都要清掉
     clearAdminAuth()
+    if (skipLogin) {
+      ensureDevAdminProfile()
+      profile.value = getAdminInfo()
+      router.push('/admin/videos')
+      return
+    }
     router.push('/admin/login')
   }
 }
@@ -28,7 +38,10 @@ async function handleLogout() {
 
 <template>
   <aside class="admin-sidebar">
-    <div class="admin-sidebar__brand">Base-Med</div>
+    <div class="admin-sidebar__brand">
+      <span>Base-Med</span>
+      <span v-if="adminLabel" class="admin-sidebar__user">{{ adminLabel }}</span>
+    </div>
 
     <nav class="admin-sidebar__nav">
       <RouterLink
@@ -57,11 +70,21 @@ async function handleLogout() {
 }
 
 .admin-sidebar__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   padding: var(--sp-4) var(--sp-5);
   font-size: var(--fs-lg);
   font-weight: var(--fw-bold);
   letter-spacing: 0.5px;
   border-bottom: 1px solid rgb(255 255 255 / 0.12);
+}
+
+.admin-sidebar__user {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  letter-spacing: 0;
+  color: rgb(255 255 255 / 0.72);
 }
 
 .admin-sidebar__nav {

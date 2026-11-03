@@ -1,4 +1,5 @@
-import { clearAdminAuth, getAdminToken } from '@/store/admin/auth'
+import { clearAdminAuth, getAdminToken, isSkipAdminAuth } from '@/store/admin/auth'
+import { handleMockDownload, handleMockRequest, isMockEnabled } from '@/mocks/backend'
 
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? ''
 
@@ -31,6 +32,11 @@ function buildHeaders(options) {
 }
 
 export async function request(path, options = {}) {
+  if (isMockEnabled()) {
+    const mocked = handleMockRequest(path, options)
+    if (mocked !== undefined) return mocked
+  }
+
   const headers = buildHeaders(options)
 
   const response = await fetch(resolveUrl(path), {
@@ -45,8 +51,8 @@ export async function request(path, options = {}) {
   const data = await parseBody(response)
 
   if (!response.ok) {
-    // 401 未授权：清 token 跳登录
-    if (response.status === 401) {
+    // 401 未授权：清 token 跳登录。本地免登录时留在当前页，让页面自己显示错误。
+    if (response.status === 401 && !isSkipAdminAuth()) {
       clearAdminAuth()
       const current = window.location.pathname + window.location.search
       if (!current.startsWith('/admin/login')) {
@@ -99,6 +105,11 @@ function parseFileName(disposition) {
  * 服务端出错时会返回 JSON 信封，这里按同一规则解析并抛错。
  */
 export async function requestDownload(path, options = {}) {
+  if (isMockEnabled()) {
+    const mocked = handleMockDownload(path)
+    if (mocked) return mocked
+  }
+
   const response = await fetch(resolveUrl(path), {
     ...options,
     headers: buildHeaders(options),
