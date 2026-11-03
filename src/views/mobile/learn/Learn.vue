@@ -187,6 +187,10 @@ async function goQuiz() {
   speak(title ? `视频已看完，开始《${title}》的看完答题` : '视频已看完，开始看完答题')
   router.push({ name: 'mobile-quiz', query: { videoId, stage: 'post' } })
 }
+
+function goLottery() {
+  router.push({ name: 'mobile-lottery', query: { videoId } })
+}
 </script>
 
 <template>
@@ -285,6 +289,14 @@ async function goQuiz() {
             <div class="learn__bar-fill" :class="{ 'is-ok': canQuiz }" :style="{ width: `${Math.min(100, watched)}%` }" />
           </div>
         </div>
+        <button
+          v-if="video.examState?.pre_submitted === 1"
+          type="button"
+          class="btn btn--secondary btn--lg btn--block learn__lottery"
+          @click="goLottery"
+        >
+          参与抽奖
+        </button>
         <button type="button" class="btn btn--primary btn--lg btn--block" :disabled="!canQuiz" @click="goQuiz">
           {{ canQuiz ? '去答题' : `请看完视频（${required}% 后可答题）` }}
         </button>
@@ -298,7 +310,7 @@ async function goQuiz() {
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg-page);
-  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(210px + env(safe-area-inset-bottom, 0px));
   margin: calc(-1 * var(--sp-4));
   margin-top: calc(-1 * var(--sp-4));
   margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
@@ -461,6 +473,10 @@ async function goQuiz() {
   .learn__footer {
     background: var(--bg-surface-solid);
   }
+}
+
+.learn__lottery {
+  margin-bottom: var(--sp-2);
 }
 
 .learn__bar-head {

@@ -442,14 +442,14 @@ function fireConfetti() {
           <button v-else type="button" class="btn btn--primary btn--lg btn--block" @click="closeResult">
             知道了
           </button>
-          <button
+          <!-- <button
             v-if="result.prize?.type === 'real'"
             type="button"
             class="lot-modal__later"
             @click="closeResult"
           >
             稍后填写
-          </button>
+          </button> -->
         </div>
       </div>
     </Transition>
@@ -478,7 +478,7 @@ function fireConfetti() {
         >
           {{ claiming ? '提交中…' : '确认领取' }}
         </button>
-        <button type="button" class="lot-modal__later" @click="closeClaim">稍后填写</button>
+        <!-- <button type="button" class="lot-modal__later" @click="closeClaim">稍后填写</button> -->
       </div>
     </div>
 
