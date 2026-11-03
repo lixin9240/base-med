@@ -11,9 +11,10 @@ import { currentDrId, issueDrId, setSkipWatch } from '@/store/mobile/session'
 
 const route = useRoute()
 const router = useRouter()
-const videoId = String(route.query.videoId || '')
-// 分享链接入口（后端生成的 H5 链接形如 /mobile/learn?video_id=5&share=xxx）
-const shareVideoId = String(route.query.video_id || '')
+const videoId = String(route.query.videoId || route.query.video_id || '')
+// 分享链接入口：兼容 videoId 与 video_id
+const shareToken = String(route.query.share || '')
+const shareVideoId = String(route.query.video_id || route.query.videoId || '')
 
 const video = ref(null)
 const error = ref('')
@@ -37,9 +38,16 @@ const articleHtml = computed(() => formatArticleHtml(video.value?.articleBody ||
 onMounted(async () => {
   try {
     // 通过分享链接进入：先签发匿名编号，再跳转到对应视频的前测题页面
-    if (shareVideoId) {
+    if (shareToken || shareVideoId) {
+      if (!shareVideoId) {
+        error.value = '链接缺少视频编号'
+        return
+      }
       await issueDrId(shareVideoId)
-      router.replace({ name: 'mobile-quiz', query: { videoId: shareVideoId, stage: 'pre' } })
+      router.replace({
+        name: 'mobile-quiz',
+        query: { videoId: shareVideoId, share: shareToken || undefined, stage: 'pre' },
+      })
       return
     }
 

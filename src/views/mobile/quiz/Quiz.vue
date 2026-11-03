@@ -18,8 +18,23 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+
+function queryText(source, key) {
+  const value = source?.[key]
+  if (Array.isArray(value)) return value[0] ? String(value[0]) : ''
+  return value ? String(value) : ''
+}
+
+/** 分享链接可能先落到首页再跳回答题，地址栏参数比首次路由更可靠 */
+function entryVideoId() {
+  const fromRoute = queryText(route.query, 'videoId') || queryText(route.query, 'video_id')
+  if (fromRoute) return fromRoute
+  const search = new URLSearchParams(window.location.search)
+  return search.get('videoId') || search.get('video_id') || ''
+}
+
 // 分享链接（后端生成）形如 /mobile/quiz?videoId=5&share=xxx，兼容 video_id 写法
-const videoId = String(route.query.videoId ?? route.query.video_id ?? '')
+let videoId = entryVideoId()
 const stageParam = String(route.query.stage || '')
 const isRetake = stageParam === 'retake'
 /**
@@ -94,13 +109,14 @@ function revealQuiz() {
 
 onMounted(async () => {
   try {
+    videoId = entryVideoId() || videoId
     drId.value = currentDrId()
     // 分享链接入口：直接打开 /mobile/quiz?videoId=X 时无 dr_id，先签发匿名编号再答题
     if (!drId.value && videoId) {
       drId.value = await issueDrId(videoId)
     }
-    if (!drId.value || !videoId) {
-      router.replace('/mobile/home')
+    if (!videoId || !drId.value) {
+      error.value = !videoId ? '链接缺少视频编号' : '进入失败，请重新打开链接'
       return
     }
     const detail = await getPublicVideoDetail(drId.value, videoId)
