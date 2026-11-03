@@ -10,6 +10,9 @@ const EXAM_SUBMIT_PRE_PATH = '/api/public/exam/submit-pre'
 const EXAM_SUBMIT_POST_PATH = '/api/public/exam/submit-post'
 const EXAM_RETAKE_PATH = '/api/public/exam/retake'
 const EXAM_RESULT_PATH = '/api/public/exam/result'
+const LOTTERY_INFO_PATH = '/api/public/lottery/info'
+const LOTTERY_DRAW_PATH = '/api/public/lottery/draw'
+const LOTTERY_CLAIM_PATH = '/api/public/lottery/claim'
 
 /** 3.1 获取匿名 DR 编号（点击视频时签发）。参数 video_id。返回 dr_id 字符串 */
 export async function createPublicDr(videoId) {
@@ -97,6 +100,38 @@ export async function getExamResult(params) {
   const body = await get(`${EXAM_RESULT_PATH}?${query}`)
   if (!body || typeof body !== 'object' || !body.data) {
     throw new Error('答题结果加载失败：服务未返回标准数据')
+  }
+  return body.data
+}
+
+/** 4.1 获取抽奖信息：奖品、剩余次数、最近中奖播报、待领取奖品 */
+export async function getLotteryInfo(params) {
+  const query = Object.entries(params)
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+    .join('&')
+
+  const body = await get(`${LOTTERY_INFO_PATH}?${query}`)
+  if (!body || typeof body !== 'object' || !body.data) {
+    throw new Error('抽奖信息加载失败：服务未返回标准数据')
+  }
+  return body.data
+}
+
+/** 4.2 参与抽奖。payload：{ dr_id, video_id?, exam_record_id? } */
+export async function drawLottery(payload) {
+  const body = await post(LOTTERY_DRAW_PATH, payload)
+  if (!body || typeof body !== 'object' || !body.data) {
+    throw new Error('抽奖失败：服务未返回标准数据')
+  }
+  return body.data
+}
+
+/** 4.3 填写手机号领取真实奖品。payload：{ dr_id, record_id, phone } */
+export async function claimLotteryPrize(payload) {
+  const body = await post(LOTTERY_CLAIM_PATH, payload)
+  if (!body || typeof body !== 'object' || !body.data) {
+    throw new Error('领奖信息提交失败：服务未返回标准数据')
   }
   return body.data
 }

@@ -37,6 +37,10 @@ const error = ref('')
 const answeredCount = ref(0)
 const submitting = ref(false)
 
+// TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
+const answeredPeople = 1286
+const winnerPeople = 357
+
 const isPre = computed(() => stage.value === 'pre')
 const stageTitle = computed(() =>
   isRetake ? '再次答题' : isPre.value ? '学前答题' : '看完答题',
@@ -151,10 +155,12 @@ async function onSubmit(answers) {
 
 <template>
   <div class="qp">
-    <PageNav :title="stageTitle" :show-back="false">
-      <template #right>
-        <span class="qp__progress">{{ answeredCount }}/{{ questions.length }}</span>
-      </template>
+    <PageNav
+      :title="stageTitle"
+      :show-back="false"
+      :answered-people="answeredPeople"
+      :winner-people="winnerPeople"
+    >
     </PageNav>
 
     <div v-if="error" class="empty">

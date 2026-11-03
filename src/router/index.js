@@ -93,6 +93,12 @@ const router = createRouter({
           name: 'mobile-report',
           component: () => import('@/views/mobile/report/Report.vue'),
         },
+        // 用户端 · 幸运抽奖
+        {
+          path: 'lottery',
+          name: 'mobile-lottery',
+          component: () => import('@/views/mobile/lottery/Lottery.vue'),
+        },
       ],
     },
   ],
