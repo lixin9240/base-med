@@ -1,9 +1,11 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
+import QuizSplash from '@/components/mobile/QuizSplash.vue'
+import { speak } from '@/utils/speech'
 import { toast } from '@/utils/toast'
 import { currentDrId, isSkipWatch, issueDrId } from '@/store/mobile/session'
 import {
@@ -16,17 +18,39 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+
+function queryText(source, key) {
+  const value = source?.[key]
+  if (Array.isArray(value)) return value[0] ? String(value[0]) : ''
+  return value ? String(value) : ''
+}
+
+/** 分享链接可能先落到首页再跳回答题，地址栏参数比首次路由更可靠 */
+function entryVideoId() {
+  const fromRoute = queryText(route.query, 'videoId') || queryText(route.query, 'video_id')
+  if (fromRoute) return fromRoute
+  const search = new URLSearchParams(window.location.search)
+  return search.get('videoId') || search.get('video_id') || ''
+}
+
 // 分享链接（后端生成）形如 /mobile/quiz?videoId=5&share=xxx，兼容 video_id 写法
-const videoId = String(route.query.videoId ?? route.query.video_id ?? '')
-const stageParam = String(route.query.stage || '')
-const isRetake = stageParam === 'retake'
+let videoId = entryVideoId()
+
+function currentStage() {
+  const fromRoute = queryText(route.query, 'stage')
+  if (fromRoute) return fromRoute
+  return new URLSearchParams(window.location.search).get('stage') || ''
+}
+
 /**
  * 只有显式带 stage=post / stage=retake 才进入后测（看完答题）；
  * 其余情况（分享链接入口、参数丢失）一律从「学前答题」开始。
- * 页面内跳转（首页 / 学习页 / 报告页）都会显式带上 stage。
+ * 跟地址走，避免同一次停留里阶段变了还沿用进页时的旧值。
  */
+const stageName = computed(() => currentStage())
+const isRetake = computed(() => stageName.value === 'retake')
 const stage = computed(() =>
-  stageParam === 'post' || stageParam === 'retake' ? 'post' : 'pre',
+  stageName.value === 'post' || stageName.value === 'retake' ? 'post' : 'pre',
 )
 
 const course = ref(null)
@@ -36,11 +60,22 @@ const ready = ref(false)
 const error = ref('')
 const answeredCount = ref(0)
 const submitting = ref(false)
+/** 学前、再次答题进页面前就盖住，避免先闪出题目再出开屏。看完答题不播 */
+const showSplash = ref(false)
+
+// TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
+const answeredPeople = 1286
+const winnerPeople = 357
 
 const isPre = computed(() => stage.value === 'pre')
 const stageTitle = computed(() =>
-  isRetake ? '再次答题' : isPre.value ? '学前答题' : '看完答题',
+  isRetake.value ? '再次答题' : isPre.value ? '学前答题' : '看完答题',
 )
+const splashCue = computed(() => {
+  const title = course.value?.title
+  if (!isPre.value || !title) return ''
+  return `即将开始《${title}》的学前答题`
+})
 
 function categoryIcon(category) {
   if (category === '影像检查') return 'monitor'
@@ -56,15 +91,45 @@ function categoryTone(category) {
   return 'mint'
 }
 
+watch(error, (value) => {
+  if (value) showSplash.value = false
+})
+
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+/** 看完视频后的那次答题（stage=post）不出开屏。学前和再次答题才出 */
+function syncSplash() {
+  if (prefersReducedMotion() || stageName.value === 'post') {
+    showSplash.value = false
+    return
+  }
+  showSplash.value = true
+}
+
+syncSplash()
+watch(stageName, syncSplash)
+
+function onSplashFinished() {
+  showSplash.value = false
+}
+
+/** 题目就绪后允许离开开屏。开屏本身在进页面时已经挂上 */
+function revealQuiz() {
+  ready.value = true
+}
+
 onMounted(async () => {
   try {
+    videoId = entryVideoId() || videoId
     drId.value = currentDrId()
     // 分享链接入口：直接打开 /mobile/quiz?videoId=X 时无 dr_id，先签发匿名编号再答题
     if (!drId.value && videoId) {
       drId.value = await issueDrId(videoId)
     }
-    if (!drId.value || !videoId) {
-      router.replace('/mobile/home')
+    if (!videoId || !drId.value) {
+      error.value = !videoId ? '链接缺少视频编号' : '进入失败，请重新打开链接'
       return
     }
     const detail = await getPublicVideoDetail(drId.value, videoId)
@@ -80,16 +145,20 @@ onMounted(async () => {
     questions.value = await listPublicQuestions(videoId)
 
     if (!questions.value.length) {
-      ready.value = true
-      if (!isPre.value) router.replace({ name: 'mobile-learn', query: { videoId } })
+      if (!isPre.value) {
+        router.replace({ name: 'mobile-learn', query: { videoId } })
+        return
+      }
+      revealQuiz()
       return
     }
 
     // 再次答题（3.9）不校验学前答题与观看进度：用户已完整走过一遍
-    if (!isPre.value && !isRetake) {
+    if (!isPre.value && !isRetake.value) {
       if (!course.value.examState?.pre_submitted) {
         toast('请先完成学前答题')
         router.replace({ name: 'mobile-quiz', query: { videoId, stage: 'pre' } })
+        revealQuiz()
         return
       }
       if (course.value.videoUrl && !isSkipWatch(videoId) && course.value.watchProgress?.is_unlocked !== 1) {
@@ -99,7 +168,7 @@ onMounted(async () => {
       }
     }
 
-    ready.value = true
+    revealQuiz()
   } catch (e) {
     error.value = e?.message || '加载失败'
   }
@@ -126,12 +195,13 @@ async function onSubmit(answers) {
         })),
       })
       toast('前测完成')
+      speak(`学前答题结束。请观看《${course.value?.title || '本视频'}》`)
       router.replace({ name: 'mobile-learn', query: { videoId } })
       return
     }
 
     // 再次答题走 3.9：只重评后测，前测沿用最近一条记录
-    const submit = isRetake ? submitRetakeExam : submitPostExam
+    const submit = isRetake.value ? submitRetakeExam : submitPostExam
     const data = await submit({
       dr_id: drId.value,
       video_id: videoId,
@@ -150,11 +220,13 @@ async function onSubmit(answers) {
 </script>
 
 <template>
-  <div class="qp">
-    <PageNav :title="stageTitle" :show-back="false">
-      <template #right>
-        <span class="qp__progress">{{ answeredCount }}/{{ questions.length }}</span>
-      </template>
+  <div v-show="!showSplash" class="qp">
+    <PageNav
+      :title="stageTitle"
+      :show-back="false"
+      :answered-people="answeredPeople"
+      :winner-people="winnerPeople"
+    >
     </PageNav>
 
     <div v-if="error" class="empty">
@@ -212,6 +284,8 @@ async function onSubmit(answers) {
       </div>
     </template>
   </div>
+
+  <QuizSplash v-if="showSplash" :can-leave="ready" :cue="splashCue" @finished="onSplashFinished" />
 </template>
 
 <style scoped>

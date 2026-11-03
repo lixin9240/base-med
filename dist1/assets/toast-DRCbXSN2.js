@@ -1,0 +1,1 @@
+import{j as e}from"./runtime-core.esm-bundler-XR1XXNT1.js";var t=e(``),n;function r(){return{message:t}}function i(e,r=2200){t.value=e,clearTimeout(n),n=setTimeout(()=>{t.value=``},r)}export{r as n,i as t};

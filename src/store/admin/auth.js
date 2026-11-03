@@ -34,6 +34,29 @@ export function getAdminInfo() {
   return read(INFO_KEY, null)
 }
 
+/**
+ * 本地开发免登录。
+ * 只认 Vite development 环境里的 VITE_SKIP_ADMIN_AUTH=true，生产构建不会带上这个值。
+ */
+export function isSkipAdminAuth() {
+  return import.meta.env.VITE_SKIP_ADMIN_AUTH === 'true'
+}
+
+/** 免登录时的界面资料。不是后端签发的凭证，不写入 token。 */
+const DEV_ADMIN_INFO = {
+  id: 0,
+  username: 'local',
+  name: '本地预览',
+  status: 1,
+}
+
+/** 免登录且本地还没有管理员资料时，补一份仅供界面显示的资料 */
+export function ensureDevAdminProfile() {
+  if (!isSkipAdminAuth()) return
+  if (getAdminInfo()) return
+  write(INFO_KEY, DEV_ADMIN_INFO)
+}
+
 /** 保存登录态 */
 export function saveAdminAuth({ token, adminInfo }) {
   write(TOKEN_KEY, token ?? '')

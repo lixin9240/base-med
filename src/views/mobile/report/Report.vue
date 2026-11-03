@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import { QUESTION_TYPE_LABEL } from '@/utils/question'
+import { speak } from '@/utils/speech'
 import { currentDrId } from '@/store/mobile/session'
 import { getExamResult } from '@/api/public'
 
@@ -12,6 +13,9 @@ const router = useRouter()
 const record = ref(null)
 const error = ref('')
 const loading = ref(true)
+// TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
+const answeredPeople = 1286
+const winnerPeople = 357
 
 function mapDetailItem(item) {
   return {
@@ -54,7 +58,14 @@ onMounted(async () => {
       preTotal: data.pre?.total ?? 0,
       postCorrect: data.post?.correct ?? 0,
       postTotal: data.post?.total ?? 0,
+      // TODO: 后端结果接口暂未返回这两项统计，先使用占位数据
+      answeredCount: 128,
+      winnerCount: 36,
       detail: (data.question_detail || []).map(mapDetailItem),
+    }
+    const percent = Number(record.value.percent)
+    if (Number.isFinite(percent)) {
+      speak(`答题结束。正确率百分之${percent}，${record.value.passed ? '已通过' : '未通过'}`)
     }
   } catch (e) {
     error.value = e?.message || '加载失败'
@@ -109,11 +120,26 @@ function correctAnswerLabel(item) {
   }
   return item.answer || ''
 }
+
+function goLottery() {
+  router.push({
+    name: 'mobile-lottery',
+    query: {
+      videoId: record.value?.videoId,
+      examRecordId: record.value?.examRecordId,
+    },
+  })
+}
 </script>
 
 <template>
   <div class="result">
-    <PageNav title="答题结果" :show-back="false" />
+    <PageNav
+     title="答题结果"
+    :show-back="false"
+    :answered-people="answeredPeople"
+    :winner-people="winnerPeople"
+    />
 
     <div v-if="error" class="empty">
       <div class="empty__icon">
@@ -146,6 +172,12 @@ function correctAnswerLabel(item) {
           <AppIcon name="arrowRight" :size="13" />
           看完答题 {{ record.postCorrect }}/{{ record.postTotal }}
         </p>
+      </section>
+
+      <section class="lottery-entry">
+        <button type="button" class="btn btn--primary btn--lg btn--block" @click="goLottery">
+          参与抽奖
+        </button>
       </section>
 
       <section class="review">
@@ -300,6 +332,17 @@ function correctAnswerLabel(item) {
   padding: 5px 12px;
   background: var(--bg-muted);
   border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.lottery-entry {
+  margin: 0 var(--sp-4) var(--sp-4);
+  text-align: center;
+}
+
+.lottery-entry__hint {
+  margin: var(--sp-2) 0 0;
   font-size: var(--fs-xs);
   color: var(--text-secondary);
 }

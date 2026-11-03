@@ -4,15 +4,16 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import { formatArticleHtml } from '@/utils/article'
+import { speak, whenSpeechEnds } from '@/utils/speech'
 import { toast } from '@/utils/toast'
 import { getPublicVideoDetail, reportVideoProgress } from '@/api/public'
 import { currentDrId, issueDrId, setSkipWatch } from '@/store/mobile/session'
 
 const route = useRoute()
 const router = useRouter()
-const videoId = String(route.query.videoId || '')
-// 分享链接入口（后端生成的 H5 链接形如 /mobile/learn?video_id=5&share=xxx）
-const shareVideoId = String(route.query.video_id || '')
+const videoId = String(route.query.videoId || route.query.video_id || '')
+// 只有地址里带 share 才是分享链接。普通观看页也会带 videoId，不能据此再跳回答题。
+const shareToken = String(route.query.share || '')
 
 const video = ref(null)
 const error = ref('')
@@ -24,6 +25,10 @@ const badRate = ref(false)
 const noVideoMode = ref(false)
 const loading = ref(true)
 
+// TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
+const answeredPeople = 1286
+const winnerPeople = 357
+
 let maxTime = 0 // 最大观看位置（秒）
 let reportTimer = null
 
@@ -32,9 +37,16 @@ const articleHtml = computed(() => formatArticleHtml(video.value?.articleBody ||
 onMounted(async () => {
   try {
     // 通过分享链接进入：先签发匿名编号，再跳转到对应视频的前测题页面
-    if (shareVideoId) {
-      await issueDrId(shareVideoId)
-      router.replace({ name: 'mobile-quiz', query: { videoId: shareVideoId, stage: 'pre' } })
+    if (shareToken) {
+      if (!videoId) {
+        error.value = '链接缺少视频编号'
+        return
+      }
+      await issueDrId(videoId)
+      router.replace({
+        name: 'mobile-quiz',
+        query: { videoId, share: shareToken, stage: 'pre' },
+      })
       return
     }
 
@@ -70,6 +82,7 @@ onMounted(async () => {
       maxTime = Number(wp.watched_seconds) || 0
       reportTimer = window.setInterval(reportProgress, 3000)
       await nextTick()
+      await whenSpeechEnds()
       await tryAutoPlay()
     }
     document.addEventListener('visibilitychange', onVisibility)
@@ -177,13 +190,24 @@ function onVideoError() {
 async function goQuiz() {
   // 跳转前先把进度同步到后端，确保后端 is_unlocked 已更新（否则长视频到 90% 点去答题会被后测门槛弹回）
   await reportProgress()
+  const title = video.value?.title
+  speak(title ? `视频已看完，开始《${title}》的看完答题` : '视频已看完，开始看完答题')
   router.push({ name: 'mobile-quiz', query: { videoId, stage: 'post' } })
+}
+
+function goLottery() {
+  router.push({ name: 'mobile-lottery', query: { videoId } })
 }
 </script>
 
 <template>
   <div class="learn">
-    <PageNav title="观看视频" :show-back="false" />
+    <PageNav
+      title="观看视频"
+      :show-back="false"
+      :answered-people="answeredPeople"
+      :winner-people="winnerPeople"
+    />
 
     <div v-if="error" class="empty">
       <div class="empty__icon">
@@ -285,7 +309,7 @@ async function goQuiz() {
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg-page);
-  padding-bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(210px + env(safe-area-inset-bottom, 0px));
   margin: calc(-1 * var(--sp-4));
   margin-top: calc(-1 * var(--sp-4));
   margin-left: calc(-1 * max(var(--sp-4), env(safe-area-inset-left, 0px)));
@@ -448,6 +472,10 @@ async function goQuiz() {
   .learn__footer {
     background: var(--bg-surface-solid);
   }
+}
+
+.learn__lottery {
+  margin-bottom: var(--sp-2);
 }
 
 .learn__bar-head {

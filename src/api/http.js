@@ -1,6 +1,7 @@
-import { clearAdminAuth, getAdminToken } from '@/store/admin/auth'
+import { clearAdminAuth, getAdminToken, isSkipAdminAuth } from '@/store/admin/auth'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL ?? ''
+// 生产包读不到 .env.development。未配置时直接请求这台后端，避免打到前端自己的域名。
+const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://47.108.175.101:6327'
 
 async function parseBody(response) {
   const text = await response.text()
@@ -31,10 +32,11 @@ function buildHeaders(options) {
 }
 
 export async function request(path, options = {}) {
-  const headers = buildHeaders(options)
+  const { skipAuthRedirect = false, ...fetchOptions } = options
+  const headers = buildHeaders(fetchOptions)
 
   const response = await fetch(resolveUrl(path), {
-    ...options,
+    ...fetchOptions,
     headers,
     body:
       options.body && typeof options.body === 'object' && !(options.body instanceof FormData)
@@ -45,8 +47,8 @@ export async function request(path, options = {}) {
   const data = await parseBody(response)
 
   if (!response.ok) {
-    // 401 未授权：清 token 跳登录
-    if (response.status === 401) {
+    // 401 未授权：清 token 跳登录。本地免登录时留在当前页，让页面自己显示错误。
+    if (response.status === 401 && !skipAuthRedirect && !isSkipAdminAuth()) {
       clearAdminAuth()
       const current = window.location.pathname + window.location.search
       if (!current.startsWith('/admin/login')) {
