@@ -75,12 +75,26 @@ function categoryIdOf(name) {
   return matched ? matched.id : null
 }
 
+/** 当前分类没有接口 id 时，改用分类接口返回的第一项，保证保存能带上 category_id */
+function alignCategory() {
+  if (categoryIdOf(draft.category) !== null) return
+  const first = props.categories?.[0]
+  if (first?.name) draft.category = first.name
+}
+
 watch(
   () => props.open,
   (open) => {
     if (open) reset()
   },
   { immediate: true },
+)
+
+watch(
+  () => props.categories,
+  () => {
+    if (props.open) alignCategory()
+  },
 )
 
 function nextOrder() {
@@ -101,6 +115,7 @@ function reset() {
   uploadingCover.value = false
   if (videoInput.value) videoInput.value.value = ''
   if (coverInput.value) coverInput.value.value = ''
+  alignCategory()
 }
 
 function clearError(key) {
@@ -217,7 +232,11 @@ async function submit() {
     // 新增和编辑都要提交真实的 category_id
     const categoryId = categoryIdOf(draft.category)
     if (categoryId === null) {
-      errors.value = { ...errors.value, category: '该分类不在分类列表中，请重新选择' }
+      const message = props.categories?.length
+        ? '该分类不在分类列表中，请重新选择'
+        : '分类列表还没加载成功，请关闭弹窗后重试'
+      errors.value = { ...errors.value, category: message }
+      uploadError.value = message
       return
     }
 
@@ -651,7 +670,6 @@ async function submit() {
 }
 
 .field--category {
-  display: none;
   flex: 0 0 220px;
 }
 
