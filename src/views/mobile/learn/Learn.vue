@@ -289,14 +289,6 @@ function goLottery() {
             <div class="learn__bar-fill" :class="{ 'is-ok': canQuiz }" :style="{ width: `${Math.min(100, watched)}%` }" />
           </div>
         </div>
-        <button
-          v-if="video.examState?.pre_submitted === 1"
-          type="button"
-          class="btn btn--secondary btn--lg btn--block learn__lottery"
-          @click="goLottery"
-        >
-          参与抽奖
-        </button>
         <button type="button" class="btn btn--primary btn--lg btn--block" :disabled="!canQuiz" @click="goQuiz">
           {{ canQuiz ? '去答题' : `请看完视频（${required}% 后可答题）` }}
         </button>
