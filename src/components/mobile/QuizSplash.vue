@@ -16,7 +16,7 @@ const EXIT_MS = 800
 
 const root = ref(null)
 const startBtn = ref(null)
-const playing = ref(false)
+const playing = ref(true)
 const leaving = ref(false)
 const progress = ref(0)
 
