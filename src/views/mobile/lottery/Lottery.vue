@@ -301,7 +301,6 @@ function fireConfetti() {
       <section class="lot__hero">
         <p class="lot__eyebrow">答题闯关 · 健康好礼</p>
         <h1 class="lot__title">转动幸运轮盘</h1>
-        <p class="lot__subtitle">每天 3 次机会，答完题就能抽</p>
 
         <div v-if="currentWinner" class="lot__ticker">
           <span class="lot__ticker-label">中奖播报</span>
@@ -382,7 +381,6 @@ function fireConfetti() {
       <section class="lot__rules">
         <h2>活动说明</h2>
         <ul>
-          <li>每天 3 次抽奖机会，次日零点重置。</li>
           <li>抽中「再来一次」不消耗抽奖次数。</li>
           <li>抽中实物奖品后请填写 11 位手机号，方便工作人员联系。</li>
         </ul>
