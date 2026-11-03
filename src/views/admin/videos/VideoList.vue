@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from 'vue'
 import {
   getAdminVideoDetail,
-  listAdminCategories,
   listAdminVideos,
   updateAdminVideoStatus,
 } from '@/api'
@@ -28,9 +27,6 @@ const switchingId = ref(null)
 const editLoadingId = ref(null)
 const keyword = ref('')
 const searchInput = ref('')
-
-/** 分类列表（视频表单下拉用），来自 2.7.1；保存时用它把分类名换成 category_id */
-const categories = ref([])
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
@@ -138,17 +134,8 @@ function toEditDraft(detail) {
   }
 }
 
-async function loadCategories() {
-  try {
-    categories.value = await listAdminCategories()
-  } catch (error) {
-    if (!loadError.value) loadError.value = error?.message || '分类列表加载失败，请稍后重试'
-  }
-}
-
 onMounted(() => {
   refreshVideos()
-  loadCategories()
 })
 
 function openConfig(video) {
@@ -425,7 +412,6 @@ async function togglePublished(video) {
     <VideoFormModal
       :open="formOpen"
       :video="editingVideo"
-      :categories="categories"
       @close="formOpen = false"
       @saved="refreshVideos"
     />

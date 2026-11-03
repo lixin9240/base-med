@@ -38,8 +38,6 @@ export function validateVideoDraft(draft, { hasUploadFile = false } = {}) {
   if (!title) errors.title = '请填写视频标题'
   else if (title.length > VIDEO_TITLE_MAX) errors.title = `标题不能超过 ${VIDEO_TITLE_MAX} 个字`
 
-  if (!draft.category) errors.category = '请选择分类'
-
   if (!String(draft.speaker ?? '').trim()) errors.speaker = '请填写主讲人'
 
   const intro = String(draft.intro ?? '').trim()
