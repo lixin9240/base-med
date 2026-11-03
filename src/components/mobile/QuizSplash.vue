@@ -1,8 +1,8 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
-  /** 题目已就绪后才允许帘幕收起 */
+  /** 题目已就绪后，进度条才收成「开始答题」 */
   canLeave: { type: Boolean, default: false },
 })
 
@@ -12,6 +12,7 @@ const LOAD_MS = 6400
 const EXIT_MS = 800
 
 const root = ref(null)
+const startBtn = ref(null)
 const playing = ref(false)
 const leaving = ref(false)
 const progress = ref(0)
@@ -29,13 +30,22 @@ function armTrace() {
   })
 }
 
+const canStart = computed(() => sequenceDone.value && props.canLeave)
+
 function beginLeave() {
-  if (leaving.value || !sequenceDone.value || !props.canLeave) return
+  if (leaving.value || !canStart.value) return
   leaving.value = true
   leaveTimer = window.setTimeout(() => emit('finished'), EXIT_MS)
 }
 
-watch([sequenceDone, () => props.canLeave], beginLeave)
+function onStart() {
+  beginLeave()
+}
+
+watch(canStart, (ready) => {
+  if (!ready) return
+  nextTick(() => startBtn.value?.focus())
+})
 
 onMounted(() => {
   armTrace()
@@ -60,7 +70,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div ref="root" class="quiz-splash" :class="{ 'is-play': playing, 'is-leave': leaving }" aria-hidden="true">
+  <div
+    ref="root"
+    class="quiz-splash"
+    :class="{ 'is-play': playing, 'is-leave': leaving }"
+    :aria-hidden="canStart ? 'false' : 'true'"
+  >
     <div class="stickers">
       <div class="sticker sticker-card">
         <div class="sticker-bob">
@@ -116,11 +131,20 @@ onBeforeUnmount(() => {
       <p class="splash-sub">每日一题 · 开始作答</p>
     </div>
 
-    <div class="load">
-      <div class="load-track">
+    <div class="load" :class="{ 'is-ready': canStart }">
+      <button
+        ref="startBtn"
+        type="button"
+        class="load-track"
+        :disabled="!canStart || leaving"
+        @click="onStart"
+      >
         <span class="load-fill"></span>
-      </div>
-      <p class="load-label">正在载入题目 <span class="load-num">{{ progress }}</span>%</p>
+        <span class="start-text">开始答题</span>
+      </button>
+      <p class="load-label" :aria-hidden="canStart ? 'true' : 'false'">
+        正在载入题目 <span class="load-num">{{ progress }}</span>%
+      </p>
     </div>
   </div>
 </template>
@@ -241,33 +265,92 @@ onBeforeUnmount(() => {
   position: absolute;
   left: 50%;
   bottom: 32px;
+  z-index: 3;
   width: min(400px, calc(100% - 80px));
   transform: translateX(-50%);
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
 }
 
 .load-track {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
   height: 6px;
+  padding: 0;
+  border: 0;
   border-radius: 999px;
   background: rgba(47, 154, 92, 0.16);
+  color: #fff;
+  font: inherit;
   overflow: hidden;
+  cursor: default;
+  transition:
+    width 0.55s cubic-bezier(0.76, 0, 0.18, 1),
+    height 0.55s cubic-bezier(0.76, 0, 0.18, 1),
+    box-shadow 0.55s ease;
+}
+
+.is-ready .load-track {
+  width: 196px;
+  height: 48px;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(47, 122, 72, 0.22);
+}
+
+.load-track:disabled {
+  opacity: 1;
+}
+
+.load-track:focus-visible {
+  outline: 2px solid var(--jade-deep);
+  outline-offset: 3px;
 }
 
 .load-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
   display: block;
-  height: 100%;
   width: 0;
   border-radius: inherit;
   background: linear-gradient(90deg, #49c07e, var(--jade));
 }
 
+.start-text {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+}
+
+.is-ready .start-text {
+  opacity: 1;
+  transition: opacity 0.35s ease 0.2s;
+}
+
 .load-label {
   margin: 0;
+  max-height: 20px;
+  overflow: hidden;
   text-align: center;
   color: var(--jade);
   font-size: 12px;
   letter-spacing: 0.16em;
+  transition:
+    opacity 0.25s ease,
+    max-height 0.45s ease;
+}
+
+.is-ready .load-label {
+  opacity: 0;
+  max-height: 0;
 }
 
 .stickers {
