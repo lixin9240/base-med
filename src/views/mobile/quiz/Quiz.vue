@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
+import QuizSplash from '@/components/mobile/QuizSplash.vue'
 import { toast } from '@/utils/toast'
 import { currentDrId, isSkipWatch, issueDrId } from '@/store/mobile/session'
 import {
@@ -36,6 +37,8 @@ const ready = ref(false)
 const error = ref('')
 const answeredCount = ref(0)
 const submitting = ref(false)
+/** 本次进入是否正在播开屏。学前、再次答题会播；看完视频后的那次不播 */
+const showSplash = ref(false)
 
 const isPre = computed(() => stage.value === 'pre')
 const stageTitle = computed(() =>
@@ -54,6 +57,29 @@ function categoryTone(category) {
   if (category === '妇幼保健' || category === '慢病管理') return 'pink'
   if (category === '用药安全') return 'lavender'
   return 'mint'
+}
+
+watch(error, (value) => {
+  if (value) showSplash.value = false
+})
+
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function armSplash() {
+  if (prefersReducedMotion()) return
+  showSplash.value = true
+}
+
+function onSplashFinished() {
+  showSplash.value = false
+}
+
+/** 确认会留在答题页后再开屏。看完视频后的那次答题直接出题 */
+function revealQuiz() {
+  if (isPre.value || isRetake) armSplash()
+  ready.value = true
 }
 
 onMounted(async () => {
@@ -80,8 +106,11 @@ onMounted(async () => {
     questions.value = await listPublicQuestions(videoId)
 
     if (!questions.value.length) {
-      ready.value = true
-      if (!isPre.value) router.replace({ name: 'mobile-learn', query: { videoId } })
+      if (!isPre.value) {
+        router.replace({ name: 'mobile-learn', query: { videoId } })
+        return
+      }
+      revealQuiz()
       return
     }
 
@@ -90,6 +119,7 @@ onMounted(async () => {
       if (!course.value.examState?.pre_submitted) {
         toast('请先完成学前答题')
         router.replace({ name: 'mobile-quiz', query: { videoId, stage: 'pre' } })
+        revealQuiz()
         return
       }
       if (course.value.videoUrl && !isSkipWatch(videoId) && course.value.watchProgress?.is_unlocked !== 1) {
@@ -99,7 +129,7 @@ onMounted(async () => {
       }
     }
 
-    ready.value = true
+    revealQuiz()
   } catch (e) {
     error.value = e?.message || '加载失败'
   }
@@ -211,6 +241,8 @@ async function onSubmit(answers) {
         </div>
       </div>
     </template>
+
+    <QuizSplash v-if="showSplash" :can-leave="ready" @finished="onSplashFinished" />
   </div>
 </template>
 
