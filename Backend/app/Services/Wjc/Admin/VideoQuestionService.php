@@ -393,7 +393,7 @@ class VideoQuestionService
             'options' => $options,
             'option_count' => $optionCount,
             'correct_answer' => Question::normalizeCorrectAnswer($type, (string) $data['correct_answer']),
-            'analysis' => $data['analysis'] ?? null,
+            'analysis' => $data['analysis'] ?? '',
             'difficulty' => 1,
             'knowledge_point' => '',
             'created_by' => $adminId,
