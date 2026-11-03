@@ -25,6 +25,10 @@ const badRate = ref(false)
 const noVideoMode = ref(false)
 const loading = ref(true)
 
+// TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
+const answeredPeople = 1286
+const winnerPeople = 357
+
 let maxTime = 0 // 最大观看位置（秒）
 let reportTimer = null
 
@@ -187,7 +191,12 @@ async function goQuiz() {
 
 <template>
   <div class="learn">
-    <PageNav title="观看视频" :show-back="false" />
+    <PageNav
+      title="观看视频"
+      :show-back="false"
+      :answered-people="answeredPeople"
+      :winner-people="winnerPeople"
+    />
 
     <div v-if="error" class="empty">
       <div class="empty__icon">

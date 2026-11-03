@@ -9,6 +9,22 @@ const STORAGE_KEY = 'pv.mock.backend'
 const WATCH_REQUIRED = 1
 const PASS_SCORE = 60
 
+// 抽奖：6 扇区医疗主题奖品，权重后台可配（后续接真实接口时替换）
+const LOTTERY_DAILY_LIMIT = 3
+const LOTTERY_PRIZES = [
+  { id: 1, name: '远程会诊一次', type: 'real', weight: 4 },
+  { id: 2, name: '专家挂号券', type: 'real', weight: 8 },
+  { id: 3, name: '口腔护理套装', type: 'real', weight: 6 },
+  { id: 4, name: '健康咨询 30 分钟', type: 'real', weight: 10 },
+  { id: 5, name: '再来一次', type: 'retry', weight: 12 },
+  { id: 6, name: '谢谢参与', type: 'none', weight: 27 },
+]
+const DEFAULT_LOTTERY_WINNERS = [
+  { phone: '138****2468', prize_name: '专家挂号券' },
+  { phone: '139****8801', prize_name: '口腔护理套装' },
+  { phone: '137****6620', prize_name: '远程会诊一次' },
+]
+
 const QUESTIONS = {
   1: [
     {
@@ -195,6 +211,9 @@ function seedState() {
     ],
     sessions: {},
     links: {},
+    nextLotteryId: 1,
+    lotteryRecords: [],
+    lotteryWinners: DEFAULT_LOTTERY_WINNERS.map((item) => ({ ...item })),
   }
 }
 
@@ -226,10 +245,81 @@ function ok(data, extra = {}) {
   return { code: 0, success: true, msg: 'ok', data, ...extra }
 }
 
+function fail(msg, code = 1) {
+  return { code, success: false, msg, data: null }
+}
+
 function nowText() {
   const date = new Date()
   const pad = (value) => String(value).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+function todayKey() {
+  return nowText().slice(0, 10)
+}
+
+function lotteryRecords() {
+  if (!Array.isArray(state.lotteryRecords)) state.lotteryRecords = []
+  return state.lotteryRecords
+}
+
+function lotteryWinners() {
+  if (!Array.isArray(state.lotteryWinners)) state.lotteryWinners = DEFAULT_LOTTERY_WINNERS.map((item) => ({ ...item }))
+  return state.lotteryWinners
+}
+
+function lotteryChances(drId) {
+  const used = lotteryRecords().filter(
+    (item) => item.dr_id === drId && item.date === todayKey() && item.consume,
+  ).length
+  return {
+    total: LOTTERY_DAILY_LIMIT,
+    used,
+    remaining: Math.max(0, LOTTERY_DAILY_LIMIT - used),
+  }
+}
+
+function maskPhone(phone) {
+  return `${phone.slice(0, 3)}****${phone.slice(7)}`
+}
+
+function pickLotteryPrize() {
+  const total = LOTTERY_PRIZES.reduce((sum, item) => sum + item.weight, 0)
+  let roll = Math.random() * total
+  for (const prize of LOTTERY_PRIZES) {
+    if (roll < prize.weight) return prize
+    roll -= prize.weight
+  }
+  return LOTTERY_PRIZES[LOTTERY_PRIZES.length - 1]
+}
+
+function lotteryPrizePayload(prize) {
+  return {
+    id: prize.id,
+    name: prize.name,
+    type: prize.type,
+    sector_index: LOTTERY_PRIZES.findIndex((item) => item.id === prize.id),
+  }
+}
+
+function lotteryInfoOf(drId) {
+  const pending = lotteryRecords()
+    .filter((item) => item.dr_id === drId && item.prize_type === 'real' && !item.claimed_at)
+    .sort((a, b) => b.id - a.id)[0]
+
+  return {
+    prizes: LOTTERY_PRIZES.map(lotteryPrizePayload),
+    chances: lotteryChances(drId),
+    winners: lotteryWinners().slice(0, 8),
+    pending_claim: pending
+      ? {
+          record_id: pending.id,
+          prize_id: pending.prize_id,
+          prize_name: pending.prize_name,
+        }
+      : null,
+  }
 }
 
 function splitRequest(path) {
@@ -460,6 +550,67 @@ function handlePublic(pathname, query, body) {
       return String(item.video_id) === String(query.video_id) && item.dr_id === query.dr_id
     })
     return ok(record ? buildResult(record) : null)
+  }
+
+  if (pathname === '/api/public/lottery/info') {
+    if (!query.dr_id) return fail('缺少匿名编号')
+    return ok(lotteryInfoOf(String(query.dr_id)))
+  }
+
+  if (pathname === '/api/public/lottery/draw') {
+    const drId = String(body.dr_id || '')
+    if (!drId) return fail('缺少匿名编号')
+    if (lotteryChances(drId).remaining <= 0) return fail('今日抽奖次数已用完，明天再来')
+
+    const prize = pickLotteryPrize()
+    const id = state.nextLotteryId || 1
+    state.nextLotteryId = id + 1
+    lotteryRecords().unshift({
+      id,
+      dr_id: drId,
+      video_id: Number(body.video_id) || null,
+      exam_record_id: Number(body.exam_record_id) || null,
+      prize_id: prize.id,
+      prize_name: prize.name,
+      prize_type: prize.type,
+      sector_index: lotteryPrizePayload(prize).sector_index,
+      consume: prize.type !== 'retry',
+      phone: '',
+      claimed_at: null,
+      date: todayKey(),
+      drawn_at: nowText(),
+    })
+    saveState()
+    return ok({
+      record_id: id,
+      prize: lotteryPrizePayload(prize),
+      chances: lotteryChances(drId),
+    })
+  }
+
+  if (pathname === '/api/public/lottery/claim') {
+    const drId = String(body.dr_id || '')
+    const recordId = Number(body.record_id)
+    const phone = String(body.phone || '').trim()
+    if (!drId) return fail('缺少匿名编号')
+    if (!/^1[3-9]\d{9}$/.test(phone)) return fail('请输入正确的 11 位手机号')
+
+    const record = lotteryRecords().find(
+      (item) => item.id === recordId && item.dr_id === drId,
+    )
+    if (!record) return fail('抽奖记录不存在')
+    if (record.prize_type !== 'real') return fail('该奖品无需填写手机号')
+    if (record.claimed_at) return fail('奖品已领取，请勿重复提交')
+
+    record.phone = phone
+    record.claimed_at = nowText()
+    lotteryWinners().unshift({ phone: maskPhone(phone), prize_name: record.prize_name })
+    saveState()
+    return ok({
+      record_id: record.id,
+      phone: maskPhone(phone),
+      prize_name: record.prize_name,
+    })
   }
 
   return undefined
