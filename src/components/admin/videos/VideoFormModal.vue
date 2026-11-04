@@ -9,6 +9,7 @@ import {
 import {
   COVER_MAX_SIZE_MB,
   VIDEO_INTRO_MAX,
+  VIDEO_KEY_POINTS_MAX,
   VIDEO_MAX_SIZE_MB,
   VIDEO_SOURCE,
   VIDEO_TITLE_MAX,
@@ -52,6 +53,7 @@ const modalTitle = computed(() => (isEdit.value ? '编辑视频' : '新增视频
 const isUpload = computed(() => draft.source === VIDEO_SOURCE.UPLOAD)
 const titleCount = computed(() => draft.title.length)
 const introCount = computed(() => draft.intro.length)
+const keyPointsCount = computed(() => draft.articleBody.length)
 const submitLabel = computed(() => (saving.value ? '保存中…' : '保存'))
 
 watch(
@@ -89,16 +91,6 @@ function clearError(key) {
   errors.value = next
 }
 
-function selectSource(source) {
-  if (draft.source === source) return
-  draft.source = source
-  uploadError.value = ''
-  // 切换来源时清掉另一种来源的输入，避免提交错的字段
-  draft.videoUrl = ''
-  videoFileName.value = ''
-  videoFile.value = null
-  clearError('videoUrl')
-}
 
 function onVideoFile(event) {
   const file = event.target.files?.[0]
@@ -469,12 +461,19 @@ async function submit() {
         <!-- 文字要点 -->
         <label class="field">
           <span class="field__label">文字要点</span>
-          <textarea
-            v-model="draft.articleBody"
-            class="article-input"
-            rows="6"
-            placeholder="可选。给不方便看视频的人一段文字说明。段落前用【小标题】，用 **文字** 表示加粗。"
-          />
+          <span class="field__control field__control--area">
+            <textarea
+              v-model="draft.articleBody"
+              class="article-input"
+              :maxlength="VIDEO_KEY_POINTS_MAX"
+              rows="6"
+              placeholder="可选。给不方便看视频的人一段文字说明。段落前用【小标题】，用 **文字** 表示加粗。"
+            />
+            <span class="field__counter field__counter--area">
+              {{ keyPointsCount }} / {{ VIDEO_KEY_POINTS_MAX }}
+            </span>
+          </span>
+          <p v-if="errors.articleBody" class="field__error">{{ errors.articleBody }}</p>
         </label>
 
         <!-- 上架状态 + 排序号 -->
