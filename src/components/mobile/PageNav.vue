@@ -235,7 +235,7 @@ function back() {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--success);
+  background: var(--brand-primary);
   flex-shrink: 0;
 }
 

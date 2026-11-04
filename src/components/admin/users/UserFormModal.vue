@@ -421,11 +421,11 @@ async function submit() {
 .btn--primary {
   color: #fff;
   background: var(--brand-primary);
-  box-shadow: 0 4px 16px rgb(0 122 77 / 0.22);
+  box-shadow: 0 4px 16px var(--brand-glow);
 }
 
 .btn--primary:hover:not(:disabled) {
-  box-shadow: 0 6px 20px rgb(0 122 77 / 0.28);
+  box-shadow: 0 6px 20px var(--brand-glow);
 }
 
 .btn:disabled {

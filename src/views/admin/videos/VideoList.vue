@@ -803,7 +803,7 @@ async function togglePublished(video) {
   height: 18px;
   background: #fff;
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgb(27 67 50 / 0.2);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
   transition: transform var(--t-fast);
 }
 
