@@ -19,7 +19,7 @@ const router = createRouter({
     // 默认入口：打开站点后进入用户端首页
     {
       path: '/',
-      redirect: redirectShareEntry,
+      name: 'admin-login',
     },
 
     // 管理端 · 登录
