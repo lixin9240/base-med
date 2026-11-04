@@ -1,8 +1,11 @@
 /** 视频标题最多字数 */
-export const VIDEO_TITLE_MAX = 60
+export const VIDEO_TITLE_MAX = 10
 
 /** 一句话简介最多字数 */
-export const VIDEO_INTRO_MAX = 120
+export const VIDEO_INTRO_MAX = 30
+
+/** 文字要点最多字数 */
+export const VIDEO_KEY_POINTS_MAX = 240
 
 /** 视频分类（管理端下拉、用户端标签共用） */
 export const VIDEO_CATEGORIES = [

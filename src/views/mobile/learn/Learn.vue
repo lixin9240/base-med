@@ -33,6 +33,12 @@ let maxTime = 0 // 最大观看位置（秒）
 let reportTimer = null
 
 const articleHtml = computed(() => formatArticleHtml(video.value?.articleBody || ''))
+const DIAL_CIRCUMFERENCE = 2 * Math.PI * 50
+const ringPercent = computed(() => {
+  if (noVideoMode.value) return 100
+  return Math.min(100, Math.max(0, Math.round(watched.value)))
+})
+const ringOffset = computed(() => DIAL_CIRCUMFERENCE * (1 - ringPercent.value / 100))
 const isCinema = computed(() => Boolean(video.value?.videoUrl) && !noVideoMode.value)
 const paused = ref(true)
 const playhead = ref(0)
@@ -157,7 +163,8 @@ onMounted(async () => {
       speakerOrg: detail.speaker_org,
       intro: detail.brief_intro,
       videoUrl: detail.video_url,
-      articleBody: detail.text_key_points,
+      articleBody: detail.brief_intro
+,
       examState: detail.exam_state,
     }
 
@@ -356,10 +363,6 @@ async function goQuiz() {
   speak(title ? `视频已看完，开始《${title}》的看完答题` : '视频已看完，开始看完答题')
   router.push({ name: 'mobile-quiz', query: { videoId, stage: 'post' } })
 }
-
-function goLottery() {
-  router.push({ name: 'mobile-lottery', query: { videoId } })
-}
 </script>
 
 <template>
@@ -496,7 +499,26 @@ function goLottery() {
                 </button>
               </div>
             </aside>
-            <button type="button" class="dock__quiz" :class="{ 'is-wait': !canQuiz }" @click="onQuizTap">去答题</button>
+            <div
+              class="quiz-dial quiz-dial--overlay dock__dial"
+              :class="{ 'is-ready': canQuiz, 'is-wait': !canQuiz }"
+            >
+              <svg class="quiz-dial__ring" viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="quiz-dial__track" cx="60" cy="60" r="50" />
+                <circle
+                  class="quiz-dial__progress"
+                  cx="60"
+                  cy="60"
+                  r="50"
+                  :stroke-dasharray="DIAL_CIRCUMFERENCE"
+                  :stroke-dashoffset="ringOffset"
+                />
+              </svg>
+              <button type="button" class="quiz-dial__btn" :aria-disabled="!canQuiz" @click="onQuizTap">
+                <span class="quiz-dial__label">去答题</span>
+                <span class="quiz-dial__sub">{{ canQuiz ? '已解锁' : `${ringPercent}%` }}</span>
+              </button>
+            </div>
           </div>
           <p class="dock__note">该视频为科普视频，仅供健康学习，不构成诊疗建议。</p>
           <div class="scrub" :class="{ 'is-on': showScrub }">
@@ -506,18 +528,28 @@ function goLottery() {
           </div>
         </template>
         <div v-else class="learn__footer">
-          <div class="learn__bar">
-            <div class="learn__bar-head">
-              <span>{{ noVideoMode ? '已可答题' : '观看进度' }}</span>
-              <b :class="{ 'is-ok': canQuiz }">{{ Math.min(100, Math.round(watched)) }}%</b>
+          <div class="learn__dock">
+            <div class="quiz-dial" :class="{ 'is-ready': canQuiz, 'is-wait': !canQuiz }">
+              <svg class="quiz-dial__ring" viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="quiz-dial__track" cx="60" cy="60" r="50" />
+                <circle
+                  class="quiz-dial__progress"
+                  cx="60"
+                  cy="60"
+                  r="50"
+                  :stroke-dasharray="DIAL_CIRCUMFERENCE"
+                  :stroke-dashoffset="ringOffset"
+                />
+              </svg>
+              <button type="button" class="quiz-dial__btn" :aria-disabled="!canQuiz" @click="onQuizTap">
+                <span class="quiz-dial__label">去答题</span>
+                <span class="quiz-dial__sub">{{ canQuiz ? '已解锁' : `${ringPercent}%` }}</span>
+              </button>
             </div>
-            <div class="learn__bar-track">
-              <div class="learn__bar-fill" :class="{ 'is-ok': canQuiz }" :style="{ width: `${Math.min(100, watched)}%` }" />
-            </div>
+            <p class="learn__hint">
+              {{ canQuiz ? '已解锁，可以答题' : `已观看 ${ringPercent}%，看完 ${required}% 后可答题` }}
+            </p>
           </div>
-          <button type="button" class="btn btn--primary btn--lg btn--block" :disabled="!canQuiz" @click="goQuiz">
-            {{ canQuiz ? '去答题' : `请看完视频（${required}% 后可答题）` }}
-          </button>
         </div>
       </div>
     </template>
@@ -742,24 +774,117 @@ function goLottery() {
   display: none;
 }
 
-.dock__quiz {
+.quiz-dial {
+  --dial-size: 112px;
+  --dial-track: var(--border);
+  --dial-progress: var(--brand-primary);
+  --dial-glow: var(--brand-glow);
+  --dial-text: var(--brand-primary);
+  --dial-sub: var(--text-secondary);
+  position: relative;
+  width: var(--dial-size);
+  height: var(--dial-size);
+  display: grid;
+  place-items: center;
   flex-shrink: 0;
-  align-self: flex-end;
-  margin: 0 max(10px, env(safe-area-inset-right, 0px)) 4px 0;
-  padding: 8px 2px;
+}
+
+/* 浮在视频上：透明按钮 + 白色光圈 */
+.quiz-dial--overlay {
+  --dial-track: rgb(255 255 255 / 0.24);
+  --dial-progress: #fff;
+  --dial-glow: rgb(255 255 255 / 0.5);
+  --dial-text: #fff;
+  --dial-sub: rgb(255 255 255 / 0.82);
+}
+
+.quiz-dial__ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.quiz-dial__track {
+  fill: none;
+  stroke: var(--dial-track);
+  stroke-width: 6;
+}
+
+.quiz-dial__progress {
+  fill: none;
+  stroke: var(--dial-progress);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.35s linear;
+  filter: drop-shadow(0 0 6px var(--dial-glow));
+}
+
+.quiz-dial__btn {
+  position: relative;
+  z-index: 1;
+  width: calc(var(--dial-size) - 24px);
+  height: calc(var(--dial-size) - 24px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
   border: none;
+  border-radius: 50%;
   background: transparent;
-  color: #fff;
-  font-size: 15px;
-  font-weight: var(--fw-semibold);
-  line-height: 1.2;
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.7);
-  pointer-events: auto;
+  color: var(--dial-text);
+  font: inherit;
   cursor: pointer;
 }
 
-.dock__quiz.is-wait {
-  opacity: 0.55;
+.quiz-dial__label {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
+  line-height: 1.2;
+}
+
+.quiz-dial__sub {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  color: var(--dial-sub);
+}
+
+.quiz-dial--overlay .quiz-dial__label {
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.65);
+}
+
+.quiz-dial--overlay .quiz-dial__sub {
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.65);
+}
+
+.quiz-dial.is-wait {
+  opacity: 0.78;
+}
+
+.quiz-dial.is-ready .quiz-dial__progress {
+  animation: dial-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes dial-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.dock__dial {
+  --dial-size: 104px;
+  flex-shrink: 0;
+  align-self: flex-end;
+  margin: 0 max(10px, env(safe-area-inset-right, 0px)) 4px 0;
+  pointer-events: auto;
 }
 
 .dock__note {
@@ -965,6 +1090,25 @@ function goLottery() {
   backdrop-filter: blur(12px);
   border-top: 1px solid var(--border);
   z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.learn__dock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.learn__hint {
+  margin: 0;
+  max-width: 320px;
+  text-align: center;
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 @supports not ((-webkit-backdrop-filter: initial) or (backdrop-filter: initial)) {
