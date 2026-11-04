@@ -745,19 +745,21 @@ async function goQuiz() {
 }
 
 .dock__row {
+  position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   width: 100%;
+  min-height: calc(104px + 4px);
 }
 
 .stage-copy {
   flex: 1;
   min-width: 0;
-  max-width: 72%;
+  max-width: min(72%, calc(100% - 122px));
   max-height: 28dvh;
-  margin: 0 0 2px max(12px, env(safe-area-inset-left, 0px));
+  margin: 0 0 0 max(12px, env(safe-area-inset-left, 0px));
   overflow: auto;
   text-align: left;
   pointer-events: auto;
@@ -881,8 +883,9 @@ async function goQuiz() {
 
 .dock__dial {
   --dial-size: 104px;
-  flex-shrink: 0;
-  align-self: flex-end;
+  position: absolute;
+  right: 0;
+  bottom: 0;
   margin: 0 max(10px, env(safe-area-inset-right, 0px)) 4px 0;
   pointer-events: auto;
 }
