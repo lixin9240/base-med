@@ -474,7 +474,7 @@ function fireConfetti() {
 }
 
 .lot__hero {
-  padding: var(--sp-6) var(--sp-5);
+  padding: var(--sp-6) var(--sp-5) calc(var(--sp-8) + var(--sp-5));
   background:
     radial-gradient(circle at 88% 4%, rgb(245 196 81 / 0.32) 0%, transparent 46%),
     linear-gradient(160deg, #fbfefc 0%, var(--brand-tint) 42%, var(--brand-soft) 100%);
@@ -552,7 +552,7 @@ function fireConfetti() {
 .lot__stage {
   position: relative;
   z-index: 2;
-  margin: var(--sp-6) var(--sp-4) 0;
+  margin: calc(-1 * var(--sp-8)) var(--sp-4) 0;
   padding: var(--sp-5) var(--sp-4);
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
@@ -827,13 +827,12 @@ function fireConfetti() {
 
 @media (max-width: 360px) {
   .lot__hero {
-    padding: var(--sp-5) var(--sp-4);
+    padding: var(--sp-5) var(--sp-4) calc(var(--sp-8) + var(--sp-3));
   }
   .lot__title {
     font-size: var(--fs-xl);
   }
   .lot__stage {
-    margin-top: var(--sp-4);
     margin-left: var(--sp-3);
     margin-right: var(--sp-3);
     padding: var(--sp-4) var(--sp-3);
