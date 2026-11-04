@@ -11,8 +11,8 @@ const props = defineProps({
 
 const emit = defineEmits(['finished'])
 
-const LOAD_MS = 6400
-const EXIT_MS = 800
+const LOAD_MS = 3200
+const EXIT_MS = 480
 
 const root = ref(null)
 const startBtn = ref(null)
@@ -156,7 +156,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .quiz-splash {
   --serif: 'Songti SC', 'STSong', 'SimSun', 'Noto Serif SC', serif;
-  --load-ms: 6.4s;
+  --load-ms: 3.2s;
   position: fixed;
   top: 0;
   bottom: 0;
@@ -289,9 +289,9 @@ onBeforeUnmount(() => {
   overflow: hidden;
   cursor: default;
   transition:
-    width 0.55s cubic-bezier(0.76, 0, 0.18, 1),
-    height 0.55s cubic-bezier(0.76, 0, 0.18, 1),
-    box-shadow 0.55s ease;
+    width 0.32s cubic-bezier(0.76, 0, 0.18, 1),
+    height 0.32s cubic-bezier(0.76, 0, 0.18, 1),
+    box-shadow 0.32s ease;
 }
 
 .is-ready .load-track {
@@ -332,7 +332,7 @@ onBeforeUnmount(() => {
 
 .is-ready .start-text {
   opacity: 1;
-  transition: opacity 0.35s ease 0.2s;
+  transition: opacity 0.2s ease 0.12s;
 }
 
 .load-label {
@@ -344,8 +344,8 @@ onBeforeUnmount(() => {
   font-size: 12px;
   letter-spacing: 0.16em;
   transition:
-    opacity 0.25s ease,
-    max-height 0.45s ease;
+    opacity 0.16s ease,
+    max-height 0.28s ease;
 }
 
 .is-ready .load-label {
@@ -428,23 +428,23 @@ onBeforeUnmount(() => {
 .sticker-ok { top: 52%; right: max(16px, calc(50% - 224px)); width: 54px; }
 .sticker-pill { top: 58%; left: max(18px, calc(50% - 222px)); width: 68px; }
 
-.is-play .ecg-path { animation: draw 2.4s cubic-bezier(0.45, 0, 0.2, 1) 0.35s forwards; }
-.is-play .seal-ring { animation: draw 1.2s cubic-bezier(0.4, 0, 0.15, 1) 2.4s forwards; }
-.is-play .seal-char { animation: squash 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 3.15s forwards; }
-.is-play .splash-title span:nth-child(1) { animation: warp-a 0.82s cubic-bezier(0.18, 0.8, 0.2, 1) 3.55s forwards; }
-.is-play .splash-title span:nth-child(2) { animation: warp-b 0.82s cubic-bezier(0.18, 0.8, 0.2, 1) 3.7s forwards; }
-.is-play .splash-title span:nth-child(3) { animation: warp-c 0.82s cubic-bezier(0.18, 0.8, 0.2, 1) 3.85s forwards; }
-.is-play .splash-title span:nth-child(4) { animation: warp-d 0.82s cubic-bezier(0.18, 0.8, 0.2, 1) 4s forwards; }
-.is-play .splash-sub { animation: skew-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 4.45s forwards; }
-.is-play .sticker-card { animation: pop-left 0.8s cubic-bezier(0.2, 0.85, 0.2, 1) 0.45s forwards; }
-.is-play .sticker-ask { animation: pop-right 0.8s cubic-bezier(0.2, 0.85, 0.2, 1) 0.7s forwards; }
-.is-play .sticker-ok { animation: pop-right 0.75s cubic-bezier(0.2, 0.85, 0.2, 1) 1.05s forwards; }
-.is-play .sticker-pill { animation: pop-left 0.75s cubic-bezier(0.2, 0.85, 0.2, 1) 1.25s forwards; }
-.is-play .sticker-bob { animation: bob 3.2s ease-in-out 2s infinite; }
+.is-play .ecg-path { animation: draw 1.2s cubic-bezier(0.45, 0, 0.2, 1) 0.18s forwards; }
+.is-play .seal-ring { animation: draw 0.6s cubic-bezier(0.4, 0, 0.15, 1) 1.2s forwards; }
+.is-play .seal-char { animation: squash 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) 1.58s forwards; }
+.is-play .splash-title span:nth-child(1) { animation: warp-a 0.41s cubic-bezier(0.18, 0.8, 0.2, 1) 1.78s forwards; }
+.is-play .splash-title span:nth-child(2) { animation: warp-b 0.41s cubic-bezier(0.18, 0.8, 0.2, 1) 1.85s forwards; }
+.is-play .splash-title span:nth-child(3) { animation: warp-c 0.41s cubic-bezier(0.18, 0.8, 0.2, 1) 1.93s forwards; }
+.is-play .splash-title span:nth-child(4) { animation: warp-d 0.41s cubic-bezier(0.18, 0.8, 0.2, 1) 2s forwards; }
+.is-play .splash-sub { animation: skew-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) 2.23s forwards; }
+.is-play .sticker-card { animation: pop-left 0.4s cubic-bezier(0.2, 0.85, 0.2, 1) 0.23s forwards; }
+.is-play .sticker-ask { animation: pop-right 0.4s cubic-bezier(0.2, 0.85, 0.2, 1) 0.35s forwards; }
+.is-play .sticker-ok { animation: pop-right 0.38s cubic-bezier(0.2, 0.85, 0.2, 1) 0.53s forwards; }
+.is-play .sticker-pill { animation: pop-left 0.38s cubic-bezier(0.2, 0.85, 0.2, 1) 0.63s forwards; }
+.is-play .sticker-bob { animation: bob 2.2s ease-in-out 1.1s infinite; }
 .is-play .load-fill { animation: load var(--load-ms) linear forwards; }
 
 .is-leave {
-  animation: curtain 0.8s cubic-bezier(0.76, 0, 0.18, 1) forwards;
+  animation: curtain 0.48s cubic-bezier(0.76, 0, 0.18, 1) forwards;
 }
 
 @keyframes draw { to { stroke-dashoffset: 0; } }
