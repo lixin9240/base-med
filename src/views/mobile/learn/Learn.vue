@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
@@ -43,17 +43,51 @@ const isCinema = computed(() => Boolean(video.value?.videoUrl) && !noVideoMode.v
 const paused = ref(true)
 const playhead = ref(0)
 const showScrub = ref(false)
+const volume = ref(1)
+const showVolume = ref(false)
 const scrubbing = ref(false)
 const stageEl = ref(null)
 const isLandscapeSource = ref(false)
 const wideMode = ref(false)
 const deviceLandscape = ref(false)
 const videoRatio = ref('16 / 9')
+const pointsEl = ref(null)
+const pointsOverflow = ref(false)
+const pointsOpen = ref(false)
 let lastSample = 0
+let pointsObserver = null
 let scrubHideTimer = null
 let orientMedia = null
 let stagePointer = null
 let suppressClick = false
+let volumeGesture = null
+let volumeHideTimer = null
+
+function measurePoints() {
+  const el = pointsEl.value
+  if (!el || pointsOpen.value) return
+  pointsOverflow.value = el.scrollHeight > el.clientHeight + 2
+}
+
+function openPoints() {
+  pointsOpen.value = true
+  pointsOverflow.value = false
+}
+
+watch([articleHtml, isCinema], () => {
+  pointsOpen.value = false
+  pointsOverflow.value = false
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      measurePoints()
+      const el = pointsEl.value
+      pointsObserver?.disconnect()
+      if (!el) return
+      pointsObserver = new ResizeObserver(() => measurePoints())
+      pointsObserver.observe(el)
+    })
+  })
+})
 
 function onVideoClick() {
   if (suppressClick) {
@@ -129,8 +163,7 @@ onMounted(async () => {
       speakerOrg: detail.speaker_org,
       intro: detail.brief_intro,
       videoUrl: detail.video_url,
-      articleBody: detail.brief_intro
-,
+      articleBody: detail.text_key_points,
       examState: detail.exam_state,
     }
 
@@ -145,8 +178,10 @@ onMounted(async () => {
       canQuiz.value = wp.is_unlocked === 1
       maxTime = Number(wp.watched_seconds) || 0
       reportTimer = window.setInterval(reportProgress, 3000)
+      loading.value = false
+      const speechDone = whenSpeechEnds()
       await nextTick()
-      await whenSpeechEnds()
+      await speechDone
       await tryAutoPlay()
     }
     document.addEventListener('visibilitychange', onVisibility)
@@ -167,6 +202,8 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', onVisibility)
   window.removeEventListener('resize', syncDeviceLandscape)
   orientMedia?.removeEventListener('change', syncDeviceLandscape)
+  pointsObserver?.disconnect()
+  clearTimeout(volumeHideTimer)
   reportProgress()
 })
 
@@ -223,52 +260,58 @@ function onTimeUpdate() {
   syncProgress()
 }
 
-function seekFromPointer(event) {
-  const stage = stageEl.value
+function applyVolumeFromPointer(event) {
   const el = videoEl.value
-  if (!stage || !el?.duration) return
-  const rect = stage.getBoundingClientRect()
-  const turned = stage.classList.contains('is-turned')
-  const span = turned ? rect.height : rect.width
-  const offset = turned ? event.clientY - rect.top : event.clientX - rect.left
-  if (!span) return
-  const ratio = Math.min(1, Math.max(0, offset / span))
-  playhead.value = ratio * 100
-  el.currentTime = ratio * el.duration
+  const stage = stageEl.value
+  if (!el || !stage || !stagePointer) return
+  const span = Math.max(160, stage.getBoundingClientRect().height)
+  const next = Math.min(1, Math.max(0, stagePointer.volume + (stagePointer.y - event.clientY) / span))
+  volume.value = next
+  el.volume = next
+  el.muted = next === 0
 }
 
 function onStagePointerDown(event) {
   if (!isCinema.value) return
   if (event.target.closest('button, a, .stage-copy')) return
-  stagePointer = { x: event.clientX, y: event.clientY, id: event.pointerId }
+  volumeGesture = null
+  stagePointer = {
+    x: event.clientX,
+    y: event.clientY,
+    id: event.pointerId,
+    volume: volume.value,
+  }
 }
 
 function onStagePointerMove(event) {
   if (!stagePointer || event.pointerId !== stagePointer.id) return
   const dx = event.clientX - stagePointer.x
   const dy = event.clientY - stagePointer.y
-  if (!scrubbing.value && Math.hypot(dx, dy) < 8) return
-  if (!scrubbing.value) {
-    scrubbing.value = true
-    showScrub.value = true
+  if (!volumeGesture) {
+    if (Math.hypot(dx, dy) < 8) return
+    volumeGesture = Math.abs(dy) > Math.abs(dx) ? 'volume' : 'skip'
+    if (volumeGesture !== 'volume') return
+    showVolume.value = true
     suppressClick = true
-    clearTimeout(scrubHideTimer)
+    clearTimeout(volumeHideTimer)
     try {
       stageEl.value?.setPointerCapture?.(event.pointerId)
     } catch {
       // 指针已被释放时忽略
     }
   }
-  seekFromPointer(event)
+  if (volumeGesture !== 'volume') return
+  applyVolumeFromPointer(event)
 }
 
 function onStagePointerUp(event) {
   if (stagePointer && event.pointerId !== stagePointer.id) return
+  const wasVolume = volumeGesture === 'volume'
   stagePointer = null
-  if (!scrubbing.value) return
-  scrubbing.value = false
-  scrubHideTimer = window.setTimeout(() => {
-    showScrub.value = false
+  volumeGesture = null
+  if (!wasVolume) return
+  volumeHideTimer = window.setTimeout(() => {
+    showVolume.value = false
   }, 500)
 }
 
@@ -379,13 +422,13 @@ async function goQuiz() {
           ref="videoEl"
           class="player__el"
           :src="video.videoUrl"
-          autoplay
+          :poster="video.cover || undefined"
           playsinline
           webkit-playsinline
           x5-playsinline
           x5-video-player-type="h5-page"
           x5-video-player-fullscreen="false"
-          preload="metadata"
+          preload="auto"
           :aria-label="`播放视频：${video.title}`"
           @loadedmetadata="onLoadedMeta"
           @click="onVideoClick"
@@ -408,6 +451,7 @@ async function goQuiz() {
         >
           <AppIcon name="landscape" :size="20" />
         </button>
+        <div v-if="showVolume" class="volume-tip">音量 {{ Math.round(volume * 100) }}%</div>
         <div v-if="badRate" class="player__tip">
           <AppIcon name="alert" :size="14" />
           倍速播放不计入观看进度
@@ -440,9 +484,19 @@ async function goQuiz() {
       <div class="dock">
         <template v-if="isCinema">
           <div class="dock__row">
-            <aside class="stage-copy">
+            <aside class="stage-copy" :class="{ 'is-open': pointsOpen }">
               <h1 class="stage-copy__title">{{ video.title }}</h1>
-              <div v-if="video.articleBody" class="stage-copy__points" v-html="articleHtml" />
+              <div v-if="video.articleBody" class="stage-copy__fold">
+                <div
+                  ref="pointsEl"
+                  class="stage-copy__points"
+                  :class="{ 'is-clamp': !pointsOpen }"
+                  v-html="articleHtml"
+                />
+                <button v-if="pointsOverflow && !pointsOpen" type="button" class="stage-copy__more" @click.stop="openPoints">
+                  查看更多
+                </button>
+              </div>
             </aside>
             <div
               class="quiz-dial quiz-dial--overlay dock__dial"
@@ -690,25 +744,31 @@ async function goQuiz() {
 }
 
 .dock__row {
+  position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   width: 100%;
+  min-height: calc(104px + 4px);
 }
 
 .stage-copy {
   flex: 1;
   min-width: 0;
-  max-width: 72%;
+  max-width: min(72%, calc(100% - 122px));
   max-height: 28dvh;
-  margin: 0 0 2px max(12px, env(safe-area-inset-left, 0px));
+  margin: 0 0 0 max(12px, env(safe-area-inset-left, 0px));
   overflow: auto;
   text-align: left;
   pointer-events: auto;
   touch-action: pan-y;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+}
+
+.stage-copy.is-open {
+  max-height: 56dvh;
 }
 
 .stage-copy::-webkit-scrollbar {
@@ -822,8 +882,9 @@ async function goQuiz() {
 
 .dock__dial {
   --dial-size: 104px;
-  flex-shrink: 0;
-  align-self: flex-end;
+  position: absolute;
+  right: 0;
+  bottom: 0;
   margin: 0 max(10px, env(safe-area-inset-right, 0px)) 4px 0;
   pointer-events: auto;
 }
@@ -834,6 +895,21 @@ async function goQuiz() {
   line-height: 1.4;
   color: rgb(255 255 255 / 0.72);
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.65);
+  pointer-events: none;
+}
+
+.volume-tip {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 13px;
+  letter-spacing: 0.04em;
   pointer-events: none;
 }
 
@@ -869,8 +945,18 @@ async function goQuiz() {
   text-shadow: 0 1px 3px rgb(0 0 0 / 0.7);
 }
 
-.stage-copy__points {
+.stage-copy__fold {
   margin-top: 6px;
+}
+
+.stage-copy__points {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.stage-copy__points.is-clamp {
+  max-height: calc(1.45em * 4);
+  overflow: hidden;
 }
 
 .stage-copy__points :deep(p),
@@ -884,6 +970,26 @@ async function goQuiz() {
   line-height: 1.45;
   color: rgb(255 255 255 / 0.92);
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.65);
+}
+
+.stage-copy__points.is-clamp :deep(p),
+.stage-copy__points.is-clamp :deep(.art__h),
+.stage-copy__points.is-clamp :deep(.art__li) {
+  margin: 0;
+}
+
+.stage-copy__more {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.4;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .player-fallback {
