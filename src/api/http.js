@@ -32,10 +32,11 @@ function buildHeaders(options) {
 }
 
 export async function request(path, options = {}) {
-  const headers = buildHeaders(options)
+  const { skipAuthRedirect = false, ...fetchOptions } = options
+  const headers = buildHeaders(fetchOptions)
 
   const response = await fetch(resolveUrl(path), {
-    ...options,
+    ...fetchOptions,
     headers,
     body:
       options.body && typeof options.body === 'object' && !(options.body instanceof FormData)
@@ -47,7 +48,7 @@ export async function request(path, options = {}) {
 
   if (!response.ok) {
     // 401 未授权：清 token 跳登录。本地免登录时留在当前页，让页面自己显示错误。
-    if (response.status === 401 && !isSkipAdminAuth()) {
+    if (response.status === 401 && !skipAuthRedirect && !isSkipAdminAuth()) {
       clearAdminAuth()
       const current = window.location.pathname + window.location.search
       if (!current.startsWith('/admin/login')) {

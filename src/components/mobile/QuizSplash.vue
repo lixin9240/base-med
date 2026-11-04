@@ -11,12 +11,12 @@ const props = defineProps({
 
 const emit = defineEmits(['finished'])
 
-const LOAD_MS = 6400
-const EXIT_MS = 800
+const LOAD_MS = 3200
+const EXIT_MS = 480
 
 const root = ref(null)
 const startBtn = ref(null)
-const playing = ref(false)
+const playing = ref(true)
 const leaving = ref(false)
 const progress = ref(0)
 
@@ -84,27 +84,27 @@ onBeforeUnmount(() => {
       <div class="sticker sticker-card">
         <div class="sticker-bob">
           <svg viewBox="0 0 84 70" role="presentation">
-            <rect x="3" y="4" width="78" height="62" rx="14" fill="#ffffff" stroke="#9ed4b4" stroke-width="1.5" />
-            <text x="14" y="22" fill="#1f7a45" font-size="11" font-family="Microsoft YaHei, sans-serif">单选</text>
-            <circle cx="20" cy="44" r="8" fill="#e7f7ee" stroke="#2f9a5c" stroke-width="1.6" />
-            <path d="M16.4 44.2 L19 46.8 L24 41.2" fill="none" stroke="#2f9a5c" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
-            <path d="M34 38 H70 M34 46 H60" fill="none" stroke="#d5e8dc" stroke-width="2.2" stroke-linecap="round" />
+            <rect x="3" y="4" width="78" height="62" rx="14" class="sp-card" stroke-width="1.5" />
+            <text x="14" y="22" class="sp-label" font-size="11" font-family="Microsoft YaHei, sans-serif">单选</text>
+            <circle cx="20" cy="44" r="8" class="sp-check-bg" stroke-width="1.6" />
+            <path d="M16.4 44.2 L19 46.8 L24 41.2" fill="none" class="sp-check" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+            <path d="M34 38 H70 M34 46 H60" fill="none" class="sp-rule" stroke-width="2.2" stroke-linecap="round" />
           </svg>
         </div>
       </div>
       <div class="sticker sticker-ask">
         <div class="sticker-bob">
           <svg viewBox="0 0 64 60" role="presentation">
-            <path d="M8 6 H50 A8 8 0 0 1 58 14 V36 A8 8 0 0 1 50 44 H28 L18 54 V44 H14 A8 8 0 0 1 6 36 V14 A8 8 0 0 1 14 6 Z" fill="#ffffff" stroke="#2f9a5c" stroke-width="1.6" />
-            <text x="32" y="32" text-anchor="middle" fill="#1f7a45" font-size="22" font-family="Songti SC, SimSun, serif">?</text>
+            <path d="M8 6 H50 A8 8 0 0 1 58 14 V36 A8 8 0 0 1 50 44 H28 L18 54 V44 H14 A8 8 0 0 1 6 36 V14 A8 8 0 0 1 14 6 Z" class="sp-ask-bubble" stroke-width="1.6" />
+            <text x="32" y="32" text-anchor="middle" class="sp-ask-mark" font-size="22" font-family="Songti SC, SimSun, serif">?</text>
           </svg>
         </div>
       </div>
       <div class="sticker sticker-ok">
         <div class="sticker-bob">
           <svg viewBox="0 0 58 58" role="presentation">
-            <circle cx="29" cy="29" r="24" fill="#2f9a5c" />
-            <circle cx="29" cy="29" r="18" fill="#3cb371" />
+            <circle cx="29" cy="29" r="24" class="sp-ok-outer" />
+            <circle cx="29" cy="29" r="18" class="sp-ok-inner" />
             <path d="M18 30.5 L25.2 37.2 L40 21.5" fill="none" stroke="#ffffff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
         </div>
@@ -112,9 +112,9 @@ onBeforeUnmount(() => {
       <div class="sticker sticker-pill">
         <div class="sticker-bob">
           <svg viewBox="0 0 78 40" role="presentation">
-            <rect x="2" y="4" width="74" height="32" rx="16" fill="#ffffff" stroke="#b7e0c6" stroke-width="1.4" />
-            <rect x="2" y="4" width="36" height="32" rx="16" fill="#2f9a5c" />
-            <path d="M39 10 V30" stroke="#d7eadc" stroke-width="1.4" />
+            <rect x="2" y="4" width="74" height="32" rx="16" class="sp-pill-body" stroke-width="1.4" />
+            <rect x="2" y="4" width="36" height="32" rx="16" class="sp-pill-half" />
+            <path d="M39 10 V30" class="sp-pill-line" stroke-width="1.4" />
             <circle cx="20" cy="20" r="4" fill="#ffffff" />
           </svg>
         </div>
@@ -155,12 +155,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .quiz-splash {
-  --ink: #1d3d2c;
-  --muted: #7d8b84;
-  --jade: #2f9a5c;
-  --jade-deep: #1f7a45;
   --serif: 'Songti SC', 'STSong', 'SimSun', 'Noto Serif SC', serif;
-  --load-ms: 6.4s;
+  --load-ms: 3.2s;
   position: fixed;
   top: 0;
   bottom: 0;
@@ -175,10 +171,10 @@ onBeforeUnmount(() => {
   justify-content: center;
   overflow: hidden;
   background:
-    radial-gradient(75% 42% at 50% 0%, #d9f3e3 0%, transparent 70%),
-    radial-gradient(60% 36% at 88% 100%, #e8f6d4 0%, transparent 62%),
-    linear-gradient(180deg, #eef8f1 0%, #f7fbf8 48%, #f3f7ee 100%);
-  color: var(--jade-deep);
+    radial-gradient(75% 42% at 50% 0%, var(--brand-soft) 0%, transparent 70%),
+    radial-gradient(60% 36% at 88% 100%, var(--brand-tint) 0%, transparent 62%),
+    var(--bg-page-gradient);
+  color: var(--brand-primary-active);
 }
 
 .splash-center {
@@ -199,13 +195,13 @@ onBeforeUnmount(() => {
 
 .ecg-path {
   fill: none;
-  stroke: var(--jade);
+  stroke: var(--brand-primary);
   stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-dasharray: 520;
   stroke-dashoffset: 520;
-  filter: drop-shadow(0 0 4px rgba(47, 154, 92, 0.35));
+  filter: drop-shadow(0 0 4px var(--brand-glow));
 }
 
 .seal {
@@ -223,7 +219,7 @@ onBeforeUnmount(() => {
 
 .seal-ring {
   fill: none;
-  stroke: var(--jade);
+  stroke: var(--brand-primary);
   stroke-width: 1.35;
   stroke-dasharray: 190;
   stroke-dashoffset: 190;
@@ -258,7 +254,7 @@ onBeforeUnmount(() => {
 
 .splash-sub {
   margin: 12px 0 0;
-  color: var(--muted);
+  color: var(--text-secondary);
   font-size: 13px;
   letter-spacing: 0.28em;
   text-indent: 0.28em;
@@ -287,22 +283,22 @@ onBeforeUnmount(() => {
   padding: 0;
   border: 0;
   border-radius: 999px;
-  background: rgba(47, 154, 92, 0.16);
+  background: var(--brand-soft);
   color: #fff;
   font: inherit;
   overflow: hidden;
   cursor: default;
   transition:
-    width 0.55s cubic-bezier(0.76, 0, 0.18, 1),
-    height 0.55s cubic-bezier(0.76, 0, 0.18, 1),
-    box-shadow 0.55s ease;
+    width 0.32s cubic-bezier(0.76, 0, 0.18, 1),
+    height 0.32s cubic-bezier(0.76, 0, 0.18, 1),
+    box-shadow 0.32s ease;
 }
 
 .is-ready .load-track {
   width: 196px;
   height: 48px;
   cursor: pointer;
-  box-shadow: 0 8px 18px rgba(47, 122, 72, 0.22);
+  box-shadow: 0 8px 18px var(--brand-glow);
 }
 
 .load-track:disabled {
@@ -310,7 +306,7 @@ onBeforeUnmount(() => {
 }
 
 .load-track:focus-visible {
-  outline: 2px solid var(--jade-deep);
+  outline: 2px solid var(--brand-primary);
   outline-offset: 3px;
 }
 
@@ -322,7 +318,7 @@ onBeforeUnmount(() => {
   display: block;
   width: 0;
   border-radius: inherit;
-  background: linear-gradient(90deg, #49c07e, var(--jade));
+  background: linear-gradient(90deg, var(--brand-primary-hover), var(--brand-primary));
 }
 
 .start-text {
@@ -336,7 +332,7 @@ onBeforeUnmount(() => {
 
 .is-ready .start-text {
   opacity: 1;
-  transition: opacity 0.35s ease 0.2s;
+  transition: opacity 0.2s ease 0.12s;
 }
 
 .load-label {
@@ -344,12 +340,12 @@ onBeforeUnmount(() => {
   max-height: 20px;
   overflow: hidden;
   text-align: center;
-  color: var(--jade);
+  color: var(--brand-primary);
   font-size: 12px;
   letter-spacing: 0.16em;
   transition:
-    opacity 0.25s ease,
-    max-height 0.45s ease;
+    opacity 0.16s ease,
+    max-height 0.28s ease;
 }
 
 .is-ready .load-label {
@@ -365,7 +361,7 @@ onBeforeUnmount(() => {
   position: absolute;
   z-index: 1;
   opacity: 0;
-  filter: drop-shadow(0 8px 12px rgba(47, 122, 72, 0.16));
+  filter: drop-shadow(0 8px 12px var(--shadow-color2-md));
 }
 
 .sticker svg {
@@ -374,28 +370,81 @@ onBeforeUnmount(() => {
   height: auto;
 }
 
+/* 贴纸插画跟随主题色 */
+.sp-card {
+  fill: var(--bg-surface-solid);
+  stroke: var(--accent-teal-soft);
+}
+
+.sp-label {
+  fill: var(--brand-primary);
+}
+
+.sp-check-bg {
+  fill: var(--brand-tint);
+  stroke: var(--brand-primary);
+}
+
+.sp-check {
+  stroke: var(--brand-primary);
+}
+
+.sp-rule {
+  stroke: var(--border);
+}
+
+.sp-ask-bubble {
+  fill: var(--bg-surface-solid);
+  stroke: var(--brand-primary);
+}
+
+.sp-ask-mark {
+  fill: var(--brand-primary);
+}
+
+.sp-ok-outer {
+  fill: var(--brand-primary);
+}
+
+.sp-ok-inner {
+  fill: var(--brand-primary-hover);
+}
+
+.sp-pill-body {
+  fill: var(--bg-surface-solid);
+  stroke: var(--accent-teal-soft);
+}
+
+.sp-pill-half {
+  fill: var(--brand-primary);
+}
+
+.sp-pill-line {
+  stroke: var(--border);
+}
+
 .sticker-card { top: 36%; left: max(8px, calc(50% - 232px)); width: 70px; }
 .sticker-ask { top: 22%; right: max(10px, calc(50% - 230px)); width: 56px; }
 .sticker-ok { top: 52%; right: max(16px, calc(50% - 224px)); width: 54px; }
 .sticker-pill { top: 58%; left: max(18px, calc(50% - 222px)); width: 68px; }
 
-.is-play .ecg-path { animation: draw 2.4s cubic-bezier(0.45, 0, 0.2, 1) 0.35s forwards; }
-.is-play .seal-ring { animation: draw 1.2s cubic-bezier(0.4, 0, 0.15, 1) 2.4s forwards; }
-.is-play .seal-char { animation: squash 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 3.15s forwards; }
-.is-play .splash-title span:nth-child(1) { animation: warp-a 0.82s cubic-bezier(0.18, 0.8, 0.2, 1) 3.55s forwards; }
-.is-play .splash-title span:nth-child(2) { animation: warp-b 0.82s cubic-bezier(0.18, 0.8, 0.2, 1) 3.7s forwards; }
-.is-play .splash-title span:nth-child(3) { animation: warp-c 0.82s cubic-bezier(0.18, 0.8, 0.2, 1) 3.85s forwards; }
-.is-play .splash-title span:nth-child(4) { animation: warp-d 0.82s cubic-bezier(0.18, 0.8, 0.2, 1) 4s forwards; }
-.is-play .splash-sub { animation: skew-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) 4.45s forwards; }
-.is-play .sticker-card { animation: pop-left 0.8s cubic-bezier(0.2, 0.85, 0.2, 1) 0.45s forwards; }
-.is-play .sticker-ask { animation: pop-right 0.8s cubic-bezier(0.2, 0.85, 0.2, 1) 0.7s forwards; }
-.is-play .sticker-ok { animation: pop-right 0.75s cubic-bezier(0.2, 0.85, 0.2, 1) 1.05s forwards; }
-.is-play .sticker-pill { animation: pop-left 0.75s cubic-bezier(0.2, 0.85, 0.2, 1) 1.25s forwards; }
-.is-play .sticker-bob { animation: bob 3.2s ease-in-out 2s infinite; }
+.is-play .ecg-path { animation: draw 1.2s cubic-bezier(0.45, 0, 0.2, 1) 0.18s forwards; }
+.is-play .seal-ring { animation: draw 0.6s cubic-bezier(0.4, 0, 0.15, 1) 1.2s forwards; }
+.is-play .seal-char { animation: squash 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) 1.58s forwards; }
+.is-play .splash-title span:nth-child(1) { animation: warp-a 0.41s cubic-bezier(0.18, 0.8, 0.2, 1) 1.78s forwards; }
+.is-play .splash-title span:nth-child(2) { animation: warp-b 0.41s cubic-bezier(0.18, 0.8, 0.2, 1) 1.85s forwards; }
+.is-play .splash-title span:nth-child(3) { animation: warp-c 0.41s cubic-bezier(0.18, 0.8, 0.2, 1) 1.93s forwards; }
+.is-play .splash-title span:nth-child(4) { animation: warp-d 0.41s cubic-bezier(0.18, 0.8, 0.2, 1) 2s forwards; }
+.is-play .splash-sub { animation: skew-in 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) 2.23s forwards; }
+.is-play .sticker-card { animation: pop-left 0.4s cubic-bezier(0.2, 0.85, 0.2, 1) 0.23s forwards; }
+.is-play .sticker-ask { animation: pop-right 0.4s cubic-bezier(0.2, 0.85, 0.2, 1) 0.35s forwards; }
+.is-play .sticker-ok { animation: pop-right 0.38s cubic-bezier(0.2, 0.85, 0.2, 1) 0.53s forwards; }
+.is-play .sticker-pill { animation: pop-left 0.38s cubic-bezier(0.2, 0.85, 0.2, 1) 0.63s forwards; }
+.is-play .sticker-bob { animation: bob 2.2s ease-in-out 1.1s infinite; }
 .is-play .load-fill { animation: load var(--load-ms) linear forwards; }
 
 .is-leave {
-  animation: curtain 0.8s cubic-bezier(0.76, 0, 0.18, 1) forwards;
+  animation: curtain 0.48s cubic-bezier(0.76, 0, 0.18, 1) forwards;
 }
 
 @keyframes draw { to { stroke-dashoffset: 0; } }

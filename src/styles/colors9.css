@@ -1,0 +1,47 @@
+/* colors9 · 鼠尾草灰绿
+   概念：低饱和鼠尾草绿 + 暖灰白底，最安静的一套，适合患者端长时间阅读。
+   主色白字 7.05:1，正文 14.94:1，次级文字 6.43:1。 */
+.mobile-layout,
+.admin-layout {
+  --brand-primary: #4c5d4c;
+  --brand-primary-hover: #5b6f5b;
+  --brand-primary-active: #394739;
+  --brand-soft: #d9ead9;
+  --brand-soft-text: #394739;
+  --brand-tint: #f0f7f0;
+  --brand-glow: rgb(76 93 76 / 0.28);
+
+  --accent-teal: #5b6f5b;
+  --accent-teal-soft: #d9ead9;
+  --accent-pink: #ad7575;
+  --accent-pink-soft: #fceae9;
+  --accent-lavender: #657765;
+  --accent-lavender-soft: #ebf0eb;
+
+  --bg-page: #f1f5f1;
+  --bg-page-gradient: linear-gradient(165deg, #f1f5f1 0%, #f7f9f7 45%, #ffffff 100%);
+  --bg-surface: rgb(255 255 255 / 0.92);
+  --bg-surface-solid: #ffffff;
+  --bg-muted: #e6ede6;
+  --border: #d9e0d9;
+  --border-light: #e8ede8;
+
+  --text-primary: #1d201d;
+  --text-secondary: #545a54;
+  --text-disabled: #929792;
+
+  --success-bg: #e3f4e6;
+  --success-text: #174825;
+  --success: #346c42;
+  --warning-bg: #fbf1dc;
+  --warning-text: #6f4f07;
+  --danger-bg: #ffe8e6;
+  --danger-text: #822b2a;
+  --danger: #ab413e;
+  --info-bg: #e7f2e6;
+  --info-text: #314a32;
+
+  --shadow-color2-sm: rgb(76 93 76 / 0.06);
+  --shadow-color2-md: rgb(76 93 76 / 0.08);
+  --shadow-color2-lg: rgb(76 93 76 / 0.1);
+}

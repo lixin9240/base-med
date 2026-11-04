@@ -11,10 +11,17 @@ const props = defineProps({
   // 已答题人数 / 已中奖人数，传 null 则不展示
   answeredPeople: { type: Number, default: null },
   winnerPeople: { type: Number, default: null },
+  // 浮在全屏视频上：透明顶栏、浅色文字。默认关闭，其它页面外观不变
+  overlay: { type: Boolean, default: false },
 })
 
 const router = useRouter()
 
+// 已答题人数保底展示 2000，超过后展示真实值
+const MIN_ANSWERED_PEOPLE = 2000
+const answeredTarget = computed(() =>
+  Math.max(MIN_ANSWERED_PEOPLE, Number(props.answeredPeople) || 0),
+)
 const hasStats = computed(() => props.answeredPeople !== null || props.winnerPeople !== null)
 const shownAnswered = ref(0)
 const shownWinners = ref(0)
@@ -27,7 +34,7 @@ function formatCount(value) {
 // 数字从 0 快速递增，减少动态偏好时直接展示结果
 function playStatsCount() {
   cancelAnimationFrame(statsRaf)
-  const targetAnswered = Number(props.answeredPeople) || 0
+  const targetAnswered = answeredTarget.value
   const targetWinners = Number(props.winnerPeople) || 0
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     shownAnswered.value = targetAnswered
@@ -55,7 +62,7 @@ onMounted(() => {
 })
 
 watch(
-  () => [props.answeredPeople, props.winnerPeople],
+  () => [answeredTarget.value, props.winnerPeople],
   () => {
     if (hasStats.value) playStatsCount()
   },
@@ -70,7 +77,7 @@ function back() {
 </script>
 
 <template>
-  <header class="pnav" :class="{ 'pnav--brand': brand, 'pnav--stats': hasStats }">
+  <header class="pnav" :class="{ 'pnav--brand': brand, 'pnav--stats': hasStats, 'pnav--overlay': overlay }">
     <button v-if="showBack" type="button" class="pnav__icon-btn" aria-label="返回" @click="back">
       <AppIcon name="chevronLeft" :size="22" />
     </button>
@@ -86,14 +93,6 @@ function back() {
           <span class="pnav__stat-label">
             <span class="pnav__stat-dot" aria-hidden="true" />
             人已答题
-          </span>
-        </span>
-        <span class="pnav__stat-divider" aria-hidden="true" />
-        <span class="pnav__stat pnav__stat--win">
-          <b class="pnav__stat-num">{{ formatCount(shownWinners) }}</b>
-          <span class="pnav__stat-label">
-            <span class="pnav__stat-dot" aria-hidden="true" />
-            人已中奖
           </span>
         </span>
       </div>
@@ -235,7 +234,7 @@ function back() {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: var(--success);
+  background: var(--brand-primary);
   flex-shrink: 0;
 }
 
@@ -299,5 +298,42 @@ function back() {
   .pnav {
     background: var(--bg-surface-solid);
   }
+}
+
+/* 全屏播放时顶栏浮在画面上，不占独立一条白底 */
+.pnav--overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  background: transparent;
+  background-color: transparent;
+  border-bottom: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.pnav--overlay .pnav__title,
+.pnav--overlay .pnav__stat-label {
+  color: #fff;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+}
+
+.pnav--overlay .pnav__stat-num,
+.pnav--overlay .pnav__stat--win .pnav__stat-num {
+  color: #fff;
+}
+
+.pnav--overlay .pnav__stat-divider {
+  background: rgb(255 255 255 / 0.35);
+}
+
+.pnav--overlay .pnav__stat-dot {
+  background: #7dffa8;
+}
+
+.pnav--overlay .pnav__stat--win .pnav__stat-dot {
+  background: #ffd77a;
 }
 </style>

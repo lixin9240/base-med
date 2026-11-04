@@ -174,12 +174,11 @@ function goLottery() {
         </p>
       </section>
 
-      <section class="lottery-entry">
+      <!-- <section class="lottery-entry">
         <button type="button" class="btn btn--primary btn--lg btn--block" @click="goLottery">
           参与抽奖
         </button>
-        <p class="lottery-entry__hint">每天 3 次机会，中奖后填写手机号领取</p>
-      </section>
+      </section> -->
 
       <section class="review">
         <h2 class="review__head">逐题解析</h2>

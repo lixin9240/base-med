@@ -3,13 +3,23 @@ import { getAdminToken, isSkipAdminAuth } from '@/store/admin/auth'
 
 const WHITE_LIST = ['/admin/login', '/admin/forget-password']
 
+/** 分享链接若落在首页或站点根路径，仍进对应用户端答题页 */
+function redirectShareEntry(to) {
+  const videoId = to.query.videoId || to.query.video_id
+  if (!videoId && !to.query.share) return '/mobile/home'
+  return {
+    path: '/mobile/quiz',
+    query: videoId ? { ...to.query, videoId } : { ...to.query },
+  }
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // 默认入口：打开站点后进入用户端首页
+    // 默认入口：打开站点根路径后进入用户端首页，分享链接则进入答题页
     {
       path: '/',
-      redirect: '/mobile/home',
+      redirect: redirectShareEntry,
     },
 
     // 管理端 · 登录
@@ -61,13 +71,21 @@ const router = createRouter({
     {
       path: '/mobile',
       component: () => import('@/layouts/MobileLayout.vue'),
-      redirect: '/mobile/home',
+      redirect: redirectShareEntry,
       children: [
         // 用户端 · 首页（视频列表）
         {
           path: 'home',
           name: 'mobile-home',
           component: () => import('@/views/mobile/home/Home.vue'),
+          beforeEnter: (to) => {
+            const videoId = to.query.videoId || to.query.video_id
+            if (!videoId && !to.query.share) return true
+            return {
+              path: '/mobile/quiz',
+              query: videoId ? { ...to.query, videoId } : { ...to.query },
+            }
+          },
         },
         // 用户端 · 答题（学前 / 看完 / 再次答题）
         {

@@ -1,0 +1,45 @@
+/* 方案 colors2：清新绿蓝（健康、亲和，适合社区医院与健康管理平台） */
+.mobile-layout,
+.admin-layout {
+  --brand-primary: #00796b;
+  --brand-primary-hover: #009688;
+  --brand-primary-active: #00695c;
+  --brand-soft: #dbf0ee;
+  --brand-soft-text: #00695c;
+  --brand-tint: #f0f7f6;
+  --brand-glow: rgb(0 121 107 / 0.28);
+
+  --accent-teal: #004d40;
+  --accent-teal-soft: #b8cdca;
+  --accent-pink: #ef8b80;
+  --accent-pink-soft: #fbdfdc;
+  --accent-lavender: #59a89f;
+  --accent-lavender-soft: #d1e7e4;
+
+  --bg-page: #e8f5f2;
+  --bg-page-gradient: linear-gradient(165deg, #e8f5f2 0%, #f5faf9 45%, #ffffff 100%);
+  --bg-surface: rgb(255 255 255 / 0.92);
+  --bg-surface-solid: #ffffff;
+  --bg-muted: #daeeea;
+  --border: rgb(0 121 107 / 0.1);
+  --border-light: rgb(0 121 107 / 0.05);
+
+  --text-primary: #263238;
+  --text-secondary: #677074;
+  --text-disabled: #9da3a5;
+
+  --success-bg: #e6efe6;
+  --success-text: #1f5522;
+  --success: #2e7d32;
+  --warning-bg: #fff8e6;
+  --warning-text: #7a5c00;
+  --danger-bg: #fceae8;
+  --danger-text: #a6372b;
+  --danger: #e74c3c;
+  --info-bg: #e0eae8;
+  --info-text: #003028;
+
+  --shadow-color2-sm: rgb(0 121 107 / 0.06);
+  --shadow-color2-md: rgb(0 121 107 / 0.08);
+  --shadow-color2-lg: rgb(0 121 107 / 0.1);
+}

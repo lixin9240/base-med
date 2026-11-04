@@ -8,8 +8,8 @@ import {
 } from '@/api'
 import {
   COVER_MAX_SIZE_MB,
-  VIDEO_CATEGORIES,
   VIDEO_INTRO_MAX,
+  VIDEO_KEY_POINTS_MAX,
   VIDEO_MAX_SIZE_MB,
   VIDEO_SOURCE,
   VIDEO_TITLE_MAX,
@@ -30,11 +30,6 @@ const props = defineProps({
   video: {
     type: Object,
     default: null,
-  },
-  /** 分类列表（来自 2.7.1），[{ id, name }] */
-  categories: {
-    type: Array,
-    default: () => [],
   },
 })
 
@@ -58,29 +53,8 @@ const modalTitle = computed(() => (isEdit.value ? '编辑视频' : '新增视频
 const isUpload = computed(() => draft.source === VIDEO_SOURCE.UPLOAD)
 const titleCount = computed(() => draft.title.length)
 const introCount = computed(() => draft.intro.length)
+const keyPointsCount = computed(() => draft.articleBody.length)
 const submitLabel = computed(() => (saving.value ? '保存中…' : '保存'))
-
-/** 分类下拉选项：优先用 2.7.1 接口返回的分类名，接口未就绪时退回本地常量 */
-const categoryOptions = computed(() =>
-  props.categories?.length ? props.categories.map((item) => item.name) : VIDEO_CATEGORIES,
-)
-
-/** 编辑回填的分类名不在列表里时的提示 */
-const categoryMissing = computed(
-  () => Boolean(draft.category) && !categoryOptions.value.includes(draft.category),
-)
-
-function categoryIdOf(name) {
-  const matched = props.categories?.find((item) => item.name === name)
-  return matched ? matched.id : null
-}
-
-/** 当前分类没有接口 id 时，改用分类接口返回的第一项，保证保存能带上 category_id */
-function alignCategory() {
-  if (categoryIdOf(draft.category) !== null) return
-  const first = props.categories?.[0]
-  if (first?.name) draft.category = first.name
-}
 
 watch(
   () => props.open,
@@ -88,13 +62,6 @@ watch(
     if (open) reset()
   },
   { immediate: true },
-)
-
-watch(
-  () => props.categories,
-  () => {
-    if (props.open) alignCategory()
-  },
 )
 
 function nextOrder() {
@@ -115,7 +82,6 @@ function reset() {
   uploadingCover.value = false
   if (videoInput.value) videoInput.value.value = ''
   if (coverInput.value) coverInput.value.value = ''
-  alignCategory()
 }
 
 function clearError(key) {
@@ -125,16 +91,6 @@ function clearError(key) {
   errors.value = next
 }
 
-function selectSource(source) {
-  if (draft.source === source) return
-  draft.source = source
-  uploadError.value = ''
-  // 切换来源时清掉另一种来源的输入，避免提交错的字段
-  draft.videoUrl = ''
-  videoFileName.value = ''
-  videoFile.value = null
-  clearError('videoUrl')
-}
 
 function onVideoFile(event) {
   const file = event.target.files?.[0]
@@ -229,21 +185,10 @@ async function submit() {
   uploadError.value = ''
   let createdId = null
   try {
-    // 新增和编辑都要提交真实的 category_id
-    const categoryId = categoryIdOf(draft.category)
-    if (categoryId === null) {
-      const message = props.categories?.length
-        ? '该分类不在分类列表中，请重新选择'
-        : '分类列表还没加载成功，请关闭弹窗后重试'
-      errors.value = { ...errors.value, category: message }
-      uploadError.value = message
-      return
-    }
-
-    // 2.2.3 新增 / 2.2.4 编辑共用同一组字段
+    // 页面不展示分类，新增和编辑固定传 category_id = 1
     const payload = {
       title: draft.title.trim(),
-      category_id: categoryId,
+      category_id: 1,
       speaker: draft.speaker.trim(),
       speaker_title: draft.speakerTitle.trim(),
       speaker_org: draft.speakerOrg.trim(),
@@ -313,7 +258,6 @@ async function submit() {
       </header>
 
       <form class="video-form__body" @submit.prevent="submit">
-        <!-- 标题 + 分类 -->
         <div class="form-row">
           <label class="field field--grow">
             <span class="field__label"><em class="req">*</em>视频标题</span>
@@ -327,17 +271,6 @@ async function submit() {
               <span class="field__counter"> {{ titleCount }} / {{ VIDEO_TITLE_MAX }} </span>
             </span>
             <p v-if="errors.title" class="field__error">{{ errors.title }}</p>
-          </label>
-
-          <label class="field field--category">
-            <span class="field__label"><em class="req">*</em>分类</span>
-            <select v-model="draft.category">
-              <option v-for="name in categoryOptions" :key="name" :value="name">
-                {{ name }}
-              </option>
-            </select>
-            <p v-if="errors.category" class="field__error">{{ errors.category }}</p>
-            <p v-else-if="categoryMissing" class="field__error">该分类不在分类列表中，请重新选择</p>
           </label>
         </div>
 
@@ -528,12 +461,19 @@ async function submit() {
         <!-- 文字要点 -->
         <label class="field">
           <span class="field__label">文字要点</span>
-          <textarea
-            v-model="draft.articleBody"
-            class="article-input"
-            rows="6"
-            placeholder="可选。给不方便看视频的人一段文字说明。段落前用【小标题】，用 **文字** 表示加粗。"
-          />
+          <span class="field__control field__control--area">
+            <textarea
+              v-model="draft.articleBody"
+              class="article-input"
+              :maxlength="VIDEO_KEY_POINTS_MAX"
+              rows="6"
+              placeholder="可选。给不方便看视频的人一段文字说明。段落前用【小标题】，用 **文字** 表示加粗。"
+            />
+            <span class="field__counter field__counter--area">
+              {{ keyPointsCount }} / {{ VIDEO_KEY_POINTS_MAX }}
+            </span>
+          </span>
+          <p v-if="errors.articleBody" class="field__error">{{ errors.articleBody }}</p>
         </label>
 
         <!-- 上架状态 + 排序号 -->
@@ -667,10 +607,6 @@ async function submit() {
 
 .field--grow {
   flex: 1;
-}
-
-.field--category {
-  flex: 0 0 220px;
 }
 
 .field--order {
@@ -1146,7 +1082,6 @@ async function submit() {
   }
 
   .field--grow,
-  .field--category,
   .field--order {
     flex: 1 1 100%;
   }
