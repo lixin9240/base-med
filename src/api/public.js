@@ -10,6 +10,7 @@ const EXAM_SUBMIT_PRE_PATH = '/api/public/exam/submit-pre'
 const EXAM_SUBMIT_POST_PATH = '/api/public/exam/submit-post'
 const EXAM_RETAKE_PATH = '/api/public/exam/retake'
 const EXAM_RESULT_PATH = '/api/public/exam/result'
+const ANSWERED_ENTRY_PATH = '/api/public/statistics/answered-entry'
 /** 3.1 获取匿名 DR 编号（点击视频时签发）。参数 video_id。返回 dr_id 字符串 */
 export async function createPublicDr(videoId) {
   const body = await get(`${DR_CREATE_PATH}?video_id=${encodeURIComponent(videoId)}`)
@@ -98,5 +99,14 @@ export async function getExamResult(params, options = {}) {
     throw new Error('答题结果加载失败：服务未返回标准数据')
   }
   return body.data
+}
+
+/** 4.1 获取进入答题页人数（公开统计，进入答题即计数） */
+export async function getAnsweredEntryTotal() {
+  const body = await get(ANSWERED_ENTRY_PATH)
+  if (!body || typeof body !== 'object' || !body.data) {
+    throw new Error('答题人数加载失败：服务未返回标准数据')
+  }
+  return Number(body.data.answer_entry_total) || 0
 }
 

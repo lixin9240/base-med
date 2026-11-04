@@ -3,6 +3,7 @@
 
 use App\Http\Controllers\Fmy\DrController;
 use App\Http\Controllers\Fmy\ExamController;
+use App\Http\Controllers\Fmy\StatisticsController as FmyStatisticsController;
 use App\Http\Controllers\Fmy\VideoController;
 use App\Http\Controllers\Lx\ExamRecordController;
 use App\Http\Controllers\Lx\QuestionController;
@@ -204,6 +205,9 @@ Route::prefix('public')->group(function () {
 
     // 3.8 获取答题结果
     Route::get(uri: '/exam/result', action: [ExamController::class, 'result']);
+
+    // 进入答题页人数（公开统计）
+    Route::get(uri: '/statistics/answered-entry', action: [FmyStatisticsController::class, 'answeredEntry']);
 });
 
 /*
