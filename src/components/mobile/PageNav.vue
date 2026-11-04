@@ -17,6 +17,11 @@ const props = defineProps({
 
 const router = useRouter()
 
+// 已答题人数保底展示 2000，超过后展示真实值
+const MIN_ANSWERED_PEOPLE = 2000
+const answeredTarget = computed(() =>
+  Math.max(MIN_ANSWERED_PEOPLE, Number(props.answeredPeople) || 0),
+)
 const hasStats = computed(() => props.answeredPeople !== null || props.winnerPeople !== null)
 const shownAnswered = ref(0)
 const shownWinners = ref(0)
@@ -29,7 +34,7 @@ function formatCount(value) {
 // 数字从 0 快速递增，减少动态偏好时直接展示结果
 function playStatsCount() {
   cancelAnimationFrame(statsRaf)
-  const targetAnswered = Number(props.answeredPeople) || 0
+  const targetAnswered = answeredTarget.value
   const targetWinners = Number(props.winnerPeople) || 0
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     shownAnswered.value = targetAnswered
@@ -57,7 +62,7 @@ onMounted(() => {
 })
 
 watch(
-  () => [props.answeredPeople, props.winnerPeople],
+  () => [answeredTarget.value, props.winnerPeople],
   () => {
     if (hasStats.value) playStatsCount()
   },
@@ -88,14 +93,6 @@ function back() {
           <span class="pnav__stat-label">
             <span class="pnav__stat-dot" aria-hidden="true" />
             人已答题
-          </span>
-        </span>
-        <span class="pnav__stat-divider" aria-hidden="true" />
-        <span class="pnav__stat pnav__stat--win">
-          <b class="pnav__stat-num">{{ formatCount(shownWinners) }}</b>
-          <span class="pnav__stat-label">
-            <span class="pnav__stat-dot" aria-hidden="true" />
-            人已中奖
           </span>
         </span>
       </div>
