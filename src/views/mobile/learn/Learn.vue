@@ -163,8 +163,7 @@ onMounted(async () => {
       speakerOrg: detail.speaker_org,
       intro: detail.brief_intro,
       videoUrl: detail.video_url,
-      articleBody: detail.brief_intro
-,
+      articleBody: detail.text_key_points,
       examState: detail.exam_state,
     }
 
@@ -956,7 +955,7 @@ async function goQuiz() {
 }
 
 .stage-copy__points.is-clamp {
-  max-height: calc(1.45em * 2);
+  max-height: calc(1.45em * 4);
   overflow: hidden;
 }
 
