@@ -106,7 +106,9 @@ class DoubaoTtsConnection
             $context
         );
         if ($socket === false) {
-            throw new RuntimeException('连接语音服务失败');
+            $tlsErr = openssl_error_string();
+            $hint = $tlsErr !== false ? "；TLS: $tlsErr" : '';
+            throw new RuntimeException("连接语音服务失败：主机={$this->host}，errno=$errno，errstr=$errstr{$hint}。请检查出站 443 是否放行、PHP openssl 扩展是否启用，以及 openssl.cafile/curl.cainfo 是否指向有效 CA 证书文件。");
         }
         stream_set_timeout($socket, 20);
         $this->socket = $socket;
