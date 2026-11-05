@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
+import { getAnsweredEntryTotal } from '@/api/public'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -17,15 +18,26 @@ const props = defineProps({
 
 const router = useRouter()
 
-// 已答题人数保底展示 2000，超过后展示真实值
+// 已答题人数：管理端统计大盘 answer_total_times + 2000，接口不可用时回退到 2000 保底
 const MIN_ANSWERED_PEOPLE = 2000
-const answeredTarget = computed(() =>
-  Math.max(MIN_ANSWERED_PEOPLE, Number(props.answeredPeople) || 0),
-)
+const remoteAnswered = ref(null)
+const answeredTarget = computed(() => {
+  const source = remoteAnswered.value ?? Number(props.answeredPeople) ?? 0
+  return Math.max(MIN_ANSWERED_PEOPLE, Number(source) || 0)
+})
 const hasStats = computed(() => props.answeredPeople !== null || props.winnerPeople !== null)
 const shownAnswered = ref(0)
 const shownWinners = ref(0)
 let statsRaf = null
+
+async function loadAnsweredPeople() {
+  try {
+    const total = await getAnsweredEntryTotal()
+    if (Number.isFinite(total)) remoteAnswered.value = total + 2000
+  } catch {
+    // 接口不可用时静默回退到 2000 保底
+  }
+}
 
 function formatCount(value) {
   return Number(value || 0).toLocaleString('zh-CN')
@@ -58,6 +70,8 @@ function playStatsCount() {
 }
 
 onMounted(() => {
+  // 每次组件挂载都请求一次答题人数接口
+  loadAnsweredPeople()
   if (hasStats.value) playStatsCount()
 })
 
