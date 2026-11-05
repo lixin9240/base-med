@@ -3,6 +3,7 @@
 
 use App\Http\Controllers\Fmy\DrController;
 use App\Http\Controllers\Fmy\ExamController;
+use App\Http\Controllers\Fmy\SpeechController;
 use App\Http\Controllers\Fmy\VideoController;
 use App\Http\Controllers\Lx\ExamRecordController;
 use App\Http\Controllers\Lx\QuestionController;
@@ -204,6 +205,9 @@ Route::prefix('public')->group(function () {
 
     // 3.8 获取答题结果
     Route::get(uri: '/exam/result', action: [ExamController::class, 'result']);
+
+    // 3.10 预设提示词语音合成（豆包语音，返回 MP3）
+    Route::post(uri: '/speech', action: [SpeechController::class, 'synthesize']);
 });
 
 /*

@@ -498,7 +498,7 @@ async function exportStatistics() {
 
 .stat-card__num {
   margin: 0;
-  font-size: 30px;
+  font-size: 1.875em;
   font-weight: var(--fw-bold);
   line-height: 1.1;
   color: var(--text-primary);

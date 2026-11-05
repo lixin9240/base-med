@@ -848,7 +848,7 @@ async function goQuiz() {
 }
 
 .quiz-dial__sub {
-  font-size: 10px;
+  font-size: 0.625em;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   color: var(--dial-sub);
@@ -891,7 +891,7 @@ async function goQuiz() {
 
 .dock__note {
   margin: 2px max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
-  font-size: 11px;
+  font-size: 0.6875em;
   line-height: 1.4;
   color: rgb(255 255 255 / 0.72);
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.65);
@@ -908,7 +908,7 @@ async function goQuiz() {
   border-radius: 999px;
   background: rgb(0 0 0 / 0.55);
   color: #fff;
-  font-size: 13px;
+  font-size: 0.8125em;
   letter-spacing: 0.04em;
   pointer-events: none;
 }
@@ -938,7 +938,7 @@ async function goQuiz() {
 
 .stage-copy__title {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125em;
   font-weight: var(--fw-semibold);
   line-height: 1.35;
   color: #fff;
@@ -950,7 +950,7 @@ async function goQuiz() {
 }
 
 .stage-copy__points {
-  font-size: 11px;
+  font-size: 0.6875em;
   line-height: 1.45;
 }
 
@@ -965,7 +965,7 @@ async function goQuiz() {
   margin: 0 0 3px;
   padding: 0;
   border: none;
-  font-size: 11px;
+  font-size: 0.6875em;
   font-weight: 400;
   line-height: 1.45;
   color: rgb(255 255 255 / 0.92);
@@ -985,7 +985,7 @@ async function goQuiz() {
   border: none;
   background: transparent;
   color: #fff;
-  font-size: 11px;
+  font-size: 0.6875em;
   line-height: 1.4;
   text-decoration: underline;
   text-underline-offset: 2px;

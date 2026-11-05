@@ -3,14 +3,14 @@
 
 .mobile-layout,
 .admin-layout {
-  --fs-xs: 12px;
-  --fs-sm: 14px;
-  --fs-base: 15px;
-  --fs-md: 16px;
-  --fs-lg: 18px;
-  --fs-xl: 20px;
-  --fs-2xl: 24px;
-  --fs-3xl: 30px;
+  --fs-xs: 0.75em;
+  --fs-sm: 0.875em;
+  --fs-base: 0.9375em;
+  --fs-md: 1em;
+  --fs-lg: 1.125em;
+  --fs-xl: 1.25em;
+  --fs-2xl: 1.5em;
+  --fs-3xl: 1.875em;
 
   --fw-medium: 500;
   --fw-semibold: 600;

@@ -223,7 +223,7 @@ function back() {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 10px;
+  font-size: 0.625em;
   letter-spacing: 0.02em;
   color: var(--text-secondary);
   line-height: 1.2;
