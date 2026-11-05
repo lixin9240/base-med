@@ -34,7 +34,7 @@ return [
     'doubao_tts' => [
         'key' => env('DOUBAO_TTS_API_KEY'),
         'resource_id' => env('DOUBAO_TTS_RESOURCE_ID', 'seed-tts-2.0'),
-        'speaker' => env('DOUBAO_TTS_SPEAKER', 'zh_female_zhixingnv_uranus_bigtts'),
+        'speaker' => env('DOUBAO_TTS_SPEAKER', 'zh_female_yingyujiaoxue_uranus_bigtts'),
         'host' => env('DOUBAO_TTS_HOST', 'openspeech.bytedance.com'),
     ],
 
