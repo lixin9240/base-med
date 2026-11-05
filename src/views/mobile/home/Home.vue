@@ -293,7 +293,7 @@ async function openCourse(item) {
   align-items: center;
   gap: 4px;
   margin: var(--sp-1) 0 0;
-  font-size: 11px;
+  font-size: 0.6875em;
   color: var(--success-text);
 }
 
@@ -306,7 +306,7 @@ async function openCourse(item) {
   margin-top: var(--sp-6);
   padding: 0 var(--sp-4);
   text-align: center;
-  font-size: 11px;
+  font-size: 0.6875em;
   color: var(--text-disabled);
   line-height: 1.6;
 }

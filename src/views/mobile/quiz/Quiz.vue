@@ -6,6 +6,7 @@ import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
 import QuizSplash from '@/components/mobile/QuizSplash.vue'
 import { speak } from '@/utils/speech'
+import { warmVideo } from '@/utils/video/preload'
 import { toast } from '@/utils/toast'
 import { currentDrId, isSkipWatch, issueDrId } from '@/store/mobile/session'
 import {
@@ -142,6 +143,7 @@ onMounted(async () => {
       examState: detail.exam_state,
       watchProgress: detail.watch_progress,
     }
+    warmVideo(detail.video_url)
     questions.value = await listPublicQuestions(videoId)
 
     if (!questions.value.length) {

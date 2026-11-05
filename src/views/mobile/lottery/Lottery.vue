@@ -7,12 +7,12 @@ import { claimLocalLottery, drawLocalLottery, getLocalLotteryInfo } from '@/stor
 
 const SPIN_DURATION = 4200
 const SECTOR_TONES = [
-  { bg: '#d8f3dc', text: '#14532d' },
-  { bg: '#b7e4c7', text: '#14532d' },
-  { bg: '#d8f3dc', text: '#14532d' },
-  { bg: '#b7e4c7', text: '#14532d' },
-  { bg: '#f6d365', text: '#5c4400' },
-  { bg: '#e8f5ee', text: '#5c6f65' },
+  { bg: 'var(--brand-soft)', text: 'var(--brand-soft-text)' },
+  { bg: 'var(--accent-teal-soft)', text: 'var(--brand-soft-text)' },
+  { bg: 'var(--brand-soft)', text: 'var(--brand-soft-text)' },
+  { bg: 'var(--accent-lavender-soft)', text: 'var(--brand-soft-text)' },
+  { bg: 'var(--warning-bg)', text: 'var(--warning-text)' },
+  { bg: 'var(--bg-muted)', text: 'var(--text-secondary)' },
 ]
 const PRIZE_LINE_BREAK = {
   远程会诊一次: ['远程会诊', '一次'],
@@ -241,7 +241,15 @@ function fireConfetti() {
   if (!ctx) return
   ctx.scale(dpr, dpr)
 
-  const colors = ['#1b4332', '#2d6a4f', '#52b788', '#f5c451', '#ffffff']
+  const canvasStyle = getComputedStyle(canvas)
+  const readColor = (name, fallback) => canvasStyle.getPropertyValue(name).trim() || fallback
+  const colors = [
+    readColor('--brand-primary', '#00529b'),
+    readColor('--brand-primary-hover', '#1a64ab'),
+    readColor('--accent-teal', '#00a896'),
+    '#d9a441',
+    '#ffffff',
+  ]
   const particles = Array.from({ length: 140 }, () => ({
     x: Math.random() * width,
     y: -20 - Math.random() * 120,
@@ -322,7 +330,7 @@ function fireConfetti() {
                 v-for="sector in wheelSectors"
                 :key="sector.key"
                 :d="sector.d"
-                :fill="sector.color"
+                :style="{ fill: sector.color }"
                 stroke="#ffffff"
                 stroke-width="2"
               />
@@ -338,7 +346,7 @@ function fireConfetti() {
                   :y="(lineIndex - (sector.lines.length - 1) / 2) * 14"
                   text-anchor="middle"
                   class="lot__wheel-text"
-                  :fill="sector.textColor"
+                  :style="{ fill: sector.textColor }"
                 >
                   {{ line }}
                 </text>
@@ -474,12 +482,12 @@ function fireConfetti() {
 }
 
 .lot__hero {
-  padding: var(--sp-6) var(--sp-5);
+  padding: var(--sp-6) var(--sp-5) calc(var(--sp-8) + var(--sp-5));
   background:
     radial-gradient(circle at 88% 4%, rgb(245 196 81 / 0.32) 0%, transparent 46%),
     linear-gradient(160deg, #fbfefc 0%, var(--brand-tint) 42%, var(--brand-soft) 100%);
   color: var(--brand-primary);
-  border-bottom: 1px solid rgb(27 67 50 / 0.06);
+  border-bottom: 1px solid var(--border-light);
 }
 
 .lot__eyebrow {
@@ -552,7 +560,7 @@ function fireConfetti() {
 .lot__stage {
   position: relative;
   z-index: 2;
-  margin: var(--sp-6) var(--sp-4) 0;
+  margin: calc(-1 * var(--sp-8)) var(--sp-4) 0;
   padding: var(--sp-5) var(--sp-4);
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
@@ -579,11 +587,11 @@ function fireConfetti() {
   display: block;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 10px 22px rgb(27 67 50 / 0.18));
+  filter: drop-shadow(0 10px 22px var(--brand-glow));
 }
 
 .lot__wheel-text {
-  font-size: 11px;
+  font-size: 0.6875em;
   font-weight: var(--fw-bold);
   letter-spacing: 0.5px;
 }
@@ -612,7 +620,7 @@ function fireConfetti() {
   border: 3px solid #f5c451;
   border-radius: 50%;
   background: radial-gradient(circle at 34% 28%, var(--brand-primary-hover) 0%, var(--brand-primary) 46%, var(--brand-primary-active) 100%);
-  box-shadow: 0 8px 20px rgb(27 67 50 / 0.28);
+  box-shadow: 0 8px 20px var(--brand-glow);
   color: #fff;
   font-size: var(--fs-md);
   font-weight: var(--fw-bold);
@@ -827,13 +835,12 @@ function fireConfetti() {
 
 @media (max-width: 360px) {
   .lot__hero {
-    padding: var(--sp-5) var(--sp-4);
+    padding: var(--sp-5) var(--sp-4) calc(var(--sp-8) + var(--sp-3));
   }
   .lot__title {
     font-size: var(--fs-xl);
   }
   .lot__stage {
-    margin-top: var(--sp-4);
     margin-left: var(--sp-3);
     margin-right: var(--sp-3);
     padding: var(--sp-4) var(--sp-3);

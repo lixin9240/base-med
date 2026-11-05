@@ -174,11 +174,11 @@ function goLottery() {
         </p>
       </section>
 
-      <section class="lottery-entry">
+      <!-- <section class="lottery-entry">
         <button type="button" class="btn btn--primary btn--lg btn--block" @click="goLottery">
           参与抽奖
         </button>
-      </section>
+      </section> -->
 
       <section class="review">
         <h2 class="review__head">逐题解析</h2>
@@ -294,7 +294,7 @@ function goLottery() {
 }
 
 .hero__num {
-  font-size: 46px;
+  font-size: 2.875em;
   font-weight: var(--fw-bold);
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -306,7 +306,7 @@ function goLottery() {
     padding: var(--sp-5) var(--sp-3);
   }
   .hero__num {
-    font-size: 36px;
+    font-size: 2.25em;
   }
   .review {
     margin: 0 var(--sp-3);
@@ -443,7 +443,7 @@ function goLottery() {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 0.6875em;
   font-weight: var(--fw-semibold);
   flex-shrink: 0;
 }
@@ -453,7 +453,7 @@ function goLottery() {
 }
 
 .rop__tag {
-  font-size: 11px;
+  font-size: 0.6875em;
   font-weight: var(--fw-semibold);
 }
 </style>

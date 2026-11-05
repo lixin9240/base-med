@@ -16,7 +16,7 @@ function redirectShareEntry(to) {
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // 默认入口：打开站点后进入用户端首页
+    // 默认入口：打开站点根路径后进入用户端首页，分享链接则进入答题页
     {
       path: '/',
       redirect: redirectShareEntry,

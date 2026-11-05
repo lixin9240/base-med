@@ -1,0 +1,45 @@
+/* 方案 colors4：暖白柔和（低对比、温和友好，适合患者端挂号、问诊） */
+.mobile-layout,
+.admin-layout {
+  --brand-primary: #1976d2;
+  --brand-primary-hover: #42a5f5;
+  --brand-primary-active: #0d47a1;
+  --brand-soft: #ffe6c2;
+  --brand-soft-text: #0d47a1;
+  --brand-tint: #f1f7fc;
+  --brand-glow: rgb(25 118 210 / 0.28);
+
+  --accent-teal: #37474f;
+  --accent-teal-soft: #c7cbce;
+  --accent-pink: #ee7e7c;
+  --accent-pink-soft: #fadbdb;
+  --accent-lavender: #6aa6e2;
+  --accent-lavender-soft: #d6e6f7;
+
+  --bg-page: #fafafa;
+  --bg-page-gradient: linear-gradient(165deg, #fafafa 0%, #fdfdfd 45%, #ffffff 100%);
+  --bg-surface: rgb(255 255 255 / 0.92);
+  --bg-surface-solid: #ffffff;
+  --bg-muted: #ecf2f8;
+  --border: rgb(25 118 210 / 0.1);
+  --border-light: rgb(25 118 210 / 0.05);
+
+  --text-primary: #424242;
+  --text-secondary: #7b7b7b;
+  --text-disabled: #aaaaaa;
+
+  --success-bg: #e8f4e9;
+  --success-text: #2e6d30;
+  --success: #43a047;
+  --warning-bg: #fff8e6;
+  --warning-text: #7a5c00;
+  --danger-bg: #fce7e7;
+  --danger-text: #a52926;
+  --danger: #e53935;
+  --info-bg: #e7e9ea;
+  --info-text: #222c31;
+
+  --shadow-color2-sm: rgb(25 118 210 / 0.06);
+  --shadow-color2-md: rgb(25 118 210 / 0.08);
+  --shadow-color2-lg: rgb(25 118 210 / 0.1);
+}
