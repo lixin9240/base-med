@@ -1,0 +1,47 @@
+/* colors6 · 苔原橄榄
+   概念：橄榄绿主色 + 苔原灰白底 + 旧铜色强调。
+   气质更自然、偏社区健康；主色白字 8.36:1，正文 14.8:1。 */
+.mobile-layout,
+.admin-layout {
+  --brand-primary: #465231;
+  --brand-primary-hover: #55643b;
+  --brand-primary-active: #333c22;
+  --brand-soft: #e0e8d3;
+  --brand-soft-text: #333c22;
+  --brand-tint: #f3f7ee;
+  --brand-glow: rgb(70 82 49 / 0.28);
+
+  --accent-teal: #55643b;
+  --accent-teal-soft: #e0e8d3;
+  --accent-pink: #ad7575;
+  --accent-pink-soft: #fceae9;
+  --accent-lavender: #6d755f;
+  --accent-lavender-soft: #edefea;
+
+  --bg-page: #f2f5ee;
+  --bg-page-gradient: linear-gradient(165deg, #f2f5ee 0%, #f7f9f5 45%, #ffffff 100%);
+  --bg-surface: rgb(255 255 255 / 0.92);
+  --bg-surface-solid: #ffffff;
+  --bg-muted: #e9ede4;
+  --border: #dcdfd7;
+  --border-light: #eaece6;
+
+  --text-primary: #1e2119;
+  --text-secondary: #565952;
+  --text-disabled: #949691;
+
+  --success-bg: #e3f4e6;
+  --success-text: #174825;
+  --success: #346c42;
+  --warning-bg: #fbf1dc;
+  --warning-text: #6f4f07;
+  --danger-bg: #ffe8e6;
+  --danger-text: #822b2a;
+  --danger: #ab413e;
+  --info-bg: #ebf1e3;
+  --info-text: #3c4729;
+
+  --shadow-color2-sm: rgb(70 82 49 / 0.06);
+  --shadow-color2-md: rgb(70 82 49 / 0.08);
+  --shadow-color2-lg: rgb(70 82 49 / 0.1);
+}

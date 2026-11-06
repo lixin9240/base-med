@@ -152,7 +152,7 @@
 }
 
 .brand-name {
-  font-size: 28px;
+  font-size: 1.75em;
   font-weight: var(--fw-bold);
   margin: 0;
   letter-spacing: 0.5px;
@@ -160,7 +160,7 @@
 }
 
 .brand-subtitle {
-  font-size: 17px;
+  font-size: 1.0625em;
   font-weight: 400;
   margin: 4px 0 0;
   color: var(--text-secondary);
@@ -169,7 +169,7 @@
 /* 主标题 */
 .brand-heading {
   margin: clamp(28px, 6vh, 56px) 0 0;
-  font-size: clamp(28px, 4vw, 52px);
+  font-size: clamp(1.75em, 4vw, 3.25em);
   line-height: 1.28;
   font-weight: 800;
   letter-spacing: 1px;
@@ -179,7 +179,7 @@
 /* 说明文字 */
 .brand-intro {
   margin: 28px 0 0;
-  font-size: 19px;
+  font-size: 1.1875em;
   line-height: 1.85;
   color: var(--text-secondary);
 }
@@ -224,14 +224,14 @@
 
 .feature-title {
   margin: 0 0 6px;
-  font-size: 21px;
+  font-size: 1.3125em;
   font-weight: var(--fw-bold);
   color: var(--text-primary);
 }
 
 .feature-desc {
   margin: 0;
-  font-size: 17px;
+  font-size: 1.0625em;
   line-height: 1.5;
   color: var(--text-secondary);
 }
@@ -240,7 +240,7 @@
   position: absolute;
   bottom: 28px;
   left: 80px;
-  font-size: 13px;
+  font-size: 0.8125em;
   color: var(--text-disabled);
 }
 
@@ -265,21 +265,21 @@
   }
 
   .brand-name {
-    font-size: 22px;
+    font-size: 1.375em;
   }
 
   .brand-subtitle {
-    font-size: 15px;
+    font-size: 0.9375em;
   }
 
   .brand-heading {
     margin-top: 36px;
-    font-size: 34px;
+    font-size: 2.125em;
   }
 
   .brand-intro {
     margin-top: 20px;
-    font-size: 16px;
+    font-size: 1em;
   }
 
   .feature-list {
@@ -294,11 +294,11 @@
   }
 
   .feature-title {
-    font-size: 18px;
+    font-size: 1.125em;
   }
 
   .feature-desc {
-    font-size: 15px;
+    font-size: 0.9375em;
   }
 
   .brand-footer {

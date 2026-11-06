@@ -1,0 +1,47 @@
+/* colors8 · 松林墨绿
+   概念：深松绿主色 + 冷雾白底，层级更沉稳，适合管理端和数据页。
+   主色白字 10.98:1，正文 15.66:1，次级文字 6.41:1。 */
+.mobile-layout,
+.admin-layout {
+  --brand-primary: #214331;
+  --brand-primary-hover: #2a543f;
+  --brand-primary-active: #162f22;
+  --brand-soft: #d4ebde;
+  --brand-soft-text: #162f22;
+  --brand-tint: #eff8f2;
+  --brand-glow: rgb(33 67 49 / 0.28);
+
+  --accent-teal: #2a543f;
+  --accent-teal-soft: #d4ebde;
+  --accent-pink: #ad7575;
+  --accent-pink-soft: #fceae9;
+  --accent-lavender: #60786b;
+  --accent-lavender-soft: #eaf0ed;
+
+  --bg-page: #eff5f2;
+  --bg-page-gradient: linear-gradient(165deg, #eff5f2 0%, #f6f9f7 45%, #ffffff 100%);
+  --bg-surface: rgb(255 255 255 / 0.92);
+  --bg-surface-solid: #ffffff;
+  --bg-muted: #e5eee8;
+  --border: #d8e1db;
+  --border-light: #e7ede9;
+
+  --text-primary: #161c19;
+  --text-secondary: #535a56;
+  --text-disabled: #919793;
+
+  --success-bg: #e3f4e6;
+  --success-text: #174825;
+  --success: #346c42;
+  --warning-bg: #fbf1dc;
+  --warning-text: #6f4f07;
+  --danger-bg: #ffe8e6;
+  --danger-text: #822b2a;
+  --danger: #ab413e;
+  --info-bg: #e4f3ea;
+  --info-text: #294b39;
+
+  --shadow-color2-sm: rgb(33 67 49 / 0.06);
+  --shadow-color2-md: rgb(33 67 49 / 0.08);
+  --shadow-color2-lg: rgb(33 67 49 / 0.1);
+}

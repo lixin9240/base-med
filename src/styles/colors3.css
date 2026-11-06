@@ -1,0 +1,45 @@
+/* 方案 colors3：科技蓝紫（现代、智慧医疗，适合大型医院信息化系统） */
+.mobile-layout,
+.admin-layout {
+  --brand-primary: #3f51b5;
+  --brand-primary-hover: #5c6bc0;
+  --brand-primary-active: #303f9f;
+  --brand-soft: #e4e7f5;
+  --brand-soft-text: #303f9f;
+  --brand-tint: #f3f5fb;
+  --brand-glow: rgb(63 81 181 / 0.28);
+
+  --accent-teal: #00acc1;
+  --accent-teal-soft: #b8e8ee;
+  --accent-pink: #f8857c;
+  --accent-pink-soft: #fddddb;
+  --accent-lavender: #828ecf;
+  --accent-lavender-soft: #dce0f2;
+
+  --bg-page: #edf0fa;
+  --bg-page-gradient: linear-gradient(165deg, #edf0fa 0%, #f7f8fd 45%, #ffffff 100%);
+  --bg-surface: rgb(255 255 255 / 0.92);
+  --bg-surface-solid: #ffffff;
+  --bg-muted: #e3e6f6;
+  --border: rgb(63 81 181 / 0.1);
+  --border-light: rgb(63 81 181 / 0.05);
+
+  --text-primary: #212121;
+  --text-secondary: #646464;
+  --text-disabled: #9b9b9b;
+
+  --success-bg: #eaf5ea;
+  --success-text: #347736;
+  --success: #4caf50;
+  --warning-bg: #fff8e6;
+  --warning-text: #7a5c00;
+  --danger-bg: #fee8e7;
+  --danger-text: #b03027;
+  --danger: #f44336;
+  --info-bg: #e0f5f8;
+  --info-text: #006b78;
+
+  --shadow-color2-sm: rgb(63 81 181 / 0.06);
+  --shadow-color2-md: rgb(63 81 181 / 0.08);
+  --shadow-color2-lg: rgb(63 81 181 / 0.1);
+}

@@ -2,7 +2,6 @@
 import { computed, onMounted, ref } from 'vue'
 import {
   getAdminVideoDetail,
-  listAdminCategories,
   listAdminVideos,
   updateAdminVideoStatus,
 } from '@/api'
@@ -29,9 +28,6 @@ const editLoadingId = ref(null)
 const keyword = ref('')
 const searchInput = ref('')
 
-/** 分类列表（视频表单下拉用），来自 2.7.1；保存时用它把分类名换成 category_id */
-const categories = ref([])
-
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
 const configOpen = ref(false)
@@ -51,12 +47,6 @@ function resolveLocalVideo(video) {
   return findVideoByTitle(video.title) ?? video
 }
 
-function countTone(count, total) {
-  if (!total) return 'danger'
-  if (count >= total) return 'success'
-  return count > 0 ? 'warning' : 'danger'
-}
-
 function rateTone(rate) {
   if (rate === null || rate === undefined) return ''
   if (rate >= 80) return 'success'
@@ -67,7 +57,6 @@ function rateTone(rate) {
 function toVideoRow(item) {
   // 前后测共用一套题：优先取 question_count，兼容后端旧的 pre_count 字段
   const questionCount = Number(item.question_count ?? item.pre_count) || 0
-  const questionTotal = Number(item.question_total ?? item.pre_total) || 0
   const rate = item.accuracy_rate
 
   return {
@@ -78,9 +67,8 @@ function toVideoRow(item) {
     speakerLabel: item.speaker
       ? [item.speaker, item.speaker_title].filter(Boolean).join(' · ')
       : '未指定',
-    question: `${questionCount}/${questionTotal}`,
     questionCount,
-    questionTone: countTone(questionCount, questionTotal),
+    questionTone: questionCount > 0 ? 'success' : 'danger',
     published: Number(item.status) === 1,
     attempts: `${Number(item.answer_times) || 0} 次`,
     accuracy: rate === null || rate === undefined ? '' : `${rate}%`,
@@ -146,17 +134,8 @@ function toEditDraft(detail) {
   }
 }
 
-async function loadCategories() {
-  try {
-    categories.value = await listAdminCategories()
-  } catch (error) {
-    if (!loadError.value) loadError.value = error?.message || '分类列表加载失败，请稍后重试'
-  }
-}
-
 onMounted(() => {
   refreshVideos()
-  loadCategories()
 })
 
 function openConfig(video) {
@@ -343,7 +322,7 @@ async function togglePublished(video) {
         <!-- 题目 -->
         <div class="col col--quiz">
           <span class="badge" :class="`badge--${video.questionTone}`">
-            题目 {{ video.question }}
+            题目总数 {{ video.questionCount }}
           </span>
         </div>
 
@@ -433,7 +412,6 @@ async function togglePublished(video) {
     <VideoFormModal
       :open="formOpen"
       :video="editingVideo"
-      :categories="categories"
       @close="formOpen = false"
       @saved="refreshVideos"
     />
@@ -825,7 +803,7 @@ async function togglePublished(video) {
   height: 18px;
   background: #fff;
   border-radius: 50%;
-  box-shadow: 0 1px 3px rgb(27 67 50 / 0.2);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
   transition: transform var(--t-fast);
 }
 

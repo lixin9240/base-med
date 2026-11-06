@@ -933,6 +933,250 @@
 
 ---
 
+## 2.10 LX-题库管理模块（question，题目库维护）
+
+> 题库为视频共用题目池；视频通过 video_question 关联引用题目。此处接口用于题库列表查看与题目内容维护。
+
+### 2.10.1 题目列表
+- 路径：`GET /api/admin/question/list`
+- Method：GET
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| page | int | 否 | 默认 1 |
+| page_size | int | 否 | 默认 20，最大 100 |
+| type | string | 否 | 题型筛选：single 单选 / multiple 多选 / judge 判断 |
+| knowledge_point | string | 否 | 知识点标签精确筛选，最长 64 字 |
+| stem | string | 否 | 题干关键词模糊搜索，最长 300 字 |
+
+返回（按 id 倒序）：
+
+```json
+{
+    "list": [
+        {
+            "id": 101,
+            "type": "single",
+            "stem": "成人基础生命支持中，按压与通气的比例应为？",
+            "option_count": 4,
+            "difficulty": 2,
+            "knowledge_point": "心肺复苏",
+            "created_at": "2026-10-18 10:00:00"
+        }
+    ],
+    "total": 35,
+    "page": 1,
+    "page_size": 20
+}
+```
+
+| 字段 | 类型 | 备注 |
+| ---- | ---- | ---- |
+| option_count | int | 选项数量（服务端按 options 自动计算） |
+| difficulty | int | 难度：1 易 / 2 中 / 3 难 |
+| knowledge_point | string | 知识点标签 |
+
+### 2.10.2 编辑题目
+- 路径：`POST /api/admin/question/update`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| id | bigint | 是 | 题目 ID |
+| type | string | 是 | 题型：single / multiple / judge |
+| stem | string | 是 | 题干，最长 300 字 |
+| options | array | 否 | 选项数组 `[{ "key": "A", "content": "15:2" }]`；非判断题至少 2 个，option_count 自动重算 |
+| correct_answer | string | 是 | 正确答案：单选 "C"；多选 "A,B,C"；判断 "正确"/"错误"，最长 16 字，服务端自动规范化 |
+| analysis | string | 否 | 答案解析，最长 500 字 |
+| image_url | string | 否 | 题目配图 URL，最长 256 字 |
+| difficulty | int | 否 | 难度 1-3 |
+| knowledge_point | string | 否 | 知识点标签，最长 64 字 |
+
+返回：`{ "id": 101 }`
+
+> 说明：编辑直接作用于题库题目本身，所有引用该题的视频（video_question）同步生效。
+
+### 2.10.3 删除题目
+- 路径：`POST /api/admin/question/delete`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| id | bigint | 是 | 题目 ID |
+
+返回：`{ "success": true }`
+
+---
+
+## 2.11 LX-课程管理模块（topic）
+
+### 2.11.1 课程列表
+- 路径：`GET /api/admin/topic/list`
+- Method：GET
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| page | int | 否 | 默认 1 |
+| page_size | int | 否 | 默认 20 |
+| keyword | string | 否 | 课程名称关键词筛选 |
+| status | int | 否 | 状态筛选：0 下架 / 1 上架 |
+
+返回：
+
+```json
+{
+    "list": [
+        {
+            "id": 1,
+            "name": "急救基础课程",
+            "cover_url": "https://oss.example.com/covers/topic1.png",
+            "intro": "心肺复苏、海姆立克等基础急救技能合集",
+            "sort_order": 1,
+            "status": 1,
+            "created_at": "2026-10-18 10:00:00"
+        }
+    ],
+    "total": 3,
+    "page": 1,
+    "page_size": 20
+}
+```
+
+### 2.11.2 新增课程
+- 路径：`POST /api/admin/topic/create`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| name | string | 是 | 课程名称，最长 64 字 |
+| cover_url | string | 否 | 封面图 URL |
+| intro | string | 否 | 课程简介 |
+| sort_order | int | 否 | 排序号，越小越靠前 |
+| status | int | 否 | 状态：0 下架 / 1 上架 |
+
+返回：`{ "id": 1 }`
+
+### 2.11.3 编辑课程
+- 路径：`POST /api/admin/topic/update`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| id | bigint | 是 | 课程 ID |
+| name | string | 是 | 课程名称，最长 64 字 |
+| cover_url | string | 否 | 封面图 URL |
+| intro | string | 否 | 课程简介 |
+| sort_order | int | 否 | 排序号 |
+| status | int | 否 | 状态：0 下架 / 1 上架 |
+
+返回：`{ "id": 1 }`
+
+### 2.11.4 删除课程
+- 路径：`POST /api/admin/topic/delete`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| id | bigint | 是 | 课程 ID |
+
+返回：`{ "success": true }`
+
+---
+
+## 2.12 WJC-用户启用/禁用模块（列表页「禁用登录 / 恢复登录」按钮）
+
+### 2.12.1 按状态筛选用户列表
+- 路径：`GET /api/admin/user/list`
+- Method：GET
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| status | int | 是 | 状态：0 禁用 / 1 正常 |
+| page | int | 否 | 默认 1 |
+| page_size | int | 否 | 默认 20，最大 100 |
+
+返回：分页结构同 2.2.1 用户列表。
+
+### 2.12.2 启用/禁用用户
+- 路径：`POST /api/admin/user/update-status`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| id | bigint | 是 | 管理员用户 ID |
+| status | int | 是 | 0 禁用 / 1 启用 |
+
+返回：`{ "success": true }`
+
+> 说明：禁用后该用户立即无法登录，已签发的 token 同步失效。
+
+---
+
+## 2.13 GYZ-分享链接模块（公众号分享链接，video_share_link）
+
+> 页面构成：视频列表「分享」入口——生成链接（选择时效）/ 查看当前生效链接 / 撤回链接。H5 链接 base URL 取值优先级：`system_config.h5_base_url` → 回退默认前端地址（不拼接 OSS 域名）。
+
+### 2.13.1 生成 / 重新生成分享链接
+- 路径：`POST /api/admin/share-link/generate`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| video_id | bigint | 是 | 视频 ID |
+| expire_days | int | 是 | 链接时效（天），仅支持 1 / 3 / 5 / 7 |
+
+返回：
+
+```json
+{
+    "id": 1,
+    "video_id": 1,
+    "video_url": "https://oss.example.com/videos/cpr.mp4",
+    "url": "https://h5.example.com/share?token=AbCdEf123456",
+    "token": "AbCdEf123456",
+    "expire_type": 7,
+    "expire_at": "2026-10-30 10:00:00",
+    "visit_count": 0,
+    "status": 1,
+    "created_at": "2026-10-23 10:00:00"
+}
+```
+
+| 字段 | 类型 | 备注 |
+| ---- | ---- | ---- |
+| url | string | 完整 H5 分享链接（base URL + token） |
+| token | string | 链接访问令牌 |
+| expire_type | int | 时效（天），同请求 expire_days |
+| expire_at | datetime | 过期时间 |
+| visit_count | int | 累计访问次数 |
+| status | int | 1 生效中 / 0 已撤回 |
+
+> 说明：同一视频重复生成即「重新生成」，旧链接失效，以最新一条生效链接为准。
+
+### 2.13.2 获取当前生效链接详情
+- 路径：`GET /api/admin/share-link/detail`
+- Method：GET
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| video_id | bigint | 是 | 视频 ID |
+
+返回：字段同 2.13.1；无生效链接时返回空。
+
+### 2.13.3 撤回生效链接
+- 路径：`POST /api/admin/share-link/revoke`
+- Method：POST
+
+| 参数 | 类型 | 是否必须 | 备注 |
+| ---- | ---- | ---- | ---- |
+| video_id | bigint | 是 | 视频 ID |
+
+返回：`{ "success": true }`
+
+> 说明：撤回后该视频当前生效链接立即失效（status 置 0），访问返回失效提示。
+
+---
+
 # 伏明月-用户端接口（匿名免登录，仅传 dr_id）
 
 > 页面流程：①首页视频列表（3.2，免登录、无需 dr_id）→ ②点击视频签发 dr_id（3.1，每次点击生成新的匿名编号）→ ③学前答题（3.6 取题 / 3.5 提交）→ ④观看视频（3.3 详情 + 3.4 进度上报，观看进度 ≥ 90% 解锁后测）→ ⑤看完答题（3.6 取题 / 3.7 提交）→ ⑥答题结果（3.8）。
@@ -1238,7 +1482,23 @@
 | question_detail[].post_user_answer | string  | 学后答案                                                     |
 | question_detail[].improved         | tinyint | 该题是否「学前错 → 学后对」                                  |
 
+## 3.9 再次答题（重答后测，答题结果页「再复习一下？」）
 
+- 路径：`POST /api/public/exam/retake`
+- Method：POST
+- 对应页面：答题结果页未通过（或未满分）时的重练入口。
+- 业务规则：
+  - **与 3.7 重练的区别**：不重新作答学前答题，直接**复用最近一次 `exam_record` 的前测结果**，仅重答后测；
+  - 重评后测后生成新的 `exam_record` + `exam_answer`，`attempt_no` 按 dr_id+视频 递增；
+  - 需存在最近一次答题记录（即已完成过一次完整 3.5 → 3.7 流程），否则返回 422。
+
+| 参数     | 类型   | 是否必须 | 备注                                           |
+| -------- | ------ | -------- | ---------------------------------------------- |
+| dr_id    | string | 是       | 匿名编号                                       |
+| video_id | bigint | 是       | 视频 ID                                        |
+| answers  | array  | 是       | 同 3.5，本次后测作答数组                        |
+
+返回：结构与「3.8 获取答题结果」一致（含 `result_status` / `accuracy_rate` / `pre` / `post` / `question_detail`，其中 pre 复用最近一次前测结果）。
 
 ---
 
@@ -1250,15 +1510,18 @@
 | 管理员用户管理 | 2.2 | `admin_user` |
 | 视频管理（列表/详情/增删改/上架切换） | 2.3.1~2.3.6 | `video`、`category`、`video_question`、`exam_record` |
 | 视频上传/转码 | 2.3.7、2.3.8 | `video`（oss_upload_id、transcode_status、cover_url 等） |
-| 批量导入 | 2.4.5、2.10 | `import_task`、`question`、`video_question` |
+| 批量导入 | 2.4.5、2.8 | `import_task`、`question`、`video_question` |
 | 题目配置（抽屉/新增题目弹窗） | 2.4 | `question`、`video_question` |
 | 答题记录管理 | 2.5 | `exam_record`、`exam_answer`、`question` |
 | 数据统计 | 2.6 | `exam_record`、`exam_answer`、`video`、`system_config` |
 | 分类管理 | 2.7 | `category`、`video` |
-| 题库管理 | 2.8 | `question`、`video_question` |
-| 课程管理 | 2.9 | `topic`、`video` |
-| 操作日志 | 2.11 | `operation_log` |
+| 题库管理 | 2.10 | `question`、`video_question` |
+| 课程管理 | 2.11 | `topic`、`video` |
+| 用户启用/禁用 | 2.12 | `admin_user` |
+| 分享链接 | 2.13 | `video_share_link`、`video`、`system_config` |
+| 操作日志 | 2.9 | `operation_log` |
 | 用户端入口 | 3.1 | `visit_record`（点击视频时绑定video_id并签发dr_id）、`video` |
 | 用户端视频/题目 | 3.2、3.3、3.6 | `video`、`category`、`video_question`、`question` |
 | 观看进度 | 3.4 | `video_progress`（进度上报、90%门槛计算） |
 | 学前/学后答题 | 3.5、3.7、3.8 | `exam_pretest`（学前暂存）、`exam_record`、`exam_answer`、`question`、`video_progress`（后测门槛校验） |
+| 再次答题 | 3.9 | `exam_record`、`exam_answer`、`question` |

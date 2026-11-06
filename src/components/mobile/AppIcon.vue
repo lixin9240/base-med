@@ -23,6 +23,7 @@ const paths = {
   stethoscope: 'M6 3v7a6 6 0 0 0 12 0V3M12 16v3M8 22h8',
   heartPulse: 'M12 21s-6-4.5-8-8a4 4 0 0 1 7-2 4 4 0 0 1 7 2c-2 3.5-8 8-8 8z',
   monitor: 'M3 5h18v10H3z M8 19h8',
+  landscape: 'M4 8h12v8H4z M17 7l4 5-4 5',
   activity: 'M22 12h-4l-3 7-4-14-3 7H2',
 }
 

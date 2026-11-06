@@ -1,0 +1,53 @@
+/* 方案 colors5 · 青囊
+   概念：松烟青黛（深青绿主色）+ 药笺暖白（中性底）+ 蜜蜡铜（少量强调）。
+   面向基层医生长期使用：低饱和、层级清楚、正文对比度 15:1，主色按钮白字 8.9:1。 */
+.mobile-layout,
+.admin-layout {
+  /* 品牌色：青黛 */
+  --brand-primary: #155252;
+  --brand-primary-hover: #196464;
+  --brand-primary-active: #003b3b;
+  --brand-soft: #d2eaea;
+  --brand-soft-text: #003b3b;
+  --brand-tint: #ecf8f7;
+  --brand-glow: rgb(21 82 82 / 0.28);
+
+  /* 辅助色：竹月与旧纸，仅用于分类和弱提示 */
+  --accent-teal: #196464;
+  --accent-teal-soft: #c8e3e1;
+  --accent-pink: #b96a6a;
+  --accent-pink-soft: #f3d8d7;
+  --accent-lavender: #6e8b8a;
+  --accent-lavender-soft: #dce9e8;
+
+  /* 背景与边框：带一点青的纸白 */
+  --bg-page: #f0f7f4;
+  --bg-page-gradient: linear-gradient(165deg, #eaf4f0 0%, #f5faf7 45%, #fcfefd 100%);
+  --bg-surface: rgb(255 255 255 / 0.92);
+  --bg-surface-solid: #ffffff;
+  --bg-muted: #e5f0ed;
+  --border: #d6e1e0;
+  --border-light: #e5edec;
+
+  /* 文字：墨青，不用纯黑 */
+  --text-primary: #172221;
+  --text-secondary: #515a59;
+  --text-disabled: #909796;
+
+  /* 状态色 */
+  --success-bg: #e1f4e9;
+  --success-text: #005031;
+  --success: #1f744f;
+  --warning-bg: #fbf1dc;
+  --warning-text: #724d0b;
+  --danger-bg: #ffe8e6;
+  --danger-text: #822b2a;
+  --danger: #ab413e;
+  --info-bg: #e0f3f3;
+  --info-text: #164b4b;
+
+  /* 阴影色 */
+  --shadow-color2-sm: rgb(21 82 82 / 0.06);
+  --shadow-color2-md: rgb(21 82 82 / 0.08);
+  --shadow-color2-lg: rgb(21 82 82 / 0.1);
+}

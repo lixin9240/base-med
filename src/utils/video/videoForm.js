@@ -1,4 +1,10 @@
-import { VIDEO_CATEGORIES, VIDEO_INTRO_MAX, VIDEO_SOURCE, VIDEO_TITLE_MAX } from './constants'
+import {
+  VIDEO_CATEGORIES,
+  VIDEO_INTRO_MAX,
+  VIDEO_KEY_POINTS_MAX,
+  VIDEO_SOURCE,
+  VIDEO_TITLE_MAX,
+} from './constants'
 
 /** 新建 / 编辑弹窗的初始草稿 */
 export function createVideoDraft(video) {
@@ -11,7 +17,7 @@ export function createVideoDraft(video) {
     speakerTitle: video?.speakerTitle ?? '',
     speakerOrg: video?.speakerOrg ?? '',
     intro: video?.intro ?? '',
-    source: VIDEO_SOURCE.URL,
+    source: VIDEO_SOURCE.UPLOAD,
     videoUrl: video?.videoUrl ?? '',
     cover: video?.cover ?? '',
     articleBody: video?.articleBody ?? '',
@@ -38,13 +44,16 @@ export function validateVideoDraft(draft, { hasUploadFile = false } = {}) {
   if (!title) errors.title = '请填写视频标题'
   else if (title.length > VIDEO_TITLE_MAX) errors.title = `标题不能超过 ${VIDEO_TITLE_MAX} 个字`
 
-  if (!draft.category) errors.category = '请选择分类'
-
   if (!String(draft.speaker ?? '').trim()) errors.speaker = '请填写主讲人'
 
   const intro = String(draft.intro ?? '').trim()
   if (!intro) errors.intro = '请填写一句话简介'
   else if (intro.length > VIDEO_INTRO_MAX) errors.intro = `简介不能超过 ${VIDEO_INTRO_MAX} 个字`
+
+  const keyPoints = String(draft.articleBody ?? '').trim()
+  if (keyPoints.length > VIDEO_KEY_POINTS_MAX) {
+    errors.articleBody = `文字要点不能超过 ${VIDEO_KEY_POINTS_MAX} 个字`
+  }
 
   const videoUrl = String(draft.videoUrl ?? '').trim()
   if (!videoUrl) {

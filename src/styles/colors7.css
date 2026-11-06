@@ -1,0 +1,47 @@
+/* colors7 · 翡翠竹影
+   概念：翡翠竹青主色 + 竹影白底，绿色更纯、更轻。
+   主色白字 6.79:1，正文 15.25:1，次级文字 6.65:1。 */
+.mobile-layout,
+.admin-layout {
+  --brand-primary: #106847;
+  --brand-primary-hover: #1a7b56;
+  --brand-primary-active: #024c32;
+  --brand-soft: #d4ebde;
+  --brand-soft-text: #024c32;
+  --brand-tint: #eef8f3;
+  --brand-glow: rgb(16 104 71 / 0.28);
+
+  --accent-teal: #1a7b56;
+  --accent-teal-soft: #d4ebde;
+  --accent-pink: #ad7575;
+  --accent-pink-soft: #fceae9;
+  --accent-lavender: #60786b;
+  --accent-lavender-soft: #eaf0ed;
+
+  --bg-page: #f2f9f5;
+  --bg-page-gradient: linear-gradient(165deg, #f2f9f5 0%, #f9fdfb 45%, #ffffff 100%);
+  --bg-surface: rgb(255 255 255 / 0.92);
+  --bg-surface-solid: #ffffff;
+  --bg-muted: #e5eee9;
+  --border: #d7e1db;
+  --border-light: #e7ede9;
+
+  --text-primary: #19221d;
+  --text-secondary: #525a56;
+  --text-disabled: #919794;
+
+  --success-bg: #e3f4e6;
+  --success-text: #174825;
+  --success: #346c42;
+  --warning-bg: #fbf1dc;
+  --warning-text: #6f4f07;
+  --danger-bg: #ffe8e6;
+  --danger-text: #822b2a;
+  --danger: #ab413e;
+  --info-bg: #e3f3ea;
+  --info-text: #284b3a;
+
+  --shadow-color2-sm: rgb(16 104 71 / 0.06);
+  --shadow-color2-md: rgb(16 104 71 / 0.08);
+  --shadow-color2-lg: rgb(16 104 71 / 0.1);
+}
