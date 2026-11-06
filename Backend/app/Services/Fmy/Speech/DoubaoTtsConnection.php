@@ -97,6 +97,8 @@ class DoubaoTtsConnection
         $context = stream_context_create([
             'ssl' => ['verify_peer' => true, 'verify_peer_name' => true],
         ]);
+        $errno = 0;
+        $errstr = '';
         $socket = stream_socket_client(
             'ssl://'.$this->host.':443',
             $errno,
@@ -106,7 +108,9 @@ class DoubaoTtsConnection
             $context
         );
         if ($socket === false) {
-            throw new RuntimeException('连接语音服务失败');
+            $tlsErr = openssl_error_string();
+            $hint = $tlsErr !== false ? "; TLS: $tlsErr" : '';
+            throw new RuntimeException("Failed to connect voice service: host={$this->host}, errno=$errno, errstr=$errstr{$hint}. Check egress 443, PHP openssl extension, and openssl.cafile/curl.cainfo.");
         }
         stream_set_timeout($socket, 20);
         $this->socket = $socket;
