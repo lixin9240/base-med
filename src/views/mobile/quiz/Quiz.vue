@@ -75,7 +75,7 @@ const stageTitle = computed(() =>
 const splashCue = computed(() => {
   const title = course.value?.title
   if (!isPre.value || !title) return ''
-  return `即将开始《${title}》的学前答题`
+  return `欢迎来到每日一练，开始作答。接下来是《${title}》的学前答题。`
 })
 
 function categoryIcon(category) {

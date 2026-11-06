@@ -9,6 +9,9 @@ const speechBase = String(import.meta.env.VITE_API_BASE_URL || 'http://47.108.17
 
 let player = null
 let objectUrl = ''
+let currentLine = ''
+let pendingLine = ''
+let allowGesturePlay = false
 let settled = Promise.resolve()
 let finishCurrent = () => {}
 const prepared = new Map()
@@ -74,8 +77,18 @@ async function fetchAudio(line) {
   return new Blob([bytes], { type: 'audio/mpeg' })
 }
 
-function playBlob(blob) {
+function playBlob(blob, line = '', quiet = false) {
+  if (line && player && currentLine === line && !player.ended) {
+    if (player.paused) {
+      player.play().catch(() => {
+        showStatus('语音 · 未能自动播放')
+        if (!quiet) toast('语音未能自动播放')
+      })
+    }
+    return
+  }
   stopLocal()
+  currentLine = line
   objectUrl = URL.createObjectURL(blob)
   const audio = new Audio(objectUrl)
   player = audio
@@ -89,7 +102,7 @@ function playBlob(blob) {
     audio.onerror = () => resolve()
     audio.play().catch(() => {
       showStatus('语音 · 未能自动播放')
-      toast('语音未能自动播放')
+      if (!quiet) toast('语音未能自动播放')
       resolve()
     })
   })
@@ -130,7 +143,7 @@ export function speak(text) {
   prepareSpeech(line)
   const entry = prepared.get(line)
   if (entry.blob) {
-    playBlob(entry.blob)
+    playBlob(entry.blob, line)
     return
   }
   if (entry.error) {
@@ -139,10 +152,54 @@ export function speak(text) {
   }
   settled = entry.promise
     .then((blob) => {
-      playBlob(blob)
+      playBlob(blob, line)
       return settled
     })
     .catch((error) => failSpeech(error))
+}
+
+/**
+ * 同一句已经在播就接着播，不重新开口。
+ * 开屏先安静试播；用户点击后若被拦住，再用这次点击补上。
+ */
+export function ensureSpeaking(text, quiet = false) {
+  if (!quiet) allowGesturePlay = true
+  const line = normalize(text)
+  if (!line) return
+  const stayQuiet = () => quiet && !allowGesturePlay
+  if (player && currentLine === line && !player.ended) {
+    if (player.paused) {
+      player.play().catch(() => {
+        showStatus('语音 · 未能自动播放')
+        if (!stayQuiet()) toast('语音未能自动播放')
+      })
+    }
+    return
+  }
+  if (pendingLine === line) return
+  pendingLine = line
+  prepareSpeech(line)
+  const entry = prepared.get(line)
+  if (entry.blob) {
+    pendingLine = ''
+    playBlob(entry.blob, line, stayQuiet())
+    return
+  }
+  if (entry.error) {
+    pendingLine = ''
+    if (!stayQuiet()) failSpeech(entry.error)
+    return
+  }
+  entry.promise
+    .then((blob) => {
+      if (pendingLine !== line) return
+      pendingLine = ''
+      playBlob(blob, line, stayQuiet())
+    })
+    .catch((error) => {
+      if (pendingLine === line) pendingLine = ''
+      if (!stayQuiet()) failSpeech(error)
+    })
 }
 
 /** 当前这句读完。没有在读时立即结束。 */

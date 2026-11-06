@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { prepareSpeech, speak } from '@/utils/speech'
+import { ensureSpeaking, prepareSpeech } from '@/utils/speech'
+import { playSplashTap, startSplashScore } from '@/utils/splashSound'
 
 const props = defineProps({
   /** 题目已就绪后，进度条才收成「开始答题」 */
@@ -13,6 +14,7 @@ const emit = defineEmits(['finished'])
 
 const LOAD_MS = 3200
 const EXIT_MS = 480
+const VOICE_AT = 2230
 
 const root = ref(null)
 const startBtn = ref(null)
@@ -23,6 +25,9 @@ const progress = ref(0)
 let raf = 0
 let sequenceTimer = 0
 let leaveTimer = 0
+let voiceTimer = 0
+let mountedAt = 0
+let stopScore = () => {}
 const sequenceDone = ref(false)
 
 function armTrace() {
@@ -41,8 +46,19 @@ function beginLeave() {
   leaveTimer = window.setTimeout(() => emit('finished'), EXIT_MS)
 }
 
+function queueVoice(cue) {
+  if (!cue) return
+  prepareSpeech(cue)
+  if (!mountedAt) return
+  window.clearTimeout(voiceTimer)
+  const wait = Math.max(0, VOICE_AT - (performance.now() - mountedAt))
+  voiceTimer = window.setTimeout(() => ensureSpeaking(cue, true), wait)
+}
+
 function onStart() {
-  if (props.cue) speak(props.cue)
+  stopScore()
+  if (props.cue) ensureSpeaking(props.cue)
+  else playSplashTap()
   beginLeave()
 }
 
@@ -51,15 +67,11 @@ watch(canStart, (ready) => {
   nextTick(() => startBtn.value?.focus())
 })
 
-watch(
-  () => props.cue,
-  (cue) => {
-    if (cue) prepareSpeech(cue)
-  },
-  { immediate: true },
-)
+watch(() => props.cue, queueVoice, { immediate: true })
 
 onMounted(() => {
+  mountedAt = performance.now()
+  queueVoice(props.cue)
   armTrace()
   playing.value = true
   const start = performance.now()
@@ -68,6 +80,7 @@ onMounted(() => {
     if (progress.value < 100) raf = window.requestAnimationFrame(step)
   }
   raf = window.requestAnimationFrame(step)
+  stopScore = startSplashScore()
   sequenceTimer = window.setTimeout(() => {
     progress.value = 100
     sequenceDone.value = true
@@ -75,6 +88,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  stopScore()
+  window.clearTimeout(voiceTimer)
   window.cancelAnimationFrame(raf)
   window.clearTimeout(sequenceTimer)
   window.clearTimeout(leaveTimer)
@@ -140,7 +155,7 @@ onBeforeUnmount(() => {
         </svg>
         <span class="seal-char">答</span>
       </div>
-      <p class="splash-sub">每日一题 · 开始作答</p>
+      <p class="splash-sub">每日一练 · 开始作答</p>
     </div>
 
     <div class="load" :class="{ 'is-ready': canStart }">
