@@ -1,20 +1,21 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { ensureSpeaking, prepareSpeech } from '@/utils/speech'
-import { playSplashTap, startSplashScore } from '@/utils/splashSound'
+import { ensureSpeaking, prepareSpeech, speak } from '@/utils/speech'
+import { playSplashTap, startSplashScore, unlockSplashSound } from '@/utils/splashSound'
 
 const props = defineProps({
   /** 题目已就绪后，进度条才收成「开始答题」 */
   canLeave: { type: Boolean, default: false },
-  /** 点击开始时朗读的句子，没有则不播 */
+  /** 开屏动画期间朗读的欢迎句 */
   cue: { type: String, default: '' },
+  /** 点击「开始答题」时朗读的句子 */
+  startCue: { type: String, default: '' },
 })
 
 const emit = defineEmits(['finished'])
 
 const LOAD_MS = 3200
 const EXIT_MS = 480
-const VOICE_AT = 2230
 
 const root = ref(null)
 const startBtn = ref(null)
@@ -25,8 +26,6 @@ const progress = ref(0)
 let raf = 0
 let sequenceTimer = 0
 let leaveTimer = 0
-let voiceTimer = 0
-let mountedAt = 0
 let stopScore = () => {}
 const sequenceDone = ref(false)
 
@@ -46,18 +45,34 @@ function beginLeave() {
   leaveTimer = window.setTimeout(() => emit('finished'), EXIT_MS)
 }
 
-function queueVoice(cue) {
+/** 和开屏动画、音效同一拍起播；浏览器拦住时保持安静，等手势再接上。 */
+function startVoice(cue = props.cue) {
   if (!cue) return
   prepareSpeech(cue)
-  if (!mountedAt) return
-  window.clearTimeout(voiceTimer)
-  const wait = Math.max(0, VOICE_AT - (performance.now() - mountedAt))
-  voiceTimer = window.setTimeout(() => ensureSpeaking(cue, true), wait)
+  ensureSpeaking(cue, true)
+}
+
+function unlockAudio() {
+  unlockSplashSound()
+  startVoice()
+}
+
+function onWeixinReady(done) {
+  if (typeof window === 'undefined') return
+  if (typeof window.WeixinJSBridge !== 'undefined') {
+    window.WeixinJSBridge.invoke('getNetworkType', {}, done)
+    return
+  }
+  document.addEventListener('WeixinJSBridgeReady', () => {
+    window.WeixinJSBridge.invoke('getNetworkType', {}, done)
+  }, false)
 }
 
 function onStart() {
   stopScore()
-  if (props.cue) ensureSpeaking(props.cue)
+  unlockSplashSound()
+  if (props.startCue) speak(props.startCue)
+  else if (props.cue) ensureSpeaking(props.cue)
   else playSplashTap()
   beginLeave()
 }
@@ -67,11 +82,16 @@ watch(canStart, (ready) => {
   nextTick(() => startBtn.value?.focus())
 })
 
-watch(() => props.cue, queueVoice, { immediate: true })
+watch(() => props.cue, startVoice, { immediate: true })
+watch(
+  () => props.startCue,
+  (line) => {
+    if (line) prepareSpeech(line)
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
-  mountedAt = performance.now()
-  queueVoice(props.cue)
   armTrace()
   playing.value = true
   const start = performance.now()
@@ -80,7 +100,14 @@ onMounted(() => {
     if (progress.value < 100) raf = window.requestAnimationFrame(step)
   }
   raf = window.requestAnimationFrame(step)
+  unlockSplashSound()
   stopScore = startSplashScore()
+  startVoice()
+  if (props.startCue) prepareSpeech(props.startCue)
+  onWeixinReady(() => {
+    unlockSplashSound()
+    startVoice()
+  })
   sequenceTimer = window.setTimeout(() => {
     progress.value = 100
     sequenceDone.value = true
@@ -89,7 +116,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopScore()
-  window.clearTimeout(voiceTimer)
   window.cancelAnimationFrame(raf)
   window.clearTimeout(sequenceTimer)
   window.clearTimeout(leaveTimer)
@@ -102,6 +128,7 @@ onBeforeUnmount(() => {
     class="quiz-splash"
     :class="{ 'is-play': playing, 'is-leave': leaving }"
     :aria-hidden="canStart ? 'false' : 'true'"
+    @pointerdown.once="unlockAudio"
   >
     <div class="stickers">
       <div class="sticker sticker-card">

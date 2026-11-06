@@ -5,7 +5,7 @@ import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
 import QuizPanel from '@/components/mobile/QuizPanel.vue'
 import QuizSplash from '@/components/mobile/QuizSplash.vue'
-import { speak } from '@/utils/speech'
+import { prepareSpeech, speak } from '@/utils/speech'
 import { warmVideo } from '@/utils/video/preload'
 import { toast } from '@/utils/toast'
 import { currentDrId, isSkipWatch, issueDrId } from '@/store/mobile/session'
@@ -72,10 +72,19 @@ const isPre = computed(() => stage.value === 'pre')
 const stageTitle = computed(() =>
   isRetake.value ? '再次答题' : isPre.value ? '学前答题' : '看完答题',
 )
-const splashCue = computed(() => {
-  const title = course.value?.title
-  if (!isPre.value || !title) return ''
-  return `欢迎来到每日一练，开始作答。接下来是《${title}》的学前答题。`
+const SPLASH_CUE = '每日一练来咯，快来看看你掌握多少！'
+const SPLASH_START_CUE = '先答 3 道题，看看您的基础认知'
+const splashCue = computed(() => (isPre.value ? SPLASH_CUE : ''))
+const splashStartCue = computed(() => (isPre.value ? SPLASH_START_CUE : ''))
+
+/** 开屏文案固定，进页立刻合成，动画开始时就能跟着播 */
+if (splashCue.value) prepareSpeech(splashCue.value)
+if (splashStartCue.value) prepareSpeech(splashStartCue.value)
+watch(splashCue, (cue) => {
+  if (cue) prepareSpeech(cue)
+})
+watch(splashStartCue, (cue) => {
+  if (cue) prepareSpeech(cue)
 })
 
 function categoryIcon(category) {
@@ -197,7 +206,8 @@ async function onSubmit(answers) {
         })),
       })
       toast('前测完成')
-      speak(`学前答题结束。请观看《${course.value?.title || '本视频'}》`)
+      const title = course.value?.title
+      speak(title ? `题目搞定，一起解锁《${title}》吧` : '小题答完啦，马上开启视频学习')
       router.replace({ name: 'mobile-learn', query: { videoId } })
       return
     }
@@ -287,7 +297,13 @@ async function onSubmit(answers) {
     </template>
   </div>
 
-  <QuizSplash v-if="showSplash" :can-leave="ready" :cue="splashCue" @finished="onSplashFinished" />
+  <QuizSplash
+    v-if="showSplash"
+    :can-leave="ready"
+    :cue="splashCue"
+    :start-cue="splashStartCue"
+    @finished="onSplashFinished"
+  />
 </template>
 
 <style scoped>
