@@ -94,7 +94,7 @@ export function startSplashScore() {
 
   const arm = () => {
     if (played || audio.state !== 'running') return
-    if (performance.now() - born > 400) return
+    if (performance.now() - born > 1600) return
     played = true
     schedule(audio, bus, audio.currentTime + 0.04)
   }

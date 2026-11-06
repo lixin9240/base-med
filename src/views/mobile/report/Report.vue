@@ -65,7 +65,11 @@ onMounted(async () => {
     }
     const percent = Number(record.value.percent)
     if (Number.isFinite(percent)) {
-      speak(`答题结束。正确率百分之${percent}，${record.value.passed ? '已通过' : '未通过'}`)
+      speak(
+        record.value.passed
+          ? `哇！正确率 ${percent}%，顺利通关`
+          : `正确率 ${percent}%，再看视频挑战一次！`,
+      )
     }
   } catch (e) {
     error.value = e?.message || '加载失败'
