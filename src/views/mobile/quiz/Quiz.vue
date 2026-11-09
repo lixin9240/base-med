@@ -206,8 +206,7 @@ async function onSubmit(answers) {
         })),
       })
       toast('前测完成')
-      const title = course.value?.title
-      speak(title ? `题目搞定，一起解锁《${title}》吧` : '小题答完啦，马上开启视频学习')
+      speak('开始学习视频')
       router.replace({ name: 'mobile-learn', query: { videoId } })
       return
     }
