@@ -358,8 +358,7 @@ function onVideoError() {
 async function goQuiz() {
   // 跳转前先把进度同步到后端，确保后端 is_unlocked 已更新（否则长视频到 90% 点去答题会被后测门槛弹回）
   await reportProgress()
-  const title = video.value?.title
-  speak(title ? `视频已看完，开始《${title}》的看完答题` : '视频已看完，开始看完答题')
+  speak('视频看完，趁热答题巩固一下')
   router.push({ name: 'mobile-quiz', query: { videoId, stage: 'post' } })
 }
 </script>
@@ -848,7 +847,7 @@ async function goQuiz() {
 }
 
 .quiz-dial__sub {
-  font-size: 10px;
+  font-size: 0.625em;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   color: var(--dial-sub);
@@ -891,7 +890,7 @@ async function goQuiz() {
 
 .dock__note {
   margin: 2px max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
-  font-size: 11px;
+  font-size: 0.6875em;
   line-height: 1.4;
   color: rgb(255 255 255 / 0.72);
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.65);
@@ -908,7 +907,7 @@ async function goQuiz() {
   border-radius: 999px;
   background: rgb(0 0 0 / 0.55);
   color: #fff;
-  font-size: 13px;
+  font-size: 0.8125em;
   letter-spacing: 0.04em;
   pointer-events: none;
 }
@@ -938,7 +937,7 @@ async function goQuiz() {
 
 .stage-copy__title {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125em;
   font-weight: var(--fw-semibold);
   line-height: 1.35;
   color: #fff;
@@ -950,7 +949,7 @@ async function goQuiz() {
 }
 
 .stage-copy__points {
-  font-size: 11px;
+  font-size: 0.6875em;
   line-height: 1.45;
 }
 
@@ -965,7 +964,7 @@ async function goQuiz() {
   margin: 0 0 3px;
   padding: 0;
   border: none;
-  font-size: 11px;
+  font-size: 0.6875em;
   font-weight: 400;
   line-height: 1.45;
   color: rgb(255 255 255 / 0.92);
@@ -985,7 +984,7 @@ async function goQuiz() {
   border: none;
   background: transparent;
   color: #fff;
-  font-size: 11px;
+  font-size: 0.6875em;
   line-height: 1.4;
   text-decoration: underline;
   text-underline-offset: 2px;

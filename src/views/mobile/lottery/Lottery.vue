@@ -591,7 +591,7 @@ function fireConfetti() {
 }
 
 .lot__wheel-text {
-  font-size: 11px;
+  font-size: 0.6875em;
   font-weight: var(--fw-bold);
   letter-spacing: 0.5px;
 }

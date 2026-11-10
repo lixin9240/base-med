@@ -77,19 +77,7 @@ onMounted(async () => {
     }
     const percent = Number(record.value.percent)
     if (Number.isFinite(percent)) {
-<<<<<<< Updated upstream
       speak(`答题结束。正确率百分之${percent}，${record.value.passed ? '已通过' : '未通过'}`)
-=======
-      speak(
-        record.value.passed
-          ? `哇！正确率 ${percent}%，顺利通关`
-          : `正确率 ${percent}%，再看视频挑战一次！`,
-      )
-      speechState.value = 'playing'
-      whenSpeechEnds().then(() => {
-        speechState.value = 'done'
-      })
->>>>>>> Stashed changes
     }
   } catch (e) {
     error.value = e?.message || '加载失败'
@@ -254,7 +242,7 @@ function goLottery() {
           <div class="qcard__head">
             <span class="qnum">{{ index + 1 }}</span>
             <span class="chip" :class="item.correct ? 'chip--good' : 'chip--bad'">
-              {{ item.correct ? '答对' : '答错' }}
+              <span class="chip__text">{{ item.correct ? '答对' : '答错' }}</span>
             </span>
             <span class="qcard__type">{{ QUESTION_TYPE_LABEL[item.type] }}</span>
           </div>
@@ -557,48 +545,8 @@ function goLottery() {
   margin: var(--sp-6) 2px var(--sp-3);
 }
 
-<<<<<<< Updated upstream
 .hero__num {
   font-size: 46px;
-=======
-.section-head h2 {
-  margin: 0;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-bold);
-}
-
-.section-head span {
-  font-size: 0.6875em;
-  color: var(--text-secondary);
-}
-
-.qcard {
-  padding: var(--sp-4);
-  margin-bottom: var(--sp-3);
-  background: var(--bg-surface-solid);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm);
-}
-
-.qcard__head {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-2);
-}
-
-.qnum {
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--brand-soft);
-  color: var(--brand-soft-text);
-  font-size: var(--fs-xs);
->>>>>>> Stashed changes
   font-weight: var(--fw-bold);
   font-variant-numeric: tabular-nums;
 }
@@ -612,6 +560,13 @@ function goLottery() {
   border-radius: var(--r-full);
   font-size: 0.6875em;
   font-weight: var(--fw-semibold);
+  line-height: 1;
+}
+
+/* 中文字形在行框内偏下，微微上提与左侧题号对齐 */
+.chip__text {
+  display: block;
+  transform: translateY(-1px);
 }
 
 .chip::before {
@@ -783,14 +738,13 @@ function goLottery() {
   }
 
   .hero__num {
-    font-size: 36px;
+    font-size: 2.25em;
   }
 
   .review {
     margin: 0 var(--sp-3);
   }
 }
-<<<<<<< Updated upstream
 
 .hero__total {
   font-size: var(--fs-md);
@@ -922,7 +876,7 @@ function goLottery() {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 0.6875em;
   font-weight: var(--fw-semibold);
   flex-shrink: 0;
 }
@@ -932,9 +886,7 @@ function goLottery() {
 }
 
 .rop__tag {
-  font-size: 11px;
+  font-size: 0.6875em;
   font-weight: var(--fw-semibold);
 }
-=======
->>>>>>> Stashed changes
 </style>

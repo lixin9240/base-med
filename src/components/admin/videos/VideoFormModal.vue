@@ -12,7 +12,6 @@ import {
   VIDEO_KEY_POINTS_MAX,
   VIDEO_MAX_SIZE_MB,
   VIDEO_SOURCE,
-  VIDEO_TITLE_MAX,
 } from '@/utils/video/constants'
 import { createVideoDraft, validateVideoDraft } from '@/utils/video/videoForm'
 import {
@@ -265,10 +264,8 @@ async function submit() {
               <input
                 v-model="draft.title"
                 type="text"
-                :maxlength="VIDEO_TITLE_MAX"
                 placeholder="用户端列表展示的标题"
               />
-              <span class="field__counter"> {{ titleCount }} / {{ VIDEO_TITLE_MAX }} </span>
             </span>
             <p v-if="errors.title" class="field__error">{{ errors.title }}</p>
           </label>

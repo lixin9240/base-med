@@ -1,12 +1,15 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { speak } from '@/utils/speech'
+import { ensureSpeaking, prepareSpeech, speak } from '@/utils/speech'
+import { playSplashTap, startSplashScore, unlockSplashSound } from '@/utils/splashSound'
 
 const props = defineProps({
   /** 题目已就绪后，进度条才收成「开始答题」 */
   canLeave: { type: Boolean, default: false },
-  /** 点击开始时朗读的句子，没有则不播 */
+  /** 开屏动画期间朗读的欢迎句 */
   cue: { type: String, default: '' },
+  /** 点击「开始答题」时朗读的句子 */
+  startCue: { type: String, default: '' },
 })
 
 const emit = defineEmits(['finished'])
@@ -23,6 +26,7 @@ const progress = ref(0)
 let raf = 0
 let sequenceTimer = 0
 let leaveTimer = 0
+let stopScore = () => {}
 const sequenceDone = ref(false)
 
 function armTrace() {
@@ -41,8 +45,35 @@ function beginLeave() {
   leaveTimer = window.setTimeout(() => emit('finished'), EXIT_MS)
 }
 
+/** 和开屏动画、音效同一拍起播；浏览器拦住时保持安静，等手势再接上。 */
+function startVoice(cue = props.cue) {
+  if (!cue) return
+  prepareSpeech(cue)
+  ensureSpeaking(cue, true)
+}
+
+function unlockAudio() {
+  unlockSplashSound()
+  startVoice()
+}
+
+function onWeixinReady(done) {
+  if (typeof window === 'undefined') return
+  if (typeof window.WeixinJSBridge !== 'undefined') {
+    window.WeixinJSBridge.invoke('getNetworkType', {}, done)
+    return
+  }
+  document.addEventListener('WeixinJSBridgeReady', () => {
+    window.WeixinJSBridge.invoke('getNetworkType', {}, done)
+  }, false)
+}
+
 function onStart() {
-  if (props.cue) speak(props.cue)
+  stopScore()
+  unlockSplashSound()
+  if (props.startCue) speak(props.startCue)
+  else if (props.cue) ensureSpeaking(props.cue)
+  else playSplashTap()
   beginLeave()
 }
 
@@ -50,6 +81,15 @@ watch(canStart, (ready) => {
   if (!ready) return
   nextTick(() => startBtn.value?.focus())
 })
+
+watch(() => props.cue, startVoice, { immediate: true })
+watch(
+  () => props.startCue,
+  (line) => {
+    if (line) prepareSpeech(line)
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   armTrace()
@@ -60,6 +100,14 @@ onMounted(() => {
     if (progress.value < 100) raf = window.requestAnimationFrame(step)
   }
   raf = window.requestAnimationFrame(step)
+  unlockSplashSound()
+  stopScore = startSplashScore()
+  startVoice()
+  if (props.startCue) prepareSpeech(props.startCue)
+  onWeixinReady(() => {
+    unlockSplashSound()
+    startVoice()
+  })
   sequenceTimer = window.setTimeout(() => {
     progress.value = 100
     sequenceDone.value = true
@@ -67,6 +115,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  stopScore()
   window.cancelAnimationFrame(raf)
   window.clearTimeout(sequenceTimer)
   window.clearTimeout(leaveTimer)
@@ -79,13 +128,14 @@ onBeforeUnmount(() => {
     class="quiz-splash"
     :class="{ 'is-play': playing, 'is-leave': leaving }"
     :aria-hidden="canStart ? 'false' : 'true'"
+    @pointerdown.once="unlockAudio"
   >
     <div class="stickers">
       <div class="sticker sticker-card">
         <div class="sticker-bob">
           <svg viewBox="0 0 84 70" role="presentation">
             <rect x="3" y="4" width="78" height="62" rx="14" class="sp-card" stroke-width="1.5" />
-            <text x="14" y="22" class="sp-label" font-size="11" font-family="Microsoft YaHei, sans-serif">单选</text>
+            <text x="14" y="22" class="sp-label" font-size="0.6875em" font-family="Microsoft YaHei, sans-serif">单选</text>
             <circle cx="20" cy="44" r="8" class="sp-check-bg" stroke-width="1.6" />
             <path d="M16.4 44.2 L19 46.8 L24 41.2" fill="none" class="sp-check" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             <path d="M34 38 H70 M34 46 H60" fill="none" class="sp-rule" stroke-width="2.2" stroke-linecap="round" />
@@ -96,7 +146,7 @@ onBeforeUnmount(() => {
         <div class="sticker-bob">
           <svg viewBox="0 0 64 60" role="presentation">
             <path d="M8 6 H50 A8 8 0 0 1 58 14 V36 A8 8 0 0 1 50 44 H28 L18 54 V44 H14 A8 8 0 0 1 6 36 V14 A8 8 0 0 1 14 6 Z" class="sp-ask-bubble" stroke-width="1.6" />
-            <text x="32" y="32" text-anchor="middle" class="sp-ask-mark" font-size="22" font-family="Songti SC, SimSun, serif">?</text>
+            <text x="32" y="32" text-anchor="middle" class="sp-ask-mark" font-size="1.375em" font-family="Songti SC, SimSun, serif">?</text>
           </svg>
         </div>
       </div>
@@ -132,7 +182,7 @@ onBeforeUnmount(() => {
         </svg>
         <span class="seal-char">答</span>
       </div>
-      <p class="splash-sub">每日一题 · 开始作答</p>
+      <p class="splash-sub">每日一练 · 开始作答</p>
     </div>
 
     <div class="load" :class="{ 'is-ready': canStart }">
@@ -231,7 +281,7 @@ onBeforeUnmount(() => {
   display: grid;
   place-items: center;
   font-family: var(--serif);
-  font-size: 28px;
+  font-size: 1.75em;
   letter-spacing: 0;
   opacity: 0;
 }
@@ -241,7 +291,7 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 0.16em;
   font-family: var(--serif);
-  font-size: 40px;
+  font-size: 2.5em;
   font-weight: 600;
   letter-spacing: 0;
 }
@@ -255,7 +305,7 @@ onBeforeUnmount(() => {
 .splash-sub {
   margin: 12px 0 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 0.8125em;
   letter-spacing: 0.28em;
   text-indent: 0.28em;
   opacity: 0;
@@ -325,7 +375,7 @@ onBeforeUnmount(() => {
   position: relative;
   z-index: 1;
   opacity: 0;
-  font-size: 16px;
+  font-size: 1em;
   font-weight: 600;
   letter-spacing: 0.14em;
 }
@@ -341,7 +391,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-align: center;
   color: var(--brand-primary);
-  font-size: 12px;
+  font-size: 0.75em;
   letter-spacing: 0.16em;
   transition:
     opacity 0.16s ease,
