@@ -561,6 +561,7 @@ function goLottery() {
   font-size: 0.6875em;
   font-weight: var(--fw-semibold);
   line-height: 1;
+  transform: translateY(-3px);
 }
 
 /* 中文字形在行框内偏下，微微上提与左侧题号对齐 */
