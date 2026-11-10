@@ -73,7 +73,7 @@ const stageTitle = computed(() =>
   isRetake.value ? '再次答题' : isPre.value ? '学前答题' : '看完答题',
 )
 const SPLASH_CUE = '每日一练来咯，快来看看你掌握多少！'
-const SPLASH_START_CUE = '先答 3 道题，看看您的基础认知'
+const SPLASH_START_CUE = '先答几道题，看看您的基础认知'
 const splashCue = computed(() => (isPre.value ? SPLASH_CUE : ''))
 const splashStartCue = computed(() => (isPre.value ? SPLASH_START_CUE : ''))
 
