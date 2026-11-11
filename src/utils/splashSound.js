@@ -122,7 +122,7 @@ export function playSplashTap() {
   blip(audio, bus, t + 0.045, 990, 0.07, 0.26)
 }
 
-/** 答完一题时的「叮」：偏玻璃感，定点短音。 */
+/** 切题过场「叮」：复用开屏动画最末尾那一声（784 → 1175）。 */
 export function playAnswerDing() {
   if (reducedMotion()) return
   const audio = audioContext()
@@ -130,6 +130,6 @@ export function playAnswerDing() {
   audio.resume().catch(() => {})
   const bus = busFor(audio)
   const t = audio.currentTime + 0.01
-  blip(audio, bus, t, 1480, 0.16, 0.34)
-  blip(audio, bus, t + 0.008, 2360, 0.09, 0.12, 'triangle')
+  blip(audio, bus, t, 784, 0.11, 0.26)
+  blip(audio, bus, t + 0.12, 1175, 0.16, 0.32)
 }
