@@ -121,3 +121,15 @@ export function playSplashTap() {
   blip(audio, bus, t, 660, 0.05, 0.34)
   blip(audio, bus, t + 0.045, 990, 0.07, 0.26)
 }
+
+/** 答完一题时的「叮」：偏玻璃感，定点短音。 */
+export function playAnswerDing() {
+  if (reducedMotion()) return
+  const audio = audioContext()
+  if (!audio) return
+  audio.resume().catch(() => {})
+  const bus = busFor(audio)
+  const t = audio.currentTime + 0.01
+  blip(audio, bus, t, 1480, 0.16, 0.34)
+  blip(audio, bus, t + 0.008, 2360, 0.09, 0.12, 'triangle')
+}

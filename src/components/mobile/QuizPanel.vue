@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import { QUESTION_TYPE_LABEL, hasAnswer } from '@/utils/question'
+import { playAnswerDing } from '@/utils/splashSound'
 import { toast } from '@/utils/toast'
 
 const props = defineProps({
@@ -40,13 +41,18 @@ function pick(opt) {
   if (current.value.type === 'multiple') {
     const list = Array.isArray(answers.value[index.value]) ? [...answers.value[index.value]] : []
     const pos = list.indexOf(value)
-    if (pos >= 0) list.splice(pos, 1)
-    else list.push(value)
+    if (pos >= 0) {
+      list.splice(pos, 1)
+      list.sort()
+      answers.value[index.value] = list
+      return
+    }
+    list.push(value)
     list.sort()
     answers.value[index.value] = list
-  } else {
-    answers.value[index.value] = value
+    return
   }
+  answers.value[index.value] = value
 }
 
 function requireCurrent() {
@@ -56,7 +62,9 @@ function requireCurrent() {
 }
 
 function next() {
-  if (requireCurrent()) index.value += 1
+  if (!requireCurrent()) return
+  index.value += 1
+  playAnswerDing()
 }
 
 function prev() {
@@ -65,7 +73,9 @@ function prev() {
 
 function goTo(i) {
   if (i > index.value && !requireCurrent()) return
+  const forward = i > index.value
   index.value = i
+  if (forward) playAnswerDing()
 }
 
 function submit() {
