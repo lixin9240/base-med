@@ -185,12 +185,13 @@ function goLottery() {
     </div>
 
     <template v-else-if="record">
+      <ResultBurst
+        v-if="showBurst"
+        :passed="record.passed"
+        @finished="showBurst = false"
+      />
+
       <section class="hero rise" :class="record.passed ? 'hero--pass' : 'hero--fail'">
-        <ResultBurst
-          v-if="showBurst"
-          :passed="record.passed"
-          @finished="showBurst = false"
-        />
         <p class="hero__eyebrow">看完答题 · 共 {{ record.postTotal }} 题</p>
         <h1 class="hero__title">{{ record.passed ? '答得不错！' : '再复习一下？' }}</h1>
         <p class="hero__sub">

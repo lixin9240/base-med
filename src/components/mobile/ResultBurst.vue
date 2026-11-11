@@ -23,13 +23,12 @@ onMounted(() => {
     emit('finished')
     return
   }
-  // 1.1s 开始淡出，约 1.6s 卸掉
   hideTimer = window.setTimeout(() => {
     visible.value = false
-  }, 1100)
+  }, 1200)
   doneTimer = window.setTimeout(() => {
     emit('finished')
-  }, 1600)
+  }, 1700)
 })
 
 onBeforeUnmount(() => {
@@ -47,18 +46,21 @@ onBeforeUnmount(() => {
     ]"
     aria-hidden="true"
   >
-    <span class="burst__ring" />
-    <span class="burst__badge">
-      <AppIcon :name="passed ? 'check' : 'alert'" :size="36" />
-    </span>
+    <div class="burst__core">
+      <span class="burst__ring" />
+      <span class="burst__badge">
+        <AppIcon :name="passed ? 'check' : 'x'" :size="40" />
+      </span>
+      <p class="burst__label">{{ passed ? '已通过' : '未通过' }}</p>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .burst {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 3;
+  z-index: 80;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -72,29 +74,48 @@ onBeforeUnmount(() => {
   opacity: 0;
 }
 
+.burst__core {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: burst-pop 0.55s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+}
+
 .burst__ring {
   position: absolute;
-  width: 88px;
-  height: 88px;
+  top: 0;
+  left: 50%;
+  width: 96px;
+  height: 96px;
+  margin-left: -48px;
   border-radius: 50%;
   border: 2px solid currentColor;
   opacity: 0;
   transform: scale(0.55);
   animation: burst-ring 1.05s ease-out forwards;
+  pointer-events: none;
 }
 
 .burst__badge {
   position: relative;
-  width: 72px;
-  height: 72px;
+  width: 84px;
+  height: 84px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
-  box-shadow: 0 10px 28px rgba(20, 40, 30, 0.18);
-  transform: scale(0.35);
-  animation: burst-pop 0.55s cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+  box-shadow: 0 12px 32px rgba(20, 40, 30, 0.2);
+}
+
+.burst__label {
+  margin: 0;
+  font-size: 1.25em;
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.06em;
+  text-shadow: 0 1px 8px rgba(255, 255, 255, 0.85);
 }
 
 .burst--pass {
@@ -105,12 +126,23 @@ onBeforeUnmount(() => {
   background: var(--success);
 }
 
+.burst--pass .burst__label {
+  color: var(--success-text);
+}
+
 .burst--fail {
-  color: var(--warning-text);
+  color: var(--danger);
 }
 
 .burst--fail .burst__badge {
-  background: #c9891a;
+  background: var(--danger);
+}
+
+.burst--fail .burst__label {
+  color: var(--danger-text);
+}
+
+.burst--fail .burst__core {
   animation:
     burst-pop 0.5s cubic-bezier(0.22, 1.4, 0.36, 1) forwards,
     burst-shake 0.42s ease-in-out 0.5s;
@@ -160,7 +192,7 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .burst,
-  .burst__badge,
+  .burst__core,
   .burst__ring {
     animation: none !important;
     transition: none !important;
