@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
+import ResultBurst from '@/components/mobile/ResultBurst.vue'
 import { QUESTION_TYPE_LABEL } from '@/utils/question'
 import { speak, whenSpeechEnds } from '@/utils/speech'
 import { currentDrId } from '@/store/mobile/session'
@@ -13,6 +14,8 @@ const router = useRouter()
 const record = ref(null)
 const error = ref('')
 const loading = ref(true)
+/** 英雄卡上的通过/失败浮层特效，播完卸掉 */
+const showBurst = ref(false)
 // TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
 const answeredPeople = 1286
 const winnerPeople = 357
@@ -75,6 +78,7 @@ onMounted(async () => {
       winnerCount: 36,
       detail: (data.question_detail || []).map(mapDetailItem),
     }
+    showBurst.value = true
     const percent = Number(record.value.percent)
     if (Number.isFinite(percent)) {
       speak(`答题结束。正确率百分之${percent}，${record.value.passed ? '已通过' : '未通过'}`)
@@ -182,6 +186,11 @@ function goLottery() {
 
     <template v-else-if="record">
       <section class="hero rise" :class="record.passed ? 'hero--pass' : 'hero--fail'">
+        <ResultBurst
+          v-if="showBurst"
+          :passed="record.passed"
+          @finished="showBurst = false"
+        />
         <p class="hero__eyebrow">看完答题 · 共 {{ record.postTotal }} 题</p>
         <h1 class="hero__title">{{ record.passed ? '答得不错！' : '再复习一下？' }}</h1>
         <p class="hero__sub">
