@@ -109,7 +109,7 @@
   flex-direction: column;
   justify-content: center;
   padding: clamp(36px, 7vh, 72px) clamp(24px, 6vw, 80px);
-  background: var(--bg-surface-solid);
+  background: linear-gradient(165deg, var(--brand-soft) 0%, var(--brand-tint) 48%, var(--bg-surface-solid) 100%);
   border-right: 1px solid var(--border);
   color: var(--text-primary);
   overflow: hidden;

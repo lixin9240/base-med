@@ -48,6 +48,10 @@ const showVolume = ref(false)
 const scrubbing = ref(false)
 const stageEl = ref(null)
 const isLandscapeSource = ref(false)
+/** 片源尺寸尚未读到时先按 contain，避免横屏片从 cover 跳到 letterbox */
+const metaReady = ref(false)
+/** 封面层：仅在拿到视频首帧前显示；不用 video[poster]，否则暂停又切回封面造成画幅跳动 */
+const showCover = ref(true)
 const wideMode = ref(false)
 const deviceLandscape = ref(false)
 const videoRatio = ref('16 / 9')
@@ -71,7 +75,13 @@ function measurePoints() {
 
 function openPoints() {
   pointsOpen.value = true
-  pointsOverflow.value = false
+}
+
+function closePoints() {
+  pointsOpen.value = false
+  nextTick(() => {
+    requestAnimationFrame(measurePoints)
+  })
 }
 
 watch([articleHtml, isCinema], () => {
@@ -88,6 +98,15 @@ watch([articleHtml, isCinema], () => {
     })
   })
 })
+
+watch(
+  () => video.value?.videoUrl,
+  () => {
+    metaReady.value = false
+    isLandscapeSource.value = false
+    showCover.value = true
+  },
+)
 
 function onVideoClick() {
   if (suppressClick) {
@@ -131,6 +150,13 @@ function onLoadedMeta() {
   if (!el?.videoWidth || !el?.videoHeight) return
   videoRatio.value = `${el.videoWidth} / ${el.videoHeight}`
   isLandscapeSource.value = el.videoWidth > el.videoHeight
+  metaReady.value = true
+}
+
+/** 首帧可读后关掉封面层，之后暂停也留在视频帧上，不再切回封面 */
+function onLoadedData() {
+  onLoadedMeta()
+  showCover.value = false
 }
 
 function toggleWide() {
@@ -369,7 +395,7 @@ async function goQuiz() {
     class="learn"
     :class="{
       'is-cinema': isCinema,
-      'is-letterbox': isCinema && isLandscapeSource && !wideMode,
+      'is-letterbox': isCinema && !wideMode && (!metaReady || isLandscapeSource),
       'is-wide': isCinema && wideMode,
       'is-turned': isCinema && wideMode && !deviceLandscape,
     }"
@@ -417,11 +443,17 @@ async function goQuiz() {
 
     <template v-else>
       <div v-if="isCinema" class="player" :style="{ '--video-ratio': videoRatio }">
+        <img
+          v-if="showCover && video.cover"
+          class="player__cover"
+          :src="video.cover"
+          alt=""
+          draggable="false"
+        />
         <video
           ref="videoEl"
           class="player__el"
           :src="video.videoUrl"
-          :poster="video.cover || undefined"
           playsinline
           webkit-playsinline
           x5-playsinline
@@ -430,6 +462,7 @@ async function goQuiz() {
           preload="auto"
           :aria-label="`播放视频：${video.title}`"
           @loadedmetadata="onLoadedMeta"
+          @loadeddata="onLoadedData"
           @click="onVideoClick"
           @play="onPlay"
           @pause="onPause"
@@ -492,8 +525,13 @@ async function goQuiz() {
                   :class="{ 'is-clamp': !pointsOpen }"
                   v-html="articleHtml"
                 />
-                <button v-if="pointsOverflow && !pointsOpen" type="button" class="stage-copy__more" @click.stop="openPoints">
-                  查看更多
+                <button
+                  v-if="pointsOverflow || pointsOpen"
+                  type="button"
+                  class="stage-copy__more"
+                  @click.stop="pointsOpen ? closePoints() : openPoints()"
+                >
+                  {{ pointsOpen ? '收起' : '查看更多' }}
                 </button>
               </div>
             </aside>
@@ -591,25 +629,32 @@ async function goQuiz() {
   overflow: hidden;
 }
 
-.player__el {
+.player__el,
+.player__cover {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
   background: #000;
+  border: 0;
 }
 
-/* 横屏片源先居中按原比例显示，不裁成竖屏 */
-.learn.is-letterbox .player__el {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 100%;
-  height: auto;
-  max-height: 56%;
-  aspect-ratio: var(--video-ratio, 16 / 9);
+.player__cover {
+  z-index: 0;
+  pointer-events: none;
   object-fit: contain;
-  transform: translateY(-50%);
+}
+
+.player__el {
+  z-index: 0;
+}
+
+/* 横屏片源：铺满舞台后等比容纳，元素宽高固定 */
+.learn.is-letterbox .player__el,
+.learn.is-letterbox .player__cover {
+  object-fit: contain;
 }
 
 .learn.is-letterbox .player__play {
@@ -641,8 +686,8 @@ async function goQuiz() {
   z-index: 1;
   pointer-events: none;
   background:
-    linear-gradient(to bottom, rgb(0 0 0 / 0.5) 0%, transparent 18%),
-    linear-gradient(to top, rgb(0 0 0 / 0.78) 0%, rgb(0 0 0 / 0.28) 34%, transparent 58%);
+    linear-gradient(to bottom, rgb(0 0 0 / 0.48) 0%, transparent 6%),
+    linear-gradient(to top, rgb(0 0 0 / 0.72) 0%, rgb(0 0 0 / 0.22) 12%, transparent 24%);
 }
 
 .player__play {
@@ -954,8 +999,12 @@ async function goQuiz() {
 }
 
 .stage-copy__points.is-clamp {
-  max-height: calc(1.45em * 4);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   overflow: hidden;
+  /* 略留行高余量，避免第三行字脚被裁掉 */
+  max-height: calc(1.45em * 3 + 0.25em);
 }
 
 .stage-copy__points :deep(p),
