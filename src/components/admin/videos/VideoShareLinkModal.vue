@@ -19,7 +19,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const ttlDays = ref(SHARE_TTL_OPTIONS[0].days)
+/** 链接有效期（天）：后端仅支持 1/3/5/7，前端不再提供时效选择 */
+const EXPIRE_DAYS = SHARE_TTL_OPTIONS[0].days
 const link = ref(null)
 const now = ref(Date.now())
 const copied = ref(false)
@@ -102,20 +103,6 @@ function decorateLink(item) {
   }
 }
 
-/** 已有链接的时效选中项尽量和接口返回的 expire_type（如 7d）对齐 */
-function syncTtl(item) {
-  const matched = /^(\d+)d$/.exec(String(item.expire_type ?? ''))
-  const days =
-    matched !== null
-      ? Number(matched[1])
-      : item.createdAt && item.expiresAt
-        ? Math.round((item.expiresAt - item.createdAt) / DAY_MS)
-        : null
-  if (days !== null && SHARE_TTL_OPTIONS.some((option) => option.days === days)) {
-    ttlDays.value = days
-  }
-}
-
 function start() {
   if (!props.video) return
 
@@ -125,7 +112,6 @@ function start() {
   loading.value = false
   generating.value = false
   updating.value = false
-  ttlDays.value = SHARE_TTL_OPTIONS[0].days
   now.value = Date.now()
 
   stop()
@@ -158,7 +144,6 @@ async function loadLink() {
     if (seq !== loadSeq || !props.open) return
 
     link.value = data ? decorateLink(data) : null
-    if (link.value) syncTtl(link.value)
   } catch (error) {
     if (seq === loadSeq && props.open) {
       errorMessage.value = error?.message || '链接加载失败，请稍后重试'
@@ -180,17 +165,16 @@ async function generate() {
   errorMessage.value = ''
 
   try {
-    // 后端只支持 1 / 3 / 5 / 7 天；生成新链接时会自动失效该视频的旧链接
+    // 生成新链接时会自动失效该视频的旧链接
     const data = await generateAdminShareLink({
       videoId: videoId.value,
-      expireDays: ttlDays.value,
+      expireDays: EXPIRE_DAYS,
     })
     link.value = decorateLink({
       ...data,
       created_at: data.created_at ?? Date.now(),
     })
     now.value = Date.now()
-    syncTtl(link.value)
   } catch (error) {
     errorMessage.value = error?.message || '链接生成失败，请稍后重试'
   } finally {
@@ -283,22 +267,6 @@ function preview() {
           }}》生成一条分享链接。生成后，用户端公众号入口会自动显示这条链接，用户点击即可答题、看视频。
         </p>
 
-        <div class="ttl-row">
-          <span class="ttl-row__label">链接时效</span>
-          <div class="ttl-group">
-            <button
-              v-for="option in SHARE_TTL_OPTIONS"
-              :key="option.days"
-              type="button"
-              class="ttl-btn"
-              :class="{ 'ttl-btn--on': ttlDays === option.days }"
-              @click="ttlDays = option.days"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </div>
-
         <div
           class="share-card"
           :class="{ 'share-card--expired': unavailable, 'share-card--empty': !hasLink }"
@@ -355,7 +323,7 @@ function preview() {
             </template>
           </p>
           <p v-else-if="loading" class="share-card__hint">正在加载链接…</p>
-          <p v-else class="share-card__hint">选择时效后点击下方「生成链接」。</p>
+          <p v-else class="share-card__hint">点击下方「生成链接」。</p>
         </div>
 
         <p class="share-modal__tip">重新生成后，旧链接会立即失效。</p>
@@ -488,53 +456,6 @@ function preview() {
   font-size: var(--fs-sm);
   line-height: 1.7;
   color: var(--text-secondary);
-}
-
-.ttl-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-}
-
-.ttl-row__label {
-  flex-shrink: 0;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--text-primary);
-}
-
-.ttl-group {
-  display: inline-flex;
-  padding: 3px;
-  background: var(--bg-muted);
-  border-radius: var(--r-md);
-}
-
-.ttl-btn {
-  min-width: 62px;
-  height: 32px;
-  padding: 0 var(--sp-3);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  transition:
-    background var(--t-fast),
-    color var(--t-fast),
-    box-shadow var(--t-fast);
-}
-
-.ttl-btn:hover {
-  color: var(--text-primary);
-}
-
-.ttl-btn--on {
-  color: #fff;
-  background: var(--brand-primary);
-  box-shadow: var(--shadow-sm);
 }
 
 /* ===== 链接卡片 ===== */
