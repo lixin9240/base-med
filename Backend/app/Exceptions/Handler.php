@@ -8,6 +8,8 @@ use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\Exceptions\PostTooLargeException;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -89,6 +91,26 @@ class Handler extends ExceptionHandler
             return Result::error(
                 ResponseCode::DATA_NOT_FOUND,
                 '接口不存在'
+            );
+        }
+
+        /**
+         * 请求超过 PHP post_max_size（如大文件上传）
+         */
+        if ($e instanceof PostTooLargeException) {
+            return Result::error(
+                ResponseCode::FILE_TOO_LARGE,
+                '上传内容过大，请缩小分片后重试'
+            );
+        }
+
+        /**
+         * 请求限流（throttle 中间件）
+         */
+        if ($e instanceof ThrottleRequestsException) {
+            return Result::error(
+                ResponseCode::COMMON_TOO_MANY_REQUESTS,
+                '请求过于频繁，请稍后重试'
             );
         }
 
