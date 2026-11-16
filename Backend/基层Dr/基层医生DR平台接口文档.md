@@ -355,7 +355,7 @@
 {
     "oss_upload_id": "upload_abc123",
     "oss_path": "video/2026/10/xxx.mp4",
-    "part_size": 1048576,
+    "part_size": 5242880,
     "parts": 10
 }
 ```

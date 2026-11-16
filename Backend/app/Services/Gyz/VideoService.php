@@ -22,9 +22,11 @@ use Illuminate\Support\Facades\Storage;
 class VideoService
 {
     /**
-     * 分片大小（字节）：1MB
+     * 分片大小（字节）：5MB
+     *
+     * 需保证 PHP 的 upload_max_filesize / post_max_size 不小于该值。
      */
-    private const PART_SIZE = 1048576;
+    private const PART_SIZE = 5242880;
 
     public function __construct(
         private readonly OperationLogService $operationLogService
