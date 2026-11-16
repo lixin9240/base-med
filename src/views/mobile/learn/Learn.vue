@@ -910,6 +910,36 @@ async function goQuiz() {
   opacity: 0.78;
 }
 
+/* 可点击：整钮实心绿底、白字，外圈光环绿色 */
+.quiz-dial.is-ready {
+  --dial-track: rgb(52 108 66 / 0.28);
+  --dial-progress: var(--success);
+  --dial-glow: rgb(52 108 66 / 0.55);
+  --dial-text: #fff;
+  --dial-sub: rgb(255 255 255 / 0.88);
+}
+
+.quiz-dial.is-ready .quiz-dial__btn {
+  background: var(--success);
+  box-shadow: 0 8px 20px rgb(52 108 66 / 0.35);
+}
+
+.quiz-dial--overlay.is-ready {
+  --dial-track: rgb(110 200 130 / 0.4);
+  --dial-progress: #6ed07a;
+  --dial-glow: rgb(110 200 130 / 0.75);
+}
+
+.quiz-dial--overlay.is-ready .quiz-dial__btn {
+  background: #3f9a52;
+  box-shadow: 0 8px 22px rgb(40 120 60 / 0.45);
+}
+
+.quiz-dial--overlay.is-ready .quiz-dial__label,
+.quiz-dial--overlay.is-ready .quiz-dial__sub {
+  text-shadow: none;
+}
+
 .quiz-dial.is-ready .quiz-dial__progress {
   animation: dial-pulse 1.8s ease-in-out infinite;
 }

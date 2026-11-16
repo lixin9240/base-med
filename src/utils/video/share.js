@@ -17,9 +17,10 @@ export function rewriteShareOrigin(url) {
   }
 }
 
-/** 分享链接是否已过期 */
+/** 分享链接是否已过期；无到期时间视为不过期（当前已取消时效失效能力） */
 export function isShareExpired(link, now = Date.now()) {
-  return !link?.expiresAt || now >= link.expiresAt
+  if (!link?.expiresAt) return false
+  return now >= link.expiresAt
 }
 
 /** 时间戳格式化为 YYYY-MM-DD HH:mm:ss */

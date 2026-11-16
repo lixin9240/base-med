@@ -2,9 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { generateAdminShareLink, getAdminShareLinkDetail, revokeAdminShareLink } from '@/api'
 import { SHARE_TTL_OPTIONS } from '@/utils/video/constants'
-import { formatDateTime, isShareExpired, rewriteShareOrigin } from '@/utils/video/share'
-
-const DAY_MS = 24 * 60 * 60 * 1000
+import { formatDateTime, rewriteShareOrigin } from '@/utils/video/share'
 
 const props = defineProps({
   open: {
@@ -22,41 +20,27 @@ const emit = defineEmits(['close'])
 /** 链接有效期（天）：后端仅支持 1/3/5/7，前端不再提供时效选择 */
 const EXPIRE_DAYS = SHARE_TTL_OPTIONS[0].days
 const link = ref(null)
-const now = ref(Date.now())
 const copied = ref(false)
 const loading = ref(false)
 const generating = ref(false)
 const updating = ref(false)
 const errorMessage = ref('')
-let timer = null
 let loadSeq = 0
 
 const videoId = computed(() => props.video?.apiId ?? props.video?.id ?? null)
 const hasLink = computed(() => Boolean(link.value))
 const disabled = computed(() => link.value?.status === 0)
-const expired = computed(() => hasLink.value && isShareExpired(link.value, now.value))
-/** 撤回或过期都会让用户端入口不可用 */
-const unavailable = computed(() => hasLink.value && (disabled.value || expired.value))
+/** 仅撤回会让用户端入口不可用；已取消按到期时间失效 */
+const unavailable = computed(() => hasLink.value && disabled.value)
 const statusText = computed(() => {
   if (loading.value) return '链接加载中…'
   if (!hasLink.value) return '尚未生成'
   if (disabled.value) return '链接已撤回'
-  return expired.value ? '链接已过期' : '链接已生成'
+  return '链接已生成'
 })
 const createdText = computed(() =>
   link.value?.createdAt ? formatDateTime(link.value.createdAt) : '',
 )
-const expiresText = computed(() => {
-  if (!hasLink.value || !link.value.expiresAt) return ''
-  return formatDateTime(link.value.expiresAt)
-})
-const remainingText = computed(() => {
-  if (!hasLink.value || disabled.value || expired.value) return ''
-  const remain = link.value.expiresAt - now.value
-  const hours = Math.ceil(remain / (60 * 60 * 1000))
-  if (hours <= 24) return `剩余 ${hours} 小时`
-  return `剩余 ${Math.ceil(remain / DAY_MS)} 天`
-})
 const generateLabel = computed(() => {
   if (generating.value) return '生成中…'
   return hasLink.value ? '重新生成' : '生成链接'
@@ -112,22 +96,13 @@ function start() {
   loading.value = false
   generating.value = false
   updating.value = false
-  now.value = Date.now()
 
   stop()
-  timer = window.setInterval(() => {
-    now.value = Date.now()
-  }, 30 * 1000)
-
   loadLink()
 }
 
 function stop() {
   loadSeq += 1
-  if (timer) {
-    window.clearInterval(timer)
-    timer = null
-  }
 }
 
 /**
@@ -174,7 +149,6 @@ async function generate() {
       ...data,
       created_at: data.created_at ?? Date.now(),
     })
-    now.value = Date.now()
   } catch (error) {
     errorMessage.value = error?.message || '链接生成失败，请稍后重试'
   } finally {
@@ -306,24 +280,13 @@ function preview() {
           </div>
 
           <p
-            v-if="hasLink"
-            class="share-card__hint"
-            :class="{ 'share-card__hint--expired': unavailable }"
+            v-if="hasLink && disabled"
+            class="share-card__hint share-card__hint--expired"
           >
-            <template v-if="disabled">
-              链接已撤回，用户端点击会提示「链接已失效」；如需继续分享请重新生成。
-            </template>
-            <template v-else-if="expired">
-              链接已过期，用户端入口已自动隐藏，请重新生成。
-            </template>
-            <template v-else>
-              {{ expiresText }} 到期（{{
-                remainingText
-              }}）。届时用户端入口自动隐藏，点击可直达「视频观看」。
-            </template>
+            链接已撤回，用户端点击会提示「链接已失效」；如需继续分享请重新生成。
           </p>
           <p v-else-if="loading" class="share-card__hint">正在加载链接…</p>
-          <p v-else class="share-card__hint">点击下方「生成链接」。</p>
+          <p v-else-if="!hasLink" class="share-card__hint">点击下方「生成链接」。</p>
         </div>
 
         <p class="share-modal__tip">重新生成后，旧链接会立即失效。</p>
