@@ -42,7 +42,15 @@ class RouteServiceProvider extends ServiceProvider
     protected function configureRateLimiting(): void
     {
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+            $key = $request->user()?->id ?: $request->ip();
+
+            // 视频分片按 1MB 一片上传，单个大文件会产生数百次请求，
+            // 不能与普通接口共用 60 次/分钟的限额，否则大文件必然被限流中断。
+            if ($request->is('api/admin/video/upload/*')) {
+                return Limit::perMinute(3000)->by('video-upload:' . $key);
+            }
+
+            return Limit::perMinute(60)->by($key);
         });
     }
 }
