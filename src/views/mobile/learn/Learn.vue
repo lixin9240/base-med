@@ -24,13 +24,22 @@ const canQuiz = ref(false) // 是否已解锁后测
 const badRate = ref(false)
 const noVideoMode = ref(false)
 const loading = ref(true)
+/** 开播前预缓冲中：显示加载提示，暂不自动播放 */
+const buffering = ref(false)
 
 // TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
 const answeredPeople = 1286
 const winnerPeople = 357
 
+/** 开播前至少缓冲秒数；超时则兜底开播，避免弱网一直转圈 */
+const PREBUFFER_SEC = 3.5
+const PREBUFFER_TIMEOUT_MS = 8000
+
 let maxTime = 0 // 最大观看位置（秒）
 let reportTimer = null
+let prebufferReady = false
+let prebufferPromise = null
+let stopPrebufferWait = () => {}
 
 const articleHtml = computed(() => formatArticleHtml(video.value?.articleBody || ''))
 const DIAL_CIRCUMFERENCE = 2 * Math.PI * 50
@@ -105,6 +114,10 @@ watch(
     metaReady.value = false
     isLandscapeSource.value = false
     showCover.value = true
+    prebufferReady = false
+    prebufferPromise = null
+    buffering.value = false
+    stopPrebufferWait()
   },
 )
 
@@ -116,10 +129,11 @@ function onVideoClick() {
   togglePlay()
 }
 
-function togglePlay() {
+async function togglePlay() {
   const el = videoEl.value
   if (!el) return
   if (el.paused) {
+    await waitForPrebuffer(el)
     el.play().catch(() => {
       toast('浏览器已限制自动播放，请点击播放按钮手动播放')
     })
@@ -223,6 +237,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  stopPrebufferWait()
   clearInterval(reportTimer)
   clearTimeout(scrubHideTimer)
   document.removeEventListener('visibilitychange', onVisibility)
@@ -363,11 +378,89 @@ function onEnded() {
   }
 }
 
-// 自动播放；若被浏览器自动播放策略拦截，则提示用户手动播放
+/** 当前播放头之后已缓冲的秒数 */
+function getBufferedAhead(el) {
+  const time = el.currentTime || 0
+  const ranges = el.buffered
+  for (let i = 0; i < ranges.length; i += 1) {
+    if (ranges.start(i) <= time + 0.25 && ranges.end(i) > time) {
+      return ranges.end(i) - time
+    }
+  }
+  return 0
+}
+
+/** 是否已缓冲够开播所需时长（短片则尽量等接近播完） */
+function hasEnoughBuffer(el) {
+  if (!el) return false
+  const ahead = getBufferedAhead(el)
+  const duration = el.duration
+  if (Number.isFinite(duration) && duration > 0 && duration <= PREBUFFER_SEC + 0.5) {
+    return ahead >= Math.max(0, duration - 0.2) || el.readyState >= 3
+  }
+  return ahead >= PREBUFFER_SEC || el.readyState >= 4
+}
+
+/**
+ * 开播前等待约 3.5 秒缓冲；弱网最多等 PREBUFFER_TIMEOUT_MS 后兜底继续。
+ */
+function waitForPrebuffer(el) {
+  if (!el || prebufferReady || hasEnoughBuffer(el)) {
+    prebufferReady = true
+    buffering.value = false
+    prebufferPromise = null
+    return Promise.resolve()
+  }
+  if (prebufferPromise) return prebufferPromise
+
+  buffering.value = true
+  prebufferPromise = new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      prebufferReady = true
+      buffering.value = false
+      prebufferPromise = null
+      el.removeEventListener('progress', onProgress)
+      el.removeEventListener('canplay', onProgress)
+      el.removeEventListener('canplaythrough', onProgress)
+      el.removeEventListener('loadeddata', onProgress)
+      window.clearTimeout(timer)
+      stopPrebufferWait = () => {}
+      resolve()
+    }
+    const onProgress = () => {
+      if (hasEnoughBuffer(el)) finish()
+    }
+    const timer = window.setTimeout(finish, PREBUFFER_TIMEOUT_MS)
+    stopPrebufferWait = () => {
+      if (settled) return
+      settled = true
+      buffering.value = false
+      prebufferPromise = null
+      el.removeEventListener('progress', onProgress)
+      el.removeEventListener('canplay', onProgress)
+      el.removeEventListener('canplaythrough', onProgress)
+      el.removeEventListener('loadeddata', onProgress)
+      window.clearTimeout(timer)
+      resolve()
+    }
+    el.addEventListener('progress', onProgress)
+    el.addEventListener('canplay', onProgress)
+    el.addEventListener('canplaythrough', onProgress)
+    el.addEventListener('loadeddata', onProgress)
+    onProgress()
+  })
+  return prebufferPromise
+}
+
+// 先预缓冲再自动播放；若被浏览器自动播放策略拦截，则提示用户手动播放
 async function tryAutoPlay() {
   const el = videoEl.value
   if (!el) return
   onLoadedMeta()
+  await waitForPrebuffer(el)
   try {
     await el.play()
   } catch {
@@ -376,6 +469,8 @@ async function tryAutoPlay() {
 }
 
 function onVideoError() {
+  stopPrebufferWait()
+  buffering.value = false
   noVideoMode.value = true
   canQuiz.value = true
   setSkipWatch(videoId)
@@ -472,7 +567,17 @@ async function goQuiz() {
           @error="onVideoError"
         />
         <div class="player__veil" aria-hidden="true" />
-        <button v-if="paused" type="button" class="player__play" aria-label="播放" @click.stop="togglePlay">
+        <div v-if="buffering" class="player__buffering" role="status" aria-live="polite">
+          <div class="loading-spinner loading-spinner--on-video" />
+          <p class="player__buffering-text">视频加载中…</p>
+        </div>
+        <button
+          v-else-if="paused"
+          type="button"
+          class="player__play"
+          aria-label="播放"
+          @click.stop="togglePlay"
+        >
           <span class="player__play-icon" />
         </button>
         <button
@@ -688,6 +793,36 @@ async function goQuiz() {
   background:
     linear-gradient(to bottom, rgb(0 0 0 / 0.48) 0%, transparent 6%),
     linear-gradient(to top, rgb(0 0 0 / 0.72) 0%, rgb(0 0 0 / 0.22) 12%, transparent 24%);
+}
+
+.player__buffering {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: rgb(0 0 0 / 0.48);
+  pointer-events: none;
+}
+
+.loading-spinner--on-video {
+  margin: 0;
+  border-color: rgb(255 255 255 / 0.28);
+  border-top-color: #fff;
+}
+
+.player__buffering-text {
+  margin: 0;
+  color: #fff;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.55);
 }
 
 .player__play {
