@@ -3,58 +3,38 @@
 namespace App\Http\Controllers\Gyz;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Gyz\StatisticsFilterRequest;
+use App\Services\Gyz\StatisticsExportService;
 use App\Services\Gyz\StatisticsService;
 use App\Support\Result;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-/**
- * 数据统计控制器
- *
- * 只做请求接收与结果返回，业务逻辑全部在 StatisticsService。
- */
 class StatisticsController extends Controller
 {
     public function __construct(
-        private readonly StatisticsService $statisticsService
+        private readonly StatisticsService $statisticsService,
+        private readonly StatisticsExportService $statisticsExportService
     ) {
     }
 
-    /**
-     * 2.5.1 统计大盘（4 张指标卡）
-     */
-    public function overview(): JsonResponse
+    public function overview(StatisticsFilterRequest $request): JsonResponse
     {
-        $data = $this->statisticsService->overview();
-
-        return Result::success('获取成功', $data);
+        return Result::success('获取成功', $this->statisticsService->overview($request->medicalStaffFilter()));
     }
 
-    /**
-     * 2.5.2 各视频答题情况
-     */
-    public function videoList(): JsonResponse
+    public function videoList(StatisticsFilterRequest $request): JsonResponse
     {
-        $data = $this->statisticsService->videoList();
-
-        return Result::success('获取成功', $data);
+        return Result::success('获取成功', $this->statisticsService->videoList($request->medicalStaffFilter()));
     }
 
-    /**
-     * 2.5.3 最容易答错的题
-     */
-    public function wrongQuestion(): JsonResponse
+    public function wrongQuestion(StatisticsFilterRequest $request): JsonResponse
     {
-        $data = $this->statisticsService->wrongQuestion();
-
-        return Result::success('获取成功', $data);
+        return Result::success('获取成功', $this->statisticsService->wrongQuestion($request->medicalStaffFilter()));
     }
 
-    /**
-     * 2.5.4 导出统计（「导出统计」按钮）
-     */
-    public function export(): StreamedResponse
+    public function export(StatisticsFilterRequest $request): StreamedResponse
     {
-        return $this->statisticsService->export();
+        return $this->statisticsExportService->export($request->medicalStaffFilter());
     }
 }

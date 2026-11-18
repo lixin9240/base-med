@@ -7,31 +7,32 @@ use App\Models\ExamRecord;
 use App\Models\SystemConfig;
 use App\Models\Video;
 use App\Models\VisitRecord;
+use App\Services\Traits\FiltersByMedicalStaff;
 use Illuminate\Support\Collection;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * 数据统计服务
- *
- * 只做业务逻辑：统计大盘、各视频答题情况、最容易答错的题、导出统计。
+ * 数据统计服务：大盘、各视频答题情况、最容易答错的题（支持医护筛选）
  */
 class StatisticsService
 {
+    use FiltersByMedicalStaff;
+
     /**
      * 环节展示名
      */
-    private const STAGE_LABELS = ['pretest' => '前测', 'posttest' => '后测', 'both' => '前测/后测'];
+    public const STAGE_LABELS = ['pretest' => '前测', 'posttest' => '后测', 'both' => '前测/后测'];
 
     /**
-     * 2.5.1 统计大盘（5 张指标卡）
+     * 2.6.1 统计大盘（指标卡）
      *
      * @return array<string, mixed>
      */
-    public function overview(): array
+    public function overview(?int $isMedicalStaff = null): array
     {
-        $agg = ExamRecord::query()
+        $query = ExamRecord::query();
+        $this->applyMedicalStaffFilter($query, $isMedicalStaff);
+
+        $agg = $query
             ->selectRaw('COUNT(*) AS total_times, ROUND(AVG(pretest_score)) AS pre_avg_accuracy, ROUND(AVG(posttest_score)) AS post_avg_accuracy, SUM(result_status = ?) AS pass_times', ['pass'])
             ->first();
 
@@ -41,21 +42,18 @@ class StatisticsService
             'video_total' => Video::count(),
             'video_online' => Video::query()->where('status', 1)->count(),
             'answer_total_times' => $totalTimes,
-            // 进入答题页时产生的访问记录数（点击视频即算一次）
             'answer_entry_total' => $this->answeredEntryTotal(),
-            // 兼容字段：历史口径（即答题后正确率），供前端未改版时继续显示「平均正确率」
             'avg_accuracy' => $totalTimes > 0 ? (int) $agg->post_avg_accuracy : null,
-            // 无人答题时为 null；答题前/答题后正确率分别对应学前答题、学后答题的得分
             'pre_avg_accuracy' => $totalTimes > 0 ? (int) $agg->pre_avg_accuracy : null,
             'post_avg_accuracy' => $totalTimes > 0 ? (int) $agg->post_avg_accuracy : null,
             'pass_rate' => $totalTimes > 0 ? (int) round($agg->pass_times / $totalTimes * 100) : null,
-            // 通过线取自 system_config，默认 60
             'pass_score' => $this->configValue('pass_score', 60),
+            'is_medical_staff' => $isMedicalStaff,
         ];
     }
 
     /**
-     * 公共端：进入答题页人数（visit_record 记录数）
+     * 公共端：进入答题页人数（visit_record 记录数，不受医护筛选影响）
      */
     public function answeredEntryTotal(): int
     {
@@ -63,11 +61,11 @@ class StatisticsService
     }
 
     /**
-     * 2.5.2 各视频答题情况（全量数组，页面无分页/筛选）
+     * 2.6.2 各视频答题情况
      *
      * @return array<int, array<string, mixed>>
      */
-    public function videoList(): array
+    public function videoList(?int $isMedicalStaff = null): array
     {
         $videos = Video::query()
             ->with('category:id,name')
@@ -75,7 +73,10 @@ class StatisticsService
             ->orderBy('id')
             ->get();
 
-        $stats = ExamRecord::query()
+        $statsQuery = ExamRecord::query();
+        $this->applyMedicalStaffFilter($statsQuery, $isMedicalStaff);
+
+        $stats = $statsQuery
             ->selectRaw('video_id, COUNT(*) AS answer_times, ROUND(AVG(pretest_score)) AS pre_avg_accuracy, ROUND(AVG(posttest_score)) AS post_avg_accuracy, SUM(result_status = ?) AS pass_times', ['pass'])
             ->groupBy('video_id')
             ->get()
@@ -90,9 +91,7 @@ class StatisticsService
                 'category_name' => $video->category->name ?? null,
                 'status' => (int) $video->status,
                 'answer_times' => $stat ? (int) $stat->answer_times : 0,
-                // 兼容字段：历史口径（即答题后正确率），供前端未改版时继续显示「平均正确率」
                 'avg_accuracy' => $stat ? (int) $stat->post_avg_accuracy : null,
-                // 无人答题时为 null；答题前/答题后正确率分别对应学前答题、学后答题
                 'pre_avg_accuracy' => $stat ? (int) $stat->pre_avg_accuracy : null,
                 'post_avg_accuracy' => $stat ? (int) $stat->post_avg_accuracy : null,
                 'pass_rate' => $stat ? (int) round($stat->pass_times / $stat->answer_times * 100) : null,
@@ -101,18 +100,20 @@ class StatisticsService
     }
 
     /**
-     * 2.5.3 最容易答错的题（每个视频取前测/后测错误率最高的一题，按错误率从高到低排序）
-     *
-     * 前后测错误率最高的是同一道题时合并为一条（stage=both），否则各返回一条。
+     * 2.6.3 最容易答错的题
      *
      * @return array<int, array<string, mixed>>
      */
-    public function wrongQuestion(): array
+    public function wrongQuestion(?int $isMedicalStaff = null): array
     {
-        $rows = ExamAnswer::query()
+        $query = ExamAnswer::query()
             ->join('exam_record', 'exam_answer.exam_record_id', '=', 'exam_record.id')
             ->join('question', 'exam_answer.question_id', '=', 'question.id')
-            ->join('video', 'exam_record.video_id', '=', 'video.id')
+            ->join('video', 'exam_record.video_id', '=', 'video.id');
+
+        $this->applyMedicalStaffFilter($query, $isMedicalStaff, 'exam_record.is_medical_staff');
+
+        $rows = $query
             ->selectRaw('exam_record.video_id, video.title AS video_title, exam_answer.question_id, question.stem, exam_answer.stage, COUNT(*) AS answer_times, SUM(exam_answer.is_correct = 0) AS wrong_times')
             ->groupBy('exam_record.video_id', 'video.title', 'exam_answer.question_id', 'question.stem', 'exam_answer.stage')
             ->get();
@@ -123,7 +124,6 @@ class StatisticsService
             $topPre = $this->topWrongQuestion($videoRows->where('stage', 'pretest'));
             $topPost = $this->topWrongQuestion($videoRows->where('stage', 'posttest'));
 
-            // 前后测错误率最高的是同一道题：合并为一条
             if ($topPre !== null && $topPost !== null && (int) $topPre->question_id === (int) $topPost->question_id) {
                 $result->push($this->mergeWrongQuestion($topPre, $topPost));
                 continue;
@@ -145,58 +145,19 @@ class StatisticsService
     }
 
     /**
-     * 取某一环节（前测/后测）中错误率最高的一题；无作答数据时返回 null
-     */
-    private function topWrongQuestion(Collection $rows): ?object
-    {
-        return $rows
-            ->sortByDesc(fn ($row) => (float) $row->wrong_times / (float) $row->answer_times)
-            ->first();
-    }
-
-    /**
-     * 组装单条「最容易答错的题」记录
-     */
-    private function toWrongQuestionRow(object $row, ?string $stage = null): array
-    {
-        return [
-            'question_id' => (int) $row->question_id,
-            'stem' => $row->stem,
-            'video_title' => $row->video_title,
-            'stage' => $stage ?? $row->stage,
-            'answer_times' => (int) $row->answer_times,
-            'wrong_rate' => (int) round((float) $row->wrong_times / (float) $row->answer_times * 100),
-        ];
-    }
-
-    /**
-     * 前后测最高错误率为同一道题时合并为一条（作答/答错次数累加，环节记为 both）
-     */
-    private function mergeWrongQuestion(object $pre, object $post): array
-    {
-        $answerTimes = (int) $pre->answer_times + (int) $post->answer_times;
-        $wrongTimes = (int) $pre->wrong_times + (int) $post->wrong_times;
-
-        return [
-            'question_id' => (int) $pre->question_id,
-            'stem' => $pre->stem,
-            'video_title' => $pre->video_title,
-            'stage' => 'both',
-            'answer_times' => $answerTimes,
-            'wrong_rate' => $answerTimes > 0 ? (int) round($wrongTimes / $answerTimes * 100) : 0,
-        ];
-    }
-
-    /**
-     * 每个视频最容易答错的题（前测+后测合并，取错误率最高的一题）
+     * 每个视频最容易答错的题（导出「各视频答题情况」用）
      *
-     * @return Collection<int, array{stem: string, wrong_rate: int}>  键为 video_id
+     * @return Collection<int, array{stem: string, wrong_rate: int}>
      */
-    private function mostWrongQuestionByVideo(): Collection
+    public function mostWrongQuestionByVideo(?int $isMedicalStaff = null): Collection
     {
-        $rows = ExamAnswer::query()
+        $query = ExamAnswer::query()
             ->join('exam_record', 'exam_answer.exam_record_id', '=', 'exam_record.id')
-            ->join('question', 'exam_answer.question_id', '=', 'question.id')
+            ->join('question', 'exam_answer.question_id', '=', 'question.id');
+
+        $this->applyMedicalStaffFilter($query, $isMedicalStaff, 'exam_record.is_medical_staff');
+
+        $rows = $query
             ->selectRaw('exam_record.video_id, question.stem, COUNT(*) AS answer_times, SUM(exam_answer.is_correct = 0) AS wrong_times')
             ->groupBy('exam_record.video_id', 'question.stem')
             ->get();
@@ -215,132 +176,44 @@ class StatisticsService
             });
     }
 
-    /**
-     * 2.5.4 导出统计（Excel 文件流：大盘指标 + 各视频答题情况 + 最容易答错的题）
-     */
-    public function export(): StreamedResponse
+    private function topWrongQuestion(Collection $rows): ?object
     {
-        $overview = $this->overview();
-        $videoRows = $this->videoList();
-        $wrongRows = $this->wrongQuestion();
-        $mostWrongByVideo = $this->mostWrongQuestionByVideo();
-
-        $spreadsheet = new Spreadsheet();
-
-        // ① 统计大盘
-        $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('统计大盘');
-
-        $metricRows = [
-            ['视频总数', $overview['video_total']],
-            ['其中已上架', $overview['video_online']],
-            ['答题次数', $overview['answer_total_times']],
-            ['答题前正确率(%)', $overview['pre_avg_accuracy'] ?? '—'],
-            ['答题后正确率(%)', $overview['post_avg_accuracy'] ?? '—'],
-            ['通过率(%)', $overview['pass_rate'] ?? '—'],
-            ['通过线(%)', $overview['pass_score']],
-        ];
-
-        $row = 1;
-
-        foreach ($metricRows as $metricRow) {
-            $sheet->setCellValue([1, $row], $metricRow[0]);
-            $sheet->setCellValue([2, $row], $metricRow[1]);
-            $row++;
-        }
-
-        $sheet->getColumnDimension('A')->setWidth(20);
-        $sheet->getColumnDimension('B')->setWidth(16);
-
-        // ② 各视频答题情况（含每视频最容易答错的题与汇总行）
-        $videoSheet = $spreadsheet->createSheet();
-        $videoSheet->setTitle('各视频答题情况');
-
-        $headers = ['视频', '分类', '状态', '答题次数', '答题前正确率(%)', '答题后正确率(%)', '通过率(%)', '最容易答错题', '错误率(%)'];
-
-        foreach ($headers as $index => $header) {
-            $videoSheet->setCellValue([$index + 1, 1], $header);
-        }
-
-        $row = 2;
-
-        foreach ($videoRows as $videoRow) {
-            $mostWrong = $mostWrongByVideo->get($videoRow['video_id']);
-
-            $videoSheet->setCellValue([1, $row], $videoRow['title']);
-            $videoSheet->setCellValue([2, $row], $videoRow['category_name'] ?? '');
-            $videoSheet->setCellValue([3, $row], (int) $videoRow['status'] === 1 ? '已上架' : '已下架');
-            $videoSheet->setCellValue([4, $row], $videoRow['answer_times']);
-            $videoSheet->setCellValue([5, $row], $videoRow['pre_avg_accuracy'] ?? '—');
-            $videoSheet->setCellValue([6, $row], $videoRow['post_avg_accuracy'] ?? '—');
-            $videoSheet->setCellValue([7, $row], $videoRow['pass_rate'] ?? '—');
-            $videoSheet->setCellValue([8, $row], $mostWrong['stem'] ?? '—');
-            $videoSheet->setCellValue([9, $row], $mostWrong['wrong_rate'] ?? '—');
-            $row++;
-        }
-
-        // 汇总行：总答题次数、总平均正确率、总通过率
-        $videoSheet->setCellValue([1, $row], '合计');
-        $videoSheet->setCellValue([4, $row], $overview['answer_total_times']);
-        $videoSheet->setCellValue([5, $row], $overview['pre_avg_accuracy'] ?? '—');
-        $videoSheet->setCellValue([6, $row], $overview['post_avg_accuracy'] ?? '—');
-        $videoSheet->setCellValue([7, $row], $overview['pass_rate'] ?? '—');
-
-        foreach (range('A', 'I') as $column) {
-            $videoSheet->getColumnDimension($column)->setWidth(18);
-        }
-        $videoSheet->getColumnDimension('H')->setWidth(40);
-
-        // ③ 最容易答错的题
-        $wrongSheet = $spreadsheet->createSheet();
-        $wrongSheet->setTitle('最容易答错的题');
-
-        $headers = ['题干', '所属视频', '环节', '作答次数', '错误率(%)'];
-
-        foreach ($headers as $index => $header) {
-            $wrongSheet->setCellValue([$index + 1, 1], $header);
-        }
-
-        $row = 2;
-
-        foreach ($wrongRows as $wrongRow) {
-            $wrongSheet->setCellValue([1, $row], $wrongRow['stem']);
-            $wrongSheet->setCellValue([2, $row], $wrongRow['video_title']);
-            $wrongSheet->setCellValue([3, $row], self::STAGE_LABELS[$wrongRow['stage']] ?? $wrongRow['stage']);
-            $wrongSheet->setCellValue([4, $row], $wrongRow['answer_times']);
-            $wrongSheet->setCellValue([5, $row], $wrongRow['wrong_rate']);
-            $row++;
-        }
-
-        foreach (range('A', 'E') as $column) {
-            $wrongSheet->getColumnDimension($column)->setWidth(24);
-        }
-
-        return $this->streamXlsx($spreadsheet, '数据统计_' . now()->format('Ymd_His') . '.xlsx');
+        return $rows
+            ->sortByDesc(fn ($row) => (float) $row->wrong_times / (float) $row->answer_times)
+            ->first();
     }
 
-    /**
-     * 读取 system_config 配置项（缺省时使用默认值）
-     */
-    private function configValue(string $key, int $default): int
+    private function toWrongQuestionRow(object $row, ?string $stage = null): array
+    {
+        return [
+            'question_id' => (int) $row->question_id,
+            'stem' => $row->stem,
+            'video_title' => $row->video_title,
+            'stage' => $stage ?? $row->stage,
+            'answer_times' => (int) $row->answer_times,
+            'wrong_rate' => (int) round((float) $row->wrong_times / (float) $row->answer_times * 100),
+        ];
+    }
+
+    private function mergeWrongQuestion(object $pre, object $post): array
+    {
+        $answerTimes = (int) $pre->answer_times + (int) $post->answer_times;
+        $wrongTimes = (int) $pre->wrong_times + (int) $post->wrong_times;
+
+        return [
+            'question_id' => (int) $pre->question_id,
+            'stem' => $pre->stem,
+            'video_title' => $pre->video_title,
+            'stage' => 'both',
+            'answer_times' => $answerTimes,
+            'wrong_rate' => $answerTimes > 0 ? (int) round($wrongTimes / $answerTimes * 100) : 0,
+        ];
+    }
+
+    public function configValue(string $key, int $default): int
     {
         $value = SystemConfig::query()->where('config_key', $key)->value('config_value');
 
         return $value === null ? $default : (int) $value;
-    }
-
-    /**
-     * 输出 xlsx 文件流并销毁内存中的表格对象
-     */
-    private function streamXlsx(Spreadsheet $spreadsheet, string $fileName): StreamedResponse
-    {
-        return new StreamedResponse(function () use ($spreadsheet) {
-            $writer = new Xlsx($spreadsheet);
-            $writer->save('php://output');
-            $spreadsheet->disconnectWorksheets();
-        }, 200, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'Content-Disposition' => 'attachment; filename="' . rawurlencode($fileName) . '"',
-        ]);
     }
 }

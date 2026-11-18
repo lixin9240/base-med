@@ -6,6 +6,7 @@ use App\Enums\ResponseCode;
 use App\Exceptions\BusinessException;
 use App\Models\ExamAnswer;
 use App\Models\ExamRecord;
+use App\Services\Traits\FiltersByMedicalStaff;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Storage;
@@ -14,6 +15,8 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 class ExamRecordService
 {
+    use FiltersByMedicalStaff;
+
     /**
      * 环节展示顺序：前测在前，后测在后
      */
@@ -127,13 +130,14 @@ class ExamRecordService
     {
         $records = $this->baseQuery($params)->orderByDesc('submit_at')->get();
 
-        $headers = ['时间', '视频', '编号', '猜测', '看完答题', '正确率', '结果'];
+        $headers = ['时间', '视频', '编号', '身份', '猜测', '看完答题', '正确率', '结果'];
 
         $rows = $records->map(function (ExamRecord $record) {
             return [
                 $record->submit_at?->format('Y-m-d H:i:s') ?? '',
                 $record->video->title ?? '',
                 $record->dr_id ?? '',
+                $this->medicalStaffLabel($record->is_medical_staff),
                 sprintf('%d/%d', $record->pretest_correct, (int) $record->pre_total),
                 sprintf('%d/%d', $record->posttest_correct, (int) $record->post_total),
                 sprintf('%d%%', (int) $record->accuracy_rate),
@@ -184,7 +188,24 @@ class ExamRecordService
             $query->where('result_status', $params['result_status']);
         }
 
+        $this->applyMedicalStaffFilter(
+            $query,
+            $this->normalizeMedicalStaffParam($params)
+        );
+
         return $query;
+    }
+
+    /**
+     * 导出身份列文案：展示层保留「未采集」，筛选时 null 归入非医护。
+     */
+    private function medicalStaffLabel(mixed $value): string
+    {
+        if ($value === null) {
+            return '未采集';
+        }
+
+        return (int) $value === 1 ? '医护人员' : '非医护人员';
     }
 
     /**
