@@ -6,13 +6,14 @@ const EXPORT_PATH = '/api/admin/exam-record/export'
 
 /**
  * 答题记录列表（2.5.1）。返回 { list, total, page, pageSize }，list 内字段保持后端命名。
- * videoId 对应「全部视频」筛选，resultStatus 对应「全部结果」筛选（pass / fail）。
+ * videoId / resultStatus / isMedicalStaff 对应筛选；isMedicalStaff：1 医护、0 非医护（含未采集）、空=全部。
  */
 export async function listAdminRecords({
   page = 1,
   pageSize = 20,
   videoId,
   resultStatus,
+  isMedicalStaff,
 } = {}) {
   const params = new URLSearchParams({
     page: String(page),
@@ -22,6 +23,9 @@ export async function listAdminRecords({
     params.set('video_id', String(videoId))
   }
   if (resultStatus) params.set('result_status', resultStatus)
+  if (isMedicalStaff === 0 || isMedicalStaff === 1 || isMedicalStaff === '0' || isMedicalStaff === '1') {
+    params.set('is_medical_staff', String(isMedicalStaff))
+  }
 
   const body = await get(`${LIST_PATH}?${params.toString()}`)
 
@@ -50,12 +54,15 @@ export async function getAdminRecordDetail(examRecordId) {
 }
 
 /** 导出答题记录（2.5.3）：后端生成 xlsx 并返回带签名的临时下载地址，返回 { filename, url } */
-export async function exportAdminRecords({ videoId, resultStatus } = {}) {
+export async function exportAdminRecords({ videoId, resultStatus, isMedicalStaff } = {}) {
   const params = new URLSearchParams()
   if (videoId !== undefined && videoId !== null && videoId !== '') {
     params.set('video_id', String(videoId))
   }
   if (resultStatus) params.set('result_status', resultStatus)
+  if (isMedicalStaff === 0 || isMedicalStaff === 1 || isMedicalStaff === '0' || isMedicalStaff === '1') {
+    params.set('is_medical_staff', String(isMedicalStaff))
+  }
 
   const query = params.toString()
   const body = await get(query ? `${EXPORT_PATH}?${query}` : EXPORT_PATH)

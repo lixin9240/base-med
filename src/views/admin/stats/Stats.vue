@@ -14,6 +14,8 @@ const errorQuestions = ref([])
 const loading = ref(false)
 const loadError = ref('')
 const exporting = ref(false)
+/** 统计切换：1 有医护人员 / 0 无医护人员（含未采集）；默认有医护 */
+const medicalStaffScope = ref(1)
 
 // ===== 顶部统计卡（2.6.1）=====
 const videoTotal = computed(() => Number(overview.value?.video_total) || 0)
@@ -75,11 +77,12 @@ function toQuestionRow(item) {
 async function refreshStatistics() {
   loading.value = true
   loadError.value = ''
+  const scope = medicalStaffScope.value
   try {
     const [overviewData, videos, questions] = await Promise.all([
-      getAdminStatisticsOverview(),
-      listAdminStatisticsVideos(),
-      listAdminStatisticsWrongQuestions(),
+      getAdminStatisticsOverview(scope),
+      listAdminStatisticsVideos(scope),
+      listAdminStatisticsWrongQuestions(scope),
     ])
     overview.value = overviewData
     videoStats.value = videos.map(toVideoRow)
@@ -92,6 +95,12 @@ async function refreshStatistics() {
   } finally {
     loading.value = false
   }
+}
+
+function setMedicalStaffScope(value) {
+  if (medicalStaffScope.value === value) return
+  medicalStaffScope.value = value
+  refreshStatistics()
 }
 
 onMounted(refreshStatistics)
@@ -113,7 +122,7 @@ async function exportStatistics() {
   loadError.value = ''
   let url = ''
   try {
-    const { blob, filename } = await exportAdminStatistics()
+    const { blob, filename } = await exportAdminStatistics(medicalStaffScope.value)
     url = URL.createObjectURL(blob)
 
     const a = document.createElement('a')
@@ -142,27 +151,50 @@ async function exportStatistics() {
         <p class="stats-page__desc">只看三件事：有多少人学了、答得怎么样、哪道题最容易错。</p>
       </div>
 
-      <button
-        type="button"
-        class="btn btn--secondary"
-        :disabled="exporting"
-        @click="exportStatistics"
-      >
-        <svg
-          class="btn__icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
+      <div class="stats-page__actions">
+        <div class="scope-toggle" role="group" aria-label="医护数据范围">
+          <button
+            type="button"
+            class="scope-toggle__btn"
+            :class="{ 'is-active': medicalStaffScope === 1 }"
+            :disabled="loading"
+            @click="setMedicalStaffScope(1)"
+          >
+            有医护人员
+          </button>
+          <button
+            type="button"
+            class="scope-toggle__btn"
+            :class="{ 'is-active': medicalStaffScope === 0 }"
+            :disabled="loading"
+            @click="setMedicalStaffScope(0)"
+          >
+            无医护人员
+          </button>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn--secondary"
+          :disabled="exporting"
+          @click="exportStatistics"
         >
-          <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5" />
-          <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
-        </svg>
-        {{ exporting ? '导出中…' : '导出统计' }}
-      </button>
+          <svg
+            class="btn__icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 4v11m0 0 4.5-4.5M12 15l-4.5-4.5" />
+            <path d="M4 17v1.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V17" />
+          </svg>
+          {{ exporting ? '导出中…' : '导出统计' }}
+        </button>
+      </div>
     </header>
 
     <p v-if="loadError" class="stats-banner">{{ loadError }}</p>
@@ -421,6 +453,49 @@ async function exportStatistics() {
   margin: 0;
   font-size: var(--fs-sm);
   color: var(--text-secondary);
+}
+
+.stats-page__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.scope-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  background: var(--bg-surface-solid);
+  box-shadow: var(--shadow-sm);
+}
+
+.scope-toggle__btn {
+  height: 34px;
+  padding: 0 var(--sp-4);
+  border: none;
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast);
+}
+
+.scope-toggle__btn:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.scope-toggle__btn.is-active {
+  background: var(--brand-primary);
+  color: #fff;
+}
+
+.scope-toggle__btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .btn {

@@ -15,6 +15,8 @@ const exporting = ref(false)
 
 const filterVideo = ref('')
 const filterResult = ref('')
+/** 身份筛选：'' 全部 / '1' 医护 / '0' 非医护（含未采集） */
+const filterMedicalStaff = ref('')
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
@@ -75,6 +77,12 @@ function onVideoEnter() {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
+/** 身份展示文案 */
+function medicalStaffLabel(value) {
+  if (value === null || value === undefined || value === '') return '未采集'
+  return Number(value) === 1 ? '医护人员' : '非医护人员'
+}
+
 /** 把 2.5.1 接口返回的一条记录转成列表页展示需要的字段 */
 function toRow(item) {
   return {
@@ -82,6 +90,10 @@ function toRow(item) {
     time: item.submit_at || '—',
     courseTitle: item.video_title || '',
     userId: item.dr_id || '',
+    medicalStaffLabel: medicalStaffLabel(item.is_medical_staff),
+    isMedicalStaff: item.is_medical_staff === null || item.is_medical_staff === undefined
+      ? null
+      : Number(item.is_medical_staff),
     preCorrect: Number(item.pre_correct) || 0,
     preTotal: Number(item.pre_total) || 0,
     postCorrect: Number(item.post_correct) || 0,
@@ -100,6 +112,7 @@ async function refreshRecords() {
       pageSize: PAGE_SIZE,
       videoId: filterVideo.value,
       resultStatus: filterResult.value,
+      isMedicalStaff: filterMedicalStaff.value === '' ? undefined : Number(filterMedicalStaff.value),
     })
     rows.value = data.list.map(toRow)
     total.value = data.total
@@ -147,6 +160,7 @@ async function exportRecords() {
     const data = await exportAdminRecords({
       videoId: filterVideo.value,
       resultStatus: filterResult.value,
+      isMedicalStaff: filterMedicalStaff.value === '' ? undefined : Number(filterMedicalStaff.value),
     })
     // 用隐藏 iframe 触发下载，不新开标签、不跳转页面
     const iframe = document.createElement('iframe')
@@ -195,6 +209,7 @@ async function openDetail(row) {
       videoTitle: data.video_title || '',
       drId: data.dr_id || '',
       submitAt: data.submit_at || '—',
+      medicalStaffLabel: medicalStaffLabel(data.is_medical_staff),
       passed: data.result_status === 'pass',
       percent: Number(data.accuracy_rate) || 0,
       pre: {
@@ -316,6 +331,17 @@ function closeDetail() {
           <option value="fail">未通过</option>
         </select>
 
+        <select
+          v-model="filterMedicalStaff"
+          class="select"
+          aria-label="按身份筛选"
+          @change="onFilterChange"
+        >
+          <option value="">全部身份</option>
+          <option value="1">医护人员</option>
+          <option value="0">非医护人员</option>
+        </select>
+
         <button
           type="button"
           class="btn btn--secondary"
@@ -346,6 +372,7 @@ function closeDetail() {
         <span class="col col--time">时间</span>
         <span class="col col--video">视频</span>
         <span class="col col--uid">编号</span>
+        <span class="col col--staff">身份</span>
         <span class="col col--score">前测</span>
         <span class="col col--score">看课答题</span>
         <span class="col col--result">结果</span>
@@ -356,6 +383,18 @@ function closeDetail() {
         <span class="col col--time">{{ record.time }}</span>
         <span class="col col--video">{{ record.courseTitle }}</span>
         <span class="col col--uid">{{ record.userId }}</span>
+        <span class="col col--staff">
+          <span
+            class="staff-tag"
+            :class="{
+              'staff-tag--yes': record.isMedicalStaff === 1,
+              'staff-tag--no': record.isMedicalStaff === 0,
+              'staff-tag--unknown': record.isMedicalStaff === null,
+            }"
+          >
+            {{ record.medicalStaffLabel }}
+          </span>
+        </span>
         <span class="col col--score">{{ record.preCorrect }}/{{ record.preTotal }}</span>
         <span class="col col--score">{{ record.postCorrect }}/{{ record.postTotal }}</span>
         <span class="col col--result">
@@ -419,7 +458,8 @@ function closeDetail() {
             <h2 class="modal__title">作答详情</h2>
             <p class="modal__meta">
               <template v-if="detail">
-                {{ detail.drId }} · 《{{ detail.videoTitle }}》 · {{ detail.submitAt }}
+                {{ detail.drId }} · {{ detail.medicalStaffLabel }} · 《{{ detail.videoTitle }}》 ·
+                {{ detail.submitAt }}
               </template>
               <template v-else>正在加载作答详情…</template>
             </p>
@@ -787,6 +827,39 @@ function closeDetail() {
   flex: 1.1;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+.col--staff {
+  flex: 0.85;
+  justify-content: center;
+}
+
+.staff-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+}
+
+.staff-tag--yes {
+  background: var(--brand-tint);
+  color: var(--brand-primary-hover);
+}
+
+.staff-tag--no {
+  background: var(--bg-muted);
+  color: var(--text-secondary);
+}
+
+.staff-tag--unknown {
+  background: var(--warning-bg, #fff7e6);
+  color: var(--warning-text, #ad6800);
 }
 
 .col--score {
