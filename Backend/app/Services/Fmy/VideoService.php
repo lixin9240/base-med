@@ -17,6 +17,11 @@ use Illuminate\Support\Facades\DB;
 class VideoService
 {
     /**
+     * 系统内置固定题 ID：是否为医护人员（不落题库，不参与正确率计算）
+     */
+    public const MEDICAL_STAFF_QUESTION_ID = 0;
+
+    /**
      * 用户端首页视频列表（免登录展示全部上架视频，点击视频时才签发 dr_id）
      *
      * @return array<int, array<string, mixed>>
@@ -106,17 +111,18 @@ class VideoService
      *
      * @return array<int, array<string, mixed>>
      */
-    public function questionList(int $videoId): array
+    public function questionList(int $videoId, ?string $stage = null): array
     {
         $this->onShelfVideo($videoId);
 
-        return $this->questionSet($videoId)
+        return $this->examQuestionSet($videoId, $stage ?? 'pretest')
             ->map(fn (array $question) => [
                 'question_id' => $question['question_id'],
                 'type' => $question['type'],
                 'stem' => $question['stem'],
                 'image_url' => $question['image_url'] ?? '',
                 'options' => $question['options'],
+                'is_medical_staff' => (int) ($question['is_medical_staff'] ?? 0),
             ])
             ->values()
             ->all();
@@ -234,6 +240,62 @@ class VideoService
         }
 
         return blank($video->video_url) && blank($video->oss_path);
+    }
+
+    /**
+     * 系统内置固定题：是否为医护人员（不落题库，不参与正确率计算）
+     *
+     * @return array<string, mixed>
+     */
+    public function medicalStaffQuestion(): array
+    {
+        return [
+            'question_id' => self::MEDICAL_STAFF_QUESTION_ID,
+            'type' => 'single',
+            'stem' => '请问您是否为医护人员？',
+            'image_url' => '',
+            'options' => [
+                ['key' => 'A', 'content' => '是'],
+                ['key' => 'B', 'content' => '否'],
+            ],
+            'correct_answer' => null,
+            'analysis' => '',
+            'is_medical_staff' => 1,
+        ];
+    }
+
+    /**
+     * 答题页题目集合：学前答题在真实题目最前面追加内置固定题，后测不展示
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function examQuestionSet(int $videoId, ?string $stage = null): Collection
+    {
+        $questions = $this->questionSet($videoId);
+
+        if ($stage === 'pretest') {
+            return collect([$this->medicalStaffQuestion()])->concat($questions)->values();
+        }
+
+        return $questions;
+    }
+
+    /**
+     * 从作答中解析「是否医护人员」：A-是，B-否，未作答返回 null
+     *
+     * @param  array<int, array<string, mixed>>  $answers
+     */
+    public function extractMedicalStaff(array $answers): ?int
+    {
+        foreach ($answers as $answer) {
+            if ((int) ($answer['question_id'] ?? -1) !== self::MEDICAL_STAFF_QUESTION_ID) {
+                continue;
+            }
+
+            return strtoupper((string) ($answer['user_answer'] ?? '')) === 'A' ? 1 : 0;
+        }
+
+        return null;
     }
 
     /**

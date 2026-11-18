@@ -15,6 +15,7 @@ class ExamRecord extends Model
         'dr_id',
         'video_id',
         'attempt_no',
+        'is_medical_staff',
         'pretest_correct',
         'posttest_correct',
         'pretest_score',
