@@ -1,5 +1,4 @@
-/** 视频标题最多字数 */
-export const VIDEO_TITLE_MAX = 10
+
 
 /** 一句话简介最多字数 */
 export const VIDEO_INTRO_MAX = 30

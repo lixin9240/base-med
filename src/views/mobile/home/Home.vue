@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import { listPublicVideos } from '@/api/public'
 import { issueDrId } from '@/store/mobile/session'
+import { unlockSplashSound } from '@/utils/splashSound'
 
 const router = useRouter()
 const videos = ref([])
@@ -45,6 +46,7 @@ function categoryTone(category) {
 
 async function openCourse(item) {
   if (opening.value) return
+  unlockSplashSound()
   opening.value = true
   try {
     await issueDrId(item.id)
@@ -293,7 +295,7 @@ async function openCourse(item) {
   align-items: center;
   gap: 4px;
   margin: var(--sp-1) 0 0;
-  font-size: 11px;
+  font-size: 0.6875em;
   color: var(--success-text);
 }
 
@@ -306,7 +308,7 @@ async function openCourse(item) {
   margin-top: var(--sp-6);
   padding: 0 var(--sp-4);
   text-align: center;
-  font-size: 11px;
+  font-size: 0.6875em;
   color: var(--text-disabled);
   line-height: 1.6;
 }

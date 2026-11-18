@@ -6,6 +6,7 @@ use App\Models\ExamAnswer;
 use App\Models\ExamRecord;
 use App\Models\SystemConfig;
 use App\Models\Video;
+use App\Models\VisitRecord;
 use Illuminate\Support\Collection;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -40,6 +41,8 @@ class StatisticsService
             'video_total' => Video::count(),
             'video_online' => Video::query()->where('status', 1)->count(),
             'answer_total_times' => $totalTimes,
+            // 进入答题页时产生的访问记录数（点击视频即算一次）
+            'answer_entry_total' => $this->answeredEntryTotal(),
             // 兼容字段：历史口径（即答题后正确率），供前端未改版时继续显示「平均正确率」
             'avg_accuracy' => $totalTimes > 0 ? (int) $agg->post_avg_accuracy : null,
             // 无人答题时为 null；答题前/答题后正确率分别对应学前答题、学后答题的得分
@@ -49,6 +52,14 @@ class StatisticsService
             // 通过线取自 system_config，默认 60
             'pass_score' => $this->configValue('pass_score', 60),
         ];
+    }
+
+    /**
+     * 公共端：进入答题页人数（visit_record 记录数）
+     */
+    public function answeredEntryTotal(): int
+    {
+        return VisitRecord::query()->count();
     }
 
     /**

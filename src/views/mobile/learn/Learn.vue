@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '@/components/mobile/AppIcon.vue'
 import PageNav from '@/components/mobile/PageNav.vue'
@@ -24,13 +24,22 @@ const canQuiz = ref(false) // 是否已解锁后测
 const badRate = ref(false)
 const noVideoMode = ref(false)
 const loading = ref(true)
+/** 开播前预缓冲中：显示加载提示，暂不自动播放 */
+const buffering = ref(false)
 
 // TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
 const answeredPeople = 1286
 const winnerPeople = 357
 
+/** 开播前至少缓冲秒数；超时则兜底开播，避免弱网一直转圈 */
+const PREBUFFER_SEC = 3.5
+const PREBUFFER_TIMEOUT_MS = 8000
+
 let maxTime = 0 // 最大观看位置（秒）
 let reportTimer = null
+let prebufferReady = false
+let prebufferPromise = null
+let stopPrebufferWait = () => {}
 
 const articleHtml = computed(() => formatArticleHtml(video.value?.articleBody || ''))
 const DIAL_CIRCUMFERENCE = 2 * Math.PI * 50
@@ -43,17 +52,74 @@ const isCinema = computed(() => Boolean(video.value?.videoUrl) && !noVideoMode.v
 const paused = ref(true)
 const playhead = ref(0)
 const showScrub = ref(false)
+const volume = ref(1)
+const showVolume = ref(false)
 const scrubbing = ref(false)
 const stageEl = ref(null)
 const isLandscapeSource = ref(false)
+/** 片源尺寸尚未读到时先按 contain，避免横屏片从 cover 跳到 letterbox */
+const metaReady = ref(false)
+/** 封面层：仅在拿到视频首帧前显示；不用 video[poster]，否则暂停又切回封面造成画幅跳动 */
+const showCover = ref(true)
 const wideMode = ref(false)
 const deviceLandscape = ref(false)
 const videoRatio = ref('16 / 9')
+const pointsEl = ref(null)
+const pointsOverflow = ref(false)
+const pointsOpen = ref(false)
 let lastSample = 0
+let pointsObserver = null
 let scrubHideTimer = null
 let orientMedia = null
 let stagePointer = null
 let suppressClick = false
+let volumeGesture = null
+let volumeHideTimer = null
+
+function measurePoints() {
+  const el = pointsEl.value
+  if (!el || pointsOpen.value) return
+  pointsOverflow.value = el.scrollHeight > el.clientHeight + 2
+}
+
+function openPoints() {
+  pointsOpen.value = true
+}
+
+function closePoints() {
+  pointsOpen.value = false
+  nextTick(() => {
+    requestAnimationFrame(measurePoints)
+  })
+}
+
+watch([articleHtml, isCinema], () => {
+  pointsOpen.value = false
+  pointsOverflow.value = false
+  nextTick(() => {
+    requestAnimationFrame(() => {
+      measurePoints()
+      const el = pointsEl.value
+      pointsObserver?.disconnect()
+      if (!el) return
+      pointsObserver = new ResizeObserver(() => measurePoints())
+      pointsObserver.observe(el)
+    })
+  })
+})
+
+watch(
+  () => video.value?.videoUrl,
+  () => {
+    metaReady.value = false
+    isLandscapeSource.value = false
+    showCover.value = true
+    prebufferReady = false
+    prebufferPromise = null
+    buffering.value = false
+    stopPrebufferWait()
+  },
+)
 
 function onVideoClick() {
   if (suppressClick) {
@@ -63,10 +129,11 @@ function onVideoClick() {
   togglePlay()
 }
 
-function togglePlay() {
+async function togglePlay() {
   const el = videoEl.value
   if (!el) return
   if (el.paused) {
+    await waitForPrebuffer(el)
     el.play().catch(() => {
       toast('浏览器已限制自动播放，请点击播放按钮手动播放')
     })
@@ -97,6 +164,13 @@ function onLoadedMeta() {
   if (!el?.videoWidth || !el?.videoHeight) return
   videoRatio.value = `${el.videoWidth} / ${el.videoHeight}`
   isLandscapeSource.value = el.videoWidth > el.videoHeight
+  metaReady.value = true
+}
+
+/** 首帧可读后关掉封面层，之后暂停也留在视频帧上，不再切回封面 */
+function onLoadedData() {
+  onLoadedMeta()
+  showCover.value = false
 }
 
 function toggleWide() {
@@ -129,8 +203,7 @@ onMounted(async () => {
       speakerOrg: detail.speaker_org,
       intro: detail.brief_intro,
       videoUrl: detail.video_url,
-      articleBody: detail.brief_intro
-,
+      articleBody: detail.text_key_points,
       examState: detail.exam_state,
     }
 
@@ -145,8 +218,10 @@ onMounted(async () => {
       canQuiz.value = wp.is_unlocked === 1
       maxTime = Number(wp.watched_seconds) || 0
       reportTimer = window.setInterval(reportProgress, 3000)
+      loading.value = false
+      const speechDone = whenSpeechEnds()
       await nextTick()
-      await whenSpeechEnds()
+      await speechDone
       await tryAutoPlay()
     }
     document.addEventListener('visibilitychange', onVisibility)
@@ -162,11 +237,14 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  stopPrebufferWait()
   clearInterval(reportTimer)
   clearTimeout(scrubHideTimer)
   document.removeEventListener('visibilitychange', onVisibility)
   window.removeEventListener('resize', syncDeviceLandscape)
   orientMedia?.removeEventListener('change', syncDeviceLandscape)
+  pointsObserver?.disconnect()
+  clearTimeout(volumeHideTimer)
   reportProgress()
 })
 
@@ -223,52 +301,58 @@ function onTimeUpdate() {
   syncProgress()
 }
 
-function seekFromPointer(event) {
-  const stage = stageEl.value
+function applyVolumeFromPointer(event) {
   const el = videoEl.value
-  if (!stage || !el?.duration) return
-  const rect = stage.getBoundingClientRect()
-  const turned = stage.classList.contains('is-turned')
-  const span = turned ? rect.height : rect.width
-  const offset = turned ? event.clientY - rect.top : event.clientX - rect.left
-  if (!span) return
-  const ratio = Math.min(1, Math.max(0, offset / span))
-  playhead.value = ratio * 100
-  el.currentTime = ratio * el.duration
+  const stage = stageEl.value
+  if (!el || !stage || !stagePointer) return
+  const span = Math.max(160, stage.getBoundingClientRect().height)
+  const next = Math.min(1, Math.max(0, stagePointer.volume + (stagePointer.y - event.clientY) / span))
+  volume.value = next
+  el.volume = next
+  el.muted = next === 0
 }
 
 function onStagePointerDown(event) {
   if (!isCinema.value) return
   if (event.target.closest('button, a, .stage-copy')) return
-  stagePointer = { x: event.clientX, y: event.clientY, id: event.pointerId }
+  volumeGesture = null
+  stagePointer = {
+    x: event.clientX,
+    y: event.clientY,
+    id: event.pointerId,
+    volume: volume.value,
+  }
 }
 
 function onStagePointerMove(event) {
   if (!stagePointer || event.pointerId !== stagePointer.id) return
   const dx = event.clientX - stagePointer.x
   const dy = event.clientY - stagePointer.y
-  if (!scrubbing.value && Math.hypot(dx, dy) < 8) return
-  if (!scrubbing.value) {
-    scrubbing.value = true
-    showScrub.value = true
+  if (!volumeGesture) {
+    if (Math.hypot(dx, dy) < 8) return
+    volumeGesture = Math.abs(dy) > Math.abs(dx) ? 'volume' : 'skip'
+    if (volumeGesture !== 'volume') return
+    showVolume.value = true
     suppressClick = true
-    clearTimeout(scrubHideTimer)
+    clearTimeout(volumeHideTimer)
     try {
       stageEl.value?.setPointerCapture?.(event.pointerId)
     } catch {
       // 指针已被释放时忽略
     }
   }
-  seekFromPointer(event)
+  if (volumeGesture !== 'volume') return
+  applyVolumeFromPointer(event)
 }
 
 function onStagePointerUp(event) {
   if (stagePointer && event.pointerId !== stagePointer.id) return
+  const wasVolume = volumeGesture === 'volume'
   stagePointer = null
-  if (!scrubbing.value) return
-  scrubbing.value = false
-  scrubHideTimer = window.setTimeout(() => {
-    showScrub.value = false
+  volumeGesture = null
+  if (!wasVolume) return
+  volumeHideTimer = window.setTimeout(() => {
+    showVolume.value = false
   }, 500)
 }
 
@@ -294,11 +378,89 @@ function onEnded() {
   }
 }
 
-// 自动播放；若被浏览器自动播放策略拦截，则提示用户手动播放
+/** 当前播放头之后已缓冲的秒数 */
+function getBufferedAhead(el) {
+  const time = el.currentTime || 0
+  const ranges = el.buffered
+  for (let i = 0; i < ranges.length; i += 1) {
+    if (ranges.start(i) <= time + 0.25 && ranges.end(i) > time) {
+      return ranges.end(i) - time
+    }
+  }
+  return 0
+}
+
+/** 是否已缓冲够开播所需时长（短片则尽量等接近播完） */
+function hasEnoughBuffer(el) {
+  if (!el) return false
+  const ahead = getBufferedAhead(el)
+  const duration = el.duration
+  if (Number.isFinite(duration) && duration > 0 && duration <= PREBUFFER_SEC + 0.5) {
+    return ahead >= Math.max(0, duration - 0.2) || el.readyState >= 3
+  }
+  return ahead >= PREBUFFER_SEC || el.readyState >= 4
+}
+
+/**
+ * 开播前等待约 3.5 秒缓冲；弱网最多等 PREBUFFER_TIMEOUT_MS 后兜底继续。
+ */
+function waitForPrebuffer(el) {
+  if (!el || prebufferReady || hasEnoughBuffer(el)) {
+    prebufferReady = true
+    buffering.value = false
+    prebufferPromise = null
+    return Promise.resolve()
+  }
+  if (prebufferPromise) return prebufferPromise
+
+  buffering.value = true
+  prebufferPromise = new Promise((resolve) => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      prebufferReady = true
+      buffering.value = false
+      prebufferPromise = null
+      el.removeEventListener('progress', onProgress)
+      el.removeEventListener('canplay', onProgress)
+      el.removeEventListener('canplaythrough', onProgress)
+      el.removeEventListener('loadeddata', onProgress)
+      window.clearTimeout(timer)
+      stopPrebufferWait = () => {}
+      resolve()
+    }
+    const onProgress = () => {
+      if (hasEnoughBuffer(el)) finish()
+    }
+    const timer = window.setTimeout(finish, PREBUFFER_TIMEOUT_MS)
+    stopPrebufferWait = () => {
+      if (settled) return
+      settled = true
+      buffering.value = false
+      prebufferPromise = null
+      el.removeEventListener('progress', onProgress)
+      el.removeEventListener('canplay', onProgress)
+      el.removeEventListener('canplaythrough', onProgress)
+      el.removeEventListener('loadeddata', onProgress)
+      window.clearTimeout(timer)
+      resolve()
+    }
+    el.addEventListener('progress', onProgress)
+    el.addEventListener('canplay', onProgress)
+    el.addEventListener('canplaythrough', onProgress)
+    el.addEventListener('loadeddata', onProgress)
+    onProgress()
+  })
+  return prebufferPromise
+}
+
+// 先预缓冲再自动播放；若被浏览器自动播放策略拦截，则提示用户手动播放
 async function tryAutoPlay() {
   const el = videoEl.value
   if (!el) return
   onLoadedMeta()
+  await waitForPrebuffer(el)
   try {
     await el.play()
   } catch {
@@ -307,6 +469,8 @@ async function tryAutoPlay() {
 }
 
 function onVideoError() {
+  stopPrebufferWait()
+  buffering.value = false
   noVideoMode.value = true
   canQuiz.value = true
   setSkipWatch(videoId)
@@ -315,8 +479,7 @@ function onVideoError() {
 async function goQuiz() {
   // 跳转前先把进度同步到后端，确保后端 is_unlocked 已更新（否则长视频到 90% 点去答题会被后测门槛弹回）
   await reportProgress()
-  const title = video.value?.title
-  speak(title ? `视频已看完，开始《${title}》的看完答题` : '视频已看完，开始看完答题')
+  speak('视频看完，趁热答题巩固一下')
   router.push({ name: 'mobile-quiz', query: { videoId, stage: 'post' } })
 }
 </script>
@@ -327,7 +490,7 @@ async function goQuiz() {
     class="learn"
     :class="{
       'is-cinema': isCinema,
-      'is-letterbox': isCinema && isLandscapeSource && !wideMode,
+      'is-letterbox': isCinema && !wideMode && (!metaReady || isLandscapeSource),
       'is-wide': isCinema && wideMode,
       'is-turned': isCinema && wideMode && !deviceLandscape,
     }"
@@ -375,19 +538,26 @@ async function goQuiz() {
 
     <template v-else>
       <div v-if="isCinema" class="player" :style="{ '--video-ratio': videoRatio }">
+        <img
+          v-if="showCover && video.cover"
+          class="player__cover"
+          :src="video.cover"
+          alt=""
+          draggable="false"
+        />
         <video
           ref="videoEl"
           class="player__el"
           :src="video.videoUrl"
-          autoplay
           playsinline
           webkit-playsinline
           x5-playsinline
           x5-video-player-type="h5-page"
           x5-video-player-fullscreen="false"
-          preload="metadata"
+          preload="auto"
           :aria-label="`播放视频：${video.title}`"
           @loadedmetadata="onLoadedMeta"
+          @loadeddata="onLoadedData"
           @click="onVideoClick"
           @play="onPlay"
           @pause="onPause"
@@ -397,7 +567,17 @@ async function goQuiz() {
           @error="onVideoError"
         />
         <div class="player__veil" aria-hidden="true" />
-        <button v-if="paused" type="button" class="player__play" aria-label="播放" @click.stop="togglePlay">
+        <div v-if="buffering" class="player__buffering" role="status" aria-live="polite">
+          <div class="loading-spinner loading-spinner--on-video" />
+          <p class="player__buffering-text">视频加载中…</p>
+        </div>
+        <button
+          v-else-if="paused"
+          type="button"
+          class="player__play"
+          aria-label="播放"
+          @click.stop="togglePlay"
+        >
           <span class="player__play-icon" />
         </button>
         <button
@@ -408,6 +588,7 @@ async function goQuiz() {
         >
           <AppIcon name="landscape" :size="20" />
         </button>
+        <div v-if="showVolume" class="volume-tip">音量 {{ Math.round(volume * 100) }}%</div>
         <div v-if="badRate" class="player__tip">
           <AppIcon name="alert" :size="14" />
           倍速播放不计入观看进度
@@ -440,9 +621,24 @@ async function goQuiz() {
       <div class="dock">
         <template v-if="isCinema">
           <div class="dock__row">
-            <aside class="stage-copy">
+            <aside class="stage-copy" :class="{ 'is-open': pointsOpen }">
               <h1 class="stage-copy__title">{{ video.title }}</h1>
-              <div v-if="video.articleBody" class="stage-copy__points" v-html="articleHtml" />
+              <div v-if="video.articleBody" class="stage-copy__fold">
+                <div
+                  ref="pointsEl"
+                  class="stage-copy__points"
+                  :class="{ 'is-clamp': !pointsOpen }"
+                  v-html="articleHtml"
+                />
+                <button
+                  v-if="pointsOverflow || pointsOpen"
+                  type="button"
+                  class="stage-copy__more"
+                  @click.stop="pointsOpen ? closePoints() : openPoints()"
+                >
+                  {{ pointsOpen ? '收起' : '查看更多' }}
+                </button>
+              </div>
             </aside>
             <div
               class="quiz-dial quiz-dial--overlay dock__dial"
@@ -538,25 +734,32 @@ async function goQuiz() {
   overflow: hidden;
 }
 
-.player__el {
+.player__el,
+.player__cover {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
   background: #000;
+  border: 0;
 }
 
-/* 横屏片源先居中按原比例显示，不裁成竖屏 */
-.learn.is-letterbox .player__el {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 100%;
-  height: auto;
-  max-height: 56%;
-  aspect-ratio: var(--video-ratio, 16 / 9);
+.player__cover {
+  z-index: 0;
+  pointer-events: none;
   object-fit: contain;
-  transform: translateY(-50%);
+}
+
+.player__el {
+  z-index: 0;
+}
+
+/* 横屏片源：铺满舞台后等比容纳，元素宽高固定 */
+.learn.is-letterbox .player__el,
+.learn.is-letterbox .player__cover {
+  object-fit: contain;
 }
 
 .learn.is-letterbox .player__play {
@@ -588,8 +791,38 @@ async function goQuiz() {
   z-index: 1;
   pointer-events: none;
   background:
-    linear-gradient(to bottom, rgb(0 0 0 / 0.5) 0%, transparent 18%),
-    linear-gradient(to top, rgb(0 0 0 / 0.78) 0%, rgb(0 0 0 / 0.28) 34%, transparent 58%);
+    linear-gradient(to bottom, rgb(0 0 0 / 0.48) 0%, transparent 6%),
+    linear-gradient(to top, rgb(0 0 0 / 0.72) 0%, rgb(0 0 0 / 0.22) 12%, transparent 24%);
+}
+
+.player__buffering {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  background: rgb(0 0 0 / 0.48);
+  pointer-events: none;
+}
+
+.loading-spinner--on-video {
+  margin: 0;
+  border-color: rgb(255 255 255 / 0.28);
+  border-top-color: #fff;
+}
+
+.player__buffering-text {
+  margin: 0;
+  color: #fff;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.55);
 }
 
 .player__play {
@@ -690,25 +923,31 @@ async function goQuiz() {
 }
 
 .dock__row {
+  position: relative;
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   width: 100%;
+  min-height: calc(104px + 4px);
 }
 
 .stage-copy {
   flex: 1;
   min-width: 0;
-  max-width: 72%;
+  max-width: min(72%, calc(100% - 122px));
   max-height: 28dvh;
-  margin: 0 0 2px max(12px, env(safe-area-inset-left, 0px));
+  margin: 0 0 0 max(12px, env(safe-area-inset-left, 0px));
   overflow: auto;
   text-align: left;
   pointer-events: auto;
   touch-action: pan-y;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+}
+
+.stage-copy.is-open {
+  max-height: 56dvh;
 }
 
 .stage-copy::-webkit-scrollbar {
@@ -788,7 +1027,7 @@ async function goQuiz() {
 }
 
 .quiz-dial__sub {
-  font-size: 10px;
+  font-size: 0.625em;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
   color: var(--dial-sub);
@@ -804,6 +1043,36 @@ async function goQuiz() {
 
 .quiz-dial.is-wait {
   opacity: 0.78;
+}
+
+/* 可点击：整钮实心绿底、白字，外圈光环绿色 */
+.quiz-dial.is-ready {
+  --dial-track: rgb(52 108 66 / 0.28);
+  --dial-progress: var(--success);
+  --dial-glow: rgb(52 108 66 / 0.55);
+  --dial-text: #fff;
+  --dial-sub: rgb(255 255 255 / 0.88);
+}
+
+.quiz-dial.is-ready .quiz-dial__btn {
+  background: var(--success);
+  box-shadow: 0 8px 20px rgb(52 108 66 / 0.35);
+}
+
+.quiz-dial--overlay.is-ready {
+  --dial-track: rgb(110 200 130 / 0.4);
+  --dial-progress: #6ed07a;
+  --dial-glow: rgb(110 200 130 / 0.75);
+}
+
+.quiz-dial--overlay.is-ready .quiz-dial__btn {
+  background: #3f9a52;
+  box-shadow: 0 8px 22px rgb(40 120 60 / 0.45);
+}
+
+.quiz-dial--overlay.is-ready .quiz-dial__label,
+.quiz-dial--overlay.is-ready .quiz-dial__sub {
+  text-shadow: none;
 }
 
 .quiz-dial.is-ready .quiz-dial__progress {
@@ -822,18 +1091,34 @@ async function goQuiz() {
 
 .dock__dial {
   --dial-size: 104px;
-  flex-shrink: 0;
-  align-self: flex-end;
+  position: absolute;
+  right: 0;
+  bottom: 0;
   margin: 0 max(10px, env(safe-area-inset-right, 0px)) 4px 0;
   pointer-events: auto;
 }
 
 .dock__note {
   margin: 2px max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
-  font-size: 11px;
+  font-size: 0.6875em;
   line-height: 1.4;
   color: rgb(255 255 255 / 0.72);
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.65);
+  pointer-events: none;
+}
+
+.volume-tip {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  z-index: 4;
+  transform: translate(-50%, -50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: 0.8125em;
+  letter-spacing: 0.04em;
   pointer-events: none;
 }
 
@@ -862,15 +1147,29 @@ async function goQuiz() {
 
 .stage-copy__title {
   margin: 0;
-  font-size: 13px;
+  font-size: 0.8125em;
   font-weight: var(--fw-semibold);
   line-height: 1.35;
   color: #fff;
   text-shadow: 0 1px 3px rgb(0 0 0 / 0.7);
 }
 
-.stage-copy__points {
+.stage-copy__fold {
   margin-top: 6px;
+}
+
+.stage-copy__points {
+  font-size: 0.6875em;
+  line-height: 1.45;
+}
+
+.stage-copy__points.is-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  /* 略留行高余量，避免第三行字脚被裁掉 */
+  max-height: calc(1.45em * 3 + 0.25em);
 }
 
 .stage-copy__points :deep(p),
@@ -879,11 +1178,31 @@ async function goQuiz() {
   margin: 0 0 3px;
   padding: 0;
   border: none;
-  font-size: 11px;
+  font-size: 0.6875em;
   font-weight: 400;
   line-height: 1.45;
   color: rgb(255 255 255 / 0.92);
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.65);
+}
+
+.stage-copy__points.is-clamp :deep(p),
+.stage-copy__points.is-clamp :deep(.art__h),
+.stage-copy__points.is-clamp :deep(.art__li) {
+  margin: 0;
+}
+
+.stage-copy__more {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: 0.6875em;
+  line-height: 1.4;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 .player-fallback {

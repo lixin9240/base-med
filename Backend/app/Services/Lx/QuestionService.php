@@ -72,10 +72,10 @@ class QuestionService
             'type' => $type,
             'stem' => $params['stem'],
             'correct_answer' => Question::normalizeCorrectAnswer($type, (string) $params['correct_answer']),
-            'analysis' => $params['analysis'] ?? null,
+            'analysis' => $params['analysis'] ?? '',
             'image_url' => $params['image_url'] ?? null,
             'difficulty' => $params['difficulty'] ?? $question->difficulty,
-            'knowledge_point' => $params['knowledge_point'] ?? null,
+            'knowledge_point' => $params['knowledge_point'] ?? '',
         ];
 
         if ($type === 'judge') {

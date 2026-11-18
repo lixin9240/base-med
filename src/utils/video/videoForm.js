@@ -3,7 +3,6 @@ import {
   VIDEO_INTRO_MAX,
   VIDEO_KEY_POINTS_MAX,
   VIDEO_SOURCE,
-  VIDEO_TITLE_MAX,
 } from './constants'
 
 /** 新建 / 编辑弹窗的初始草稿 */
@@ -40,9 +39,6 @@ function isPlayableUrl(value) {
 export function validateVideoDraft(draft, { hasUploadFile = false } = {}) {
   const errors = {}
 
-  const title = String(draft.title ?? '').trim()
-  if (!title) errors.title = '请填写视频标题'
-  else if (title.length > VIDEO_TITLE_MAX) errors.title = `标题不能超过 ${VIDEO_TITLE_MAX} 个字`
 
   if (!String(draft.speaker ?? '').trim()) errors.speaker = '请填写主讲人'
 

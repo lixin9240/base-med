@@ -1,0 +1,53 @@
+/* 方案 colors10 · 云蓝
+   概念：#c7e3f8 雾蓝为主色调（大面积渐变、浅底、边框），
+   深蓝 #25719d 作为可承载白字的操作色，保证按钮/顶栏文字对比度 ≥ 4.5:1。 */
+.mobile-layout,
+.admin-layout {
+  /* 品牌色：主色调 #c7e3f8 的深蓝端用于交互，浅端用于铺底 */
+  --brand-primary: #25719d;
+  --brand-primary-hover: #2c7ca9;
+  --brand-primary-active: #1a567a;
+  --brand-soft: #dceefb;
+  --brand-soft-text: #12506f;
+  --brand-tint: #f3f9fe;
+  --brand-glow: rgb(199 227 248 / 0.55);
+
+  /* 辅助色：与主色同族，仅用于分类与弱提示 */
+  --accent-teal: #4a9ec4;
+  --accent-teal-soft: #cfe7f5;
+  --accent-pink: #d98b9e;
+  --accent-pink-soft: #f8dde4;
+  --accent-lavender: #7f8fc4;
+  --accent-lavender-soft: #dfe4f5;
+
+  /* 背景与边框：以 #c7e3f8 起头的云层渐变 */
+  --bg-page: #eef6fd;
+  --bg-page-gradient: linear-gradient(165deg, #c7e3f8 0%, #eaf4fd 45%, #f9fcff 100%);
+  --bg-surface: rgb(255 255 255 / 0.94);
+  --bg-surface-solid: #ffffff;
+  --bg-muted: #dcebf8;
+  --border: rgb(37 113 157 / 0.1);
+  --border-light: rgb(37 113 157 / 0.06);
+
+  /* 文字：墨蓝，不用纯黑 */
+  --text-primary: #16324a;
+  --text-secondary: #5b7186;
+  --text-disabled: #9aabb9;
+
+  /* 状态色 */
+  --success-bg: #e2f4ea;
+  --success-text: #175f3b;
+  --success: #248a5c;
+  --warning-bg: #fdf3e0;
+  --warning-text: #7a5209;
+  --danger-bg: #fde8ec;
+  --danger-text: #8f2435;
+  --danger: #d0455a;
+  --info-bg: #e2f2fd;
+  --info-text: #14506f;
+
+  /* 阴影色：冷调浅蓝，避免发灰 */
+  --shadow-color2-sm: rgb(30 78 110 / 0.06);
+  --shadow-color2-md: rgb(30 78 110 / 0.08);
+  --shadow-color2-lg: rgb(30 78 110 / 0.1);
+}

@@ -2,9 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { generateAdminShareLink, getAdminShareLinkDetail, revokeAdminShareLink } from '@/api'
 import { SHARE_TTL_OPTIONS } from '@/utils/video/constants'
-import { formatDateTime, isShareExpired, rewriteShareOrigin } from '@/utils/video/share'
-
-const DAY_MS = 24 * 60 * 60 * 1000
+import { formatDateTime, rewriteShareOrigin } from '@/utils/video/share'
 
 const props = defineProps({
   open: {
@@ -19,43 +17,30 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const ttlDays = ref(SHARE_TTL_OPTIONS[0].days)
+/** 链接有效期（天）：后端仅支持 1/3/5/7，前端不再提供时效选择 */
+const EXPIRE_DAYS = SHARE_TTL_OPTIONS[0].days
 const link = ref(null)
-const now = ref(Date.now())
 const copied = ref(false)
 const loading = ref(false)
 const generating = ref(false)
 const updating = ref(false)
 const errorMessage = ref('')
-let timer = null
 let loadSeq = 0
 
 const videoId = computed(() => props.video?.apiId ?? props.video?.id ?? null)
 const hasLink = computed(() => Boolean(link.value))
 const disabled = computed(() => link.value?.status === 0)
-const expired = computed(() => hasLink.value && isShareExpired(link.value, now.value))
-/** 撤回或过期都会让用户端入口不可用 */
-const unavailable = computed(() => hasLink.value && (disabled.value || expired.value))
+/** 仅撤回会让用户端入口不可用；已取消按到期时间失效 */
+const unavailable = computed(() => hasLink.value && disabled.value)
 const statusText = computed(() => {
   if (loading.value) return '链接加载中…'
   if (!hasLink.value) return '尚未生成'
   if (disabled.value) return '链接已撤回'
-  return expired.value ? '链接已过期' : '链接已生成'
+  return '链接已生成'
 })
 const createdText = computed(() =>
   link.value?.createdAt ? formatDateTime(link.value.createdAt) : '',
 )
-const expiresText = computed(() => {
-  if (!hasLink.value || !link.value.expiresAt) return ''
-  return formatDateTime(link.value.expiresAt)
-})
-const remainingText = computed(() => {
-  if (!hasLink.value || disabled.value || expired.value) return ''
-  const remain = link.value.expiresAt - now.value
-  const hours = Math.ceil(remain / (60 * 60 * 1000))
-  if (hours <= 24) return `剩余 ${hours} 小时`
-  return `剩余 ${Math.ceil(remain / DAY_MS)} 天`
-})
 const generateLabel = computed(() => {
   if (generating.value) return '生成中…'
   return hasLink.value ? '重新生成' : '生成链接'
@@ -102,20 +87,6 @@ function decorateLink(item) {
   }
 }
 
-/** 已有链接的时效选中项尽量和接口返回的 expire_type（如 7d）对齐 */
-function syncTtl(item) {
-  const matched = /^(\d+)d$/.exec(String(item.expire_type ?? ''))
-  const days =
-    matched !== null
-      ? Number(matched[1])
-      : item.createdAt && item.expiresAt
-        ? Math.round((item.expiresAt - item.createdAt) / DAY_MS)
-        : null
-  if (days !== null && SHARE_TTL_OPTIONS.some((option) => option.days === days)) {
-    ttlDays.value = days
-  }
-}
-
 function start() {
   if (!props.video) return
 
@@ -125,23 +96,13 @@ function start() {
   loading.value = false
   generating.value = false
   updating.value = false
-  ttlDays.value = SHARE_TTL_OPTIONS[0].days
-  now.value = Date.now()
 
   stop()
-  timer = window.setInterval(() => {
-    now.value = Date.now()
-  }, 30 * 1000)
-
   loadLink()
 }
 
 function stop() {
   loadSeq += 1
-  if (timer) {
-    window.clearInterval(timer)
-    timer = null
-  }
 }
 
 /**
@@ -158,7 +119,6 @@ async function loadLink() {
     if (seq !== loadSeq || !props.open) return
 
     link.value = data ? decorateLink(data) : null
-    if (link.value) syncTtl(link.value)
   } catch (error) {
     if (seq === loadSeq && props.open) {
       errorMessage.value = error?.message || '链接加载失败，请稍后重试'
@@ -180,17 +140,15 @@ async function generate() {
   errorMessage.value = ''
 
   try {
-    // 后端只支持 1 / 3 / 5 / 7 天；生成新链接时会自动失效该视频的旧链接
+    // 生成新链接时会自动失效该视频的旧链接
     const data = await generateAdminShareLink({
       videoId: videoId.value,
-      expireDays: ttlDays.value,
+      expireDays: EXPIRE_DAYS,
     })
     link.value = decorateLink({
       ...data,
       created_at: data.created_at ?? Date.now(),
     })
-    now.value = Date.now()
-    syncTtl(link.value)
   } catch (error) {
     errorMessage.value = error?.message || '链接生成失败，请稍后重试'
   } finally {
@@ -283,22 +241,6 @@ function preview() {
           }}》生成一条分享链接。生成后，用户端公众号入口会自动显示这条链接，用户点击即可答题、看视频。
         </p>
 
-        <div class="ttl-row">
-          <span class="ttl-row__label">链接时效</span>
-          <div class="ttl-group">
-            <button
-              v-for="option in SHARE_TTL_OPTIONS"
-              :key="option.days"
-              type="button"
-              class="ttl-btn"
-              :class="{ 'ttl-btn--on': ttlDays === option.days }"
-              @click="ttlDays = option.days"
-            >
-              {{ option.label }}
-            </button>
-          </div>
-        </div>
-
         <div
           class="share-card"
           :class="{ 'share-card--expired': unavailable, 'share-card--empty': !hasLink }"
@@ -338,24 +280,13 @@ function preview() {
           </div>
 
           <p
-            v-if="hasLink"
-            class="share-card__hint"
-            :class="{ 'share-card__hint--expired': unavailable }"
+            v-if="hasLink && disabled"
+            class="share-card__hint share-card__hint--expired"
           >
-            <template v-if="disabled">
-              链接已撤回，用户端点击会提示「链接已失效」；如需继续分享请重新生成。
-            </template>
-            <template v-else-if="expired">
-              链接已过期，用户端入口已自动隐藏，请重新生成。
-            </template>
-            <template v-else>
-              {{ expiresText }} 到期（{{
-                remainingText
-              }}）。届时用户端入口自动隐藏，点击可直达「视频观看」。
-            </template>
+            链接已撤回，用户端点击会提示「链接已失效」；如需继续分享请重新生成。
           </p>
           <p v-else-if="loading" class="share-card__hint">正在加载链接…</p>
-          <p v-else class="share-card__hint">选择时效后点击下方「生成链接」。</p>
+          <p v-else-if="!hasLink" class="share-card__hint">点击下方「生成链接」。</p>
         </div>
 
         <p class="share-modal__tip">重新生成后，旧链接会立即失效。</p>
@@ -488,53 +419,6 @@ function preview() {
   font-size: var(--fs-sm);
   line-height: 1.7;
   color: var(--text-secondary);
-}
-
-.ttl-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-}
-
-.ttl-row__label {
-  flex-shrink: 0;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--text-primary);
-}
-
-.ttl-group {
-  display: inline-flex;
-  padding: 3px;
-  background: var(--bg-muted);
-  border-radius: var(--r-md);
-}
-
-.ttl-btn {
-  min-width: 62px;
-  height: 32px;
-  padding: 0 var(--sp-3);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--text-secondary);
-  background: transparent;
-  border: none;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  transition:
-    background var(--t-fast),
-    color var(--t-fast),
-    box-shadow var(--t-fast);
-}
-
-.ttl-btn:hover {
-  color: var(--text-primary);
-}
-
-.ttl-btn--on {
-  color: #fff;
-  background: var(--brand-primary);
-  box-shadow: var(--shadow-sm);
 }
 
 /* ===== 链接卡片 ===== */

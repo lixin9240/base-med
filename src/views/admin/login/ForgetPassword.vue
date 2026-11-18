@@ -312,14 +312,14 @@ onBeforeUnmount(() => {
 }
 
 .form-title {
-  font-size: 26px;
+  font-size: 1.625em;
   font-weight: var(--fw-semibold);
   margin: 0 0 8px;
   color: var(--text-primary);
 }
 
 .form-desc {
-  font-size: 14px;
+  font-size: 0.875em;
   color: var(--text-secondary);
   margin: 0;
 }
@@ -331,7 +331,7 @@ onBeforeUnmount(() => {
 
 .form-label {
   display: block;
-  font-size: 14px;
+  font-size: 0.875em;
   font-weight: var(--fw-medium);
   color: var(--text-secondary);
   margin-bottom: 8px;
@@ -344,7 +344,7 @@ onBeforeUnmount(() => {
 .form-input {
   width: 100%;
   padding: 12px 14px;
-  font-size: 15px;
+  font-size: 0.9375em;
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   background: var(--bg-surface-solid);
@@ -384,7 +384,7 @@ onBeforeUnmount(() => {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 1em;
   border-radius: 4px;
 }
 
@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
 .send-code-btn {
   flex: none;
   padding: 0 14px;
-  font-size: 14px;
+  font-size: 0.875em;
   font-weight: var(--fw-medium);
   color: var(--brand-primary);
   background: var(--brand-tint);
@@ -435,7 +435,7 @@ onBeforeUnmount(() => {
 .success-msg {
   margin-bottom: 12px;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: 0.8125em;
   border-radius: var(--r-sm);
 }
 
@@ -455,7 +455,7 @@ onBeforeUnmount(() => {
 .submit-btn {
   width: 100%;
   padding: 12px;
-  font-size: 16px;
+  font-size: 1em;
   font-weight: var(--fw-semibold);
   color: #fff;
   background: linear-gradient(
@@ -497,7 +497,7 @@ onBeforeUnmount(() => {
 }
 
 .back-link {
-  font-size: 14px;
+  font-size: 0.875em;
   color: var(--brand-primary);
   text-decoration: none;
 }

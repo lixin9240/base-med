@@ -22,9 +22,11 @@ use Illuminate\Support\Facades\Storage;
 class VideoService
 {
     /**
-     * 分片大小（字节）：1MB
+     * 分片大小（字节）：5MB
+     *
+     * 需保证 PHP 的 upload_max_filesize / post_max_size 不小于该值。
      */
-    private const PART_SIZE = 1048576;
+    private const PART_SIZE = 5242880;
 
     public function __construct(
         private readonly OperationLogService $operationLogService
@@ -390,12 +392,23 @@ class VideoService
         $file = $data['file'];
 
         $dir = 'video/parts/' . $data['oss_upload_id'];
-        $disk = Storage::disk('oss');
 
-        $saved = $disk->put(
-            $dir . '/part_' . $data['part_number'],
-            fopen($file->getRealPath(), 'rb')
-        );
+        try {
+            $disk = Storage::disk('oss');
+
+            $saved = $disk->put(
+                $dir . '/part_' . $data['part_number'],
+                fopen($file->getRealPath(), 'rb')
+            );
+        } catch (\Throwable $e) {
+            Log::channel('exception')->error('上传视频分片到 OSS 失败', [
+                'oss_upload_id' => $data['oss_upload_id'],
+                'part_number' => $data['part_number'],
+                'message' => $e->getMessage(),
+            ]);
+
+            throw new BusinessException(ResponseCode::FILE_UPLOAD_FAILED);
+        }
 
         if (! $saved) {
             throw new BusinessException(ResponseCode::FILE_UPLOAD_FAILED);
@@ -416,9 +429,20 @@ class VideoService
         $extension = $file->getClientOriginalExtension() ?: 'jpg';
         $ossPath = 'cover/' . date('Y/m') . '/' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . strtolower($extension);
 
-        $disk = Storage::disk('oss');
+        try {
+            $disk = Storage::disk('oss');
 
-        $saved = $disk->put($ossPath, fopen($file->getRealPath(), 'rb'));
+            $saved = $disk->put($ossPath, fopen($file->getRealPath(), 'rb'));
+        } catch (\Throwable $e) {
+            // OssAdapter::writeStream 只捕获 OssException，网络/连接异常
+            // （RequestCore_Exception）及 disk 未注册等会漏网成 500，这里统一兜底
+            Log::channel('exception')->error('上传封面图片到 OSS 失败', [
+                'oss_path' => $ossPath,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw new BusinessException(ResponseCode::FILE_UPLOAD_FAILED);
+        }
 
         if (! $saved) {
             throw new BusinessException(ResponseCode::FILE_UPLOAD_FAILED);
@@ -483,7 +507,20 @@ class VideoService
 
         fclose($targetStream);
 
-        $saved = $disk->put($ossPath, fopen($tmpPath, 'rb'));
+        try {
+            $saved = $disk->put($ossPath, fopen($tmpPath, 'rb'));
+        } catch (\Throwable $e) {
+            @unlink($tmpPath);
+
+            Log::channel('exception')->error('合并视频上传到 OSS 失败', [
+                'video_id' => $video->id,
+                'oss_path' => $ossPath,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw new BusinessException(ResponseCode::FILE_UPLOAD_FAILED);
+        }
+
         @unlink($tmpPath);
 
         if (! $saved) {

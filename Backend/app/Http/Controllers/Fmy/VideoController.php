@@ -60,7 +60,8 @@ class VideoController extends Controller
     public function questionList(QuestionListRequest $request): JsonResponse
     {
         $data = $this->videoService->questionList(
-            (int) $request->validated('video_id')
+            (int) $request->validated('video_id'),
+            $request->validated('stage')
         );
 
         return $this->success($data);

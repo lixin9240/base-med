@@ -10,6 +10,7 @@ const EXAM_SUBMIT_PRE_PATH = '/api/public/exam/submit-pre'
 const EXAM_SUBMIT_POST_PATH = '/api/public/exam/submit-post'
 const EXAM_RETAKE_PATH = '/api/public/exam/retake'
 const EXAM_RESULT_PATH = '/api/public/exam/result'
+const ANSWERED_ENTRY_PATH = '/api/public/statistics/answered-entry'
 /** 3.1 获取匿名 DR 编号（点击视频时签发）。参数 video_id。返回 dr_id 字符串 */
 export async function createPublicDr(videoId) {
   const body = await get(`${DR_CREATE_PATH}?video_id=${encodeURIComponent(videoId)}`)
@@ -47,9 +48,18 @@ export async function reportVideoProgress(payload) {
   return body.data ?? {}
 }
 
-/** 3.6 获取视频题目列表（学前/看完答题共用）。返回后端原始字段数组，不含答案与解析 */
-export async function listPublicQuestions(videoId) {
-  const body = await get(`${QUESTION_LIST_PATH}?video_id=${encodeURIComponent(videoId)}`)
+/**
+ * 3.6 获取视频题目列表（学前/看完答题共用）。
+ * @param {string|number} videoId
+ * @param {'pretest'|'posttest'} [stage='pretest'] 仅 pretest 含内置「是否医护人员」固定题
+ * @returns {Promise<Array>} 后端原始字段数组，不含答案与解析
+ */
+export async function listPublicQuestions(videoId, stage = 'pretest') {
+  const query = [
+    `video_id=${encodeURIComponent(videoId)}`,
+    `stage=${encodeURIComponent(stage)}`,
+  ].join('&')
+  const body = await get(`${QUESTION_LIST_PATH}?${query}`)
   if (!body || typeof body !== 'object' || !Array.isArray(body.data)) {
     throw new Error('题目加载失败：服务未返回标准数据')
   }
@@ -98,5 +108,14 @@ export async function getExamResult(params, options = {}) {
     throw new Error('答题结果加载失败：服务未返回标准数据')
   }
   return body.data
+}
+
+/** 4.1 获取进入答题页人数（公开统计，进入答题即计数） */
+export async function getAnsweredEntryTotal() {
+  const body = await get(ANSWERED_ENTRY_PATH)
+  if (!body || typeof body !== 'object' || !body.data) {
+    throw new Error('答题人数加载失败：服务未返回标准数据')
+  }
+  return Number(body.data.answer_entry_total) || 0
 }
 

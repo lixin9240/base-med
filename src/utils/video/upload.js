@@ -42,7 +42,7 @@ export async function uploadVideoFile(file, { videoId, onProgress } = {}) {
     video_id: videoId,
   })
 
-  const partSize = Number(task.part_size) || 1024 * 1024
+  const partSize = Number(task.part_size) || 5 * 1024 * 1024
   const totalParts = Number(task.parts) || Math.max(1, Math.ceil(file.size / partSize))
 
   for (let index = 0; index < totalParts; index += 1) {
