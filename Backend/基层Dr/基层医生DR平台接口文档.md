@@ -520,6 +520,7 @@
             "video_id": 1,
             "video_title": "心肺复苏基础操作",
             "dr_id": "DR-2026-000003",
+            "is_medical_staff": 1,
             "pre_correct": 2,
             "pre_total": 3,
             "post_correct": 3,
@@ -552,6 +553,7 @@
 | submit_at              | datetime  | 「时间」列，提交时间，列表默认按此倒序                            |
 | video_title            | string    | 「视频」列                                                        |
 | dr_id                  | string    | 「编号」列，匿名编号快照，如 DR-2026-000003                       |
+| is_medical_staff       | int       | 是否医护人员：1-是，0-否，null-未采集（学前答题内置固定题采集，不计入正确率） |
 | pre_correct/pre_total  | int       | 「猜测」列：前测（学前答题，观看前作答）答对题数 / 总题数         |
 | post_correct/post_total | int      | 「看完答题」列：后测答对题数 / 总题数                             |
 | accuracy_rate          | int       | 「正确率」列：看完答题正确率 = post_correct / post_total × 100（四舍五入） |
@@ -571,6 +573,7 @@
     "exam_record_id": 1,
     "video_title": "心肺复苏基础操作",
     "dr_id": "DR-2026-000003",
+    "is_medical_staff": 1,
     "submit_at": "2026-10-18 10:34:00",
     "result_status": "pass",
     "accuracy_rate": 100,
@@ -611,6 +614,7 @@
 | 字段          | 类型        | 备注                                                                 |
 | ------------- | ----------- | -------------------------------------------------------------------- |
 | pre/post      | object      | 抽屉头部小结：前测 x/3、看完答题 x/3（正确率）                        |
+| is_medical_staff | int      | 是否医护人员：1-是，0-否，null-未采集；内置固定题采集，不计入正确率   |
 | list[].stage  | string      | 题目卡片阶段标签：pretest 前测 / posttest 后测                        |
 | list[].type   | string      | 题型：single 单选 / multiple 多选（前端标注「多选」）/ judge 判断     |
 | list[].stem   | string      | 题干                                                                 |
@@ -1356,7 +1360,7 @@
 | -------- | ------ | -------- | ---------------------------------------------- |
 | dr_id    | string | 是       | 匿名编号                                       |
 | video_id | bigint | 是       | 视频 ID                                        |
-| answers  | array  | 是       | `[{ "question_id": 101, "user_answer": "C", "duration": 25 }]`（duration 该题用时秒，可选） |
+| answers  | array  | 是       | `[{ "question_id": 101, "user_answer": "C", "duration": 25 }]`（duration 该题用时秒，可选）；**必须包含内置固定题** `{ "question_id": 0, "user_answer": "A" }`（A-是，B-否） |
 
 返回：
 
@@ -1364,10 +1368,18 @@
 {
     "submitted": 1,
     "pre_total": 3,
-    "pre_answered": 3
+    "pre_answered": 4,
+    "is_medical_staff": 1
 }
 ```
 
+| 字段            | 类型 | 备注                                                     |
+| --------------- | ---- | -------------------------------------------------------- |
+| pre_total       | int  | 真实题目数（**不含**内置固定题）                         |
+| pre_answered    | int  | 已作答题数（含内置固定题）                               |
+| is_medical_staff | int | 本次提交的医护人员状态：1-是，0-否，null-未采集           |
+
+> 内置固定题「请问您是否为医护人员？」不落题库，**不计入答题正确率**，仅用于采集答题人身份。
 > 学前正确率不在本接口返回，统一在「看完答题」提交后（3.7）与「答题结果」页（3.8）中展示。
 
 ## 3.6 获取视频题目列表（学前/看完答题页共用）
@@ -1378,14 +1390,26 @@
 - Method：GET
 - 对应页面：学前答题页（图 3.4）与看完答题页（图 3.6）共用本题组；前端按 `type` 渲染题型标签与交互（单选「单项选择」/多选「多项选择」/判断）。
 
-| 参数     | 类型   | 是否必须 | 备注    |
-| -------- | ------ | -------- | ------- |
-| video_id | bigint | 是       | 视频 ID |
+| 参数     | 类型   | 是否必须 | 备注                                                         |
+| -------- | ------ | -------- | ------------------------------------------------------------ |
+| video_id | bigint | 是       | 视频 ID                                                      |
+| stage    | string | 否       | 环节：pretest 学前答题（默认）/ posttest 看完答题；**仅 pretest 返回内置固定题** |
 
-返回：
+返回（学前答题 pretest：第 1 题为系统内置固定题）：
 
 ```json
 [
+    {
+        "question_id": 0,
+        "type": "single",
+        "stem": "请问您是否为医护人员？",
+        "image_url": "",
+        "options": [
+            { "key": "A", "content": "是" },
+            { "key": "B", "content": "否" }
+        ],
+        "is_medical_staff": 1
+    },
     {
         "question_id": 101,
         "type": "single",
@@ -1394,12 +1418,14 @@
         "options": [
             { "key": "A", "content": "15:2" },
             { "key": "B", "content": "30:2" }
-        ]
+        ],
+        "is_medical_staff": 0
     }
 ]
 ```
 
 > 说明：不返回 `correct_answer` / `analysis`（规则 R2）；题目排序即作答顺序（题号导航 1/2/3）。
+> `question_id=0` 且 `is_medical_staff=1` 的为系统内置固定题，不参与正确率计算；`stage=posttest` 时不返回该题。
 
 
 
@@ -1412,6 +1438,7 @@
   - **观看进度门槛**：观看进度（3.4）需达到 `watch_required_percent`（默认 90%）才能提交，否则返回 422「观看进度达到 90% 后才能作答看完答题（当前 X%）」；
   - **需先完成学前答题**（3.5，答案暂存于 `exam_pretest`），否则返回 422「请先完成学前答题」；
   - 提交后合并学前暂存答案与本次后测答案，生成完整 `exam_record` + `exam_answer`（前后测各一份明细），并清除学前暂存记录；
+  - **内置固定题「是否为医护人员」只在学前答题采集**，其答案写入 `exam_record.is_medical_staff`，不参与后测评分与正确率计算；
   - 未通过可重练（R5）：再次走 学前答题（3.5）→ 看完答题（3.7）流程，`attempt_no` 按 dr_id+视频 递增。
 
 | 参数     | 类型   | 是否必须 | 备注                                           |
@@ -1420,7 +1447,7 @@
 | video_id | bigint | 是       | 视频 ID                                        |
 | answers  | array  | 是       | 同 3.5，后测作答数组                            |
 
-返回：结构与「3.8 获取答题结果」一致（含 `result_status` / `accuracy_rate` / `pre` / `post` / `question_detail`）。
+返回：结构与「3.8 获取答题结果」一致（含 `is_medical_staff` / `result_status` / `accuracy_rate` / `pre` / `post` / `question_detail`）。
 
 ## 3.8 获取答题结果（答题结果页）
 
@@ -1440,6 +1467,7 @@
     "exam_record_id": 100,
     "video_id": 1,
     "video_title": "心肺复苏基础操作",
+    "is_medical_staff": 1,
     "result_status": "fail",
     "pass_accuracy": 60,
     "accuracy_rate": 33,
@@ -1473,6 +1501,7 @@
 
 | 字段                               | 类型    | 备注                                                         |
 | ---------------------------------- | ------- | ------------------------------------------------------------ |
+| is_medical_staff                   | int     | 是否医护人员：1-是，0-否，null-未采集；来自学前答题内置固定题，不参与正确率计算 |
 | result_status                      | string  | `pass` 通过 / `fail` 未通过，由 `accuracy_rate ≥ pass_accuracy` 判定 |
 | pass_accuracy                      | int     | 通过线（百分比），默认 60，取自后台配置                      |
 | accuracy_rate                      | int     | **看完答题（后测）正确率** = `post.correct / post.total × 100`（四舍五入）； |
