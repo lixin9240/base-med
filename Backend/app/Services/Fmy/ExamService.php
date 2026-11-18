@@ -34,13 +34,16 @@ class ExamService
         $this->videoService->onShelfVideo($videoId);
         $this->videoService->assertVisitVideo($visit, $videoId);
 
-        $questions = $this->videoService->questionSet($videoId);
+        $questions = $this->videoService->examQuestionSet($videoId, 'pretest');
 
-        if ($questions->isEmpty()) {
+        // 仅内置固定题、未配置真实题目时视为未配置
+        if ($questions->count() <= 1) {
             throw new BusinessException(ResponseCode::DATA_NOT_FOUND, '该视频尚未配置题目');
         }
 
         $this->validateAnswers($questions, $answers);
+
+        $isMedicalStaff = $this->videoService->extractMedicalStaff($answers);
 
         ExamPretest::updateOrCreate(
             [
@@ -50,14 +53,16 @@ class ExamService
             [
                 'dr_id' => $drId,
                 'answers' => array_values($answers),
+                'is_medical_staff' => $isMedicalStaff,
                 'submitted_at' => now(),
             ]
         );
 
         return [
             'submitted' => 1,
-            'pre_total' => $questions->count(),
-            'pre_answered' => count($answers),
+            'pre_total' => $questions->count() - 1,
+            'pre_answered' => max(count($answers) - 1, 0),
+            'is_medical_staff' => $isMedicalStaff,
         ];
     }
 
@@ -129,6 +134,7 @@ class ExamService
                 'dr_id' => $drId,
                 'video_id' => $video->id,
                 'attempt_no' => $attemptNo,
+                'is_medical_staff' => $pretest->is_medical_staff,
                 'pretest_correct' => $preCorrect,
                 'posttest_correct' => $postCorrect,
                 'pretest_score' => $preTotal > 0 ? round($preCorrect / $preTotal * 100, 2) : 0,
@@ -209,6 +215,7 @@ class ExamService
                 'dr_id' => $drId,
                 'video_id' => $video->id,
                 'attempt_no' => $attemptNo,
+                'is_medical_staff' => $prior->is_medical_staff,
                 'pretest_correct' => $prior->pretest_correct,
                 'posttest_correct' => $postCorrect,
                 'pretest_score' => $prior->pretest_score,
@@ -507,6 +514,7 @@ class ExamService
             'exam_record_id' => $record->id,
             'video_id' => $record->video_id,
             'video_title' => $record->video->title ?? '',
+            'is_medical_staff' => $record->is_medical_staff === null ? null : (int) $record->is_medical_staff,
             'result_status' => $record->result_status,
             'pass_accuracy' => $this->passAccuracy(),
             'accuracy_rate' => $accuracy,

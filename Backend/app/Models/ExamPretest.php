@@ -13,6 +13,7 @@ class ExamPretest extends Model
         'dr_id',
         'video_id',
         'answers',
+        'is_medical_staff',
         'submitted_at',
     ];
 
