@@ -69,8 +69,17 @@ const answeredPeople = 1286
 const winnerPeople = 357
 
 const isPre = computed(() => stage.value === 'pre')
+/** 对接后端 question-list：pre → pretest，post/retake → posttest */
+const apiStage = computed(() => (isPre.value ? 'pretest' : 'posttest'))
 const stageTitle = computed(() =>
   isRetake.value ? '再次答题' : isPre.value ? '学前答题' : '看完答题',
+)
+/** 真实知识题数量（不含内置「是否医护人员」固定题），用于提示文案 */
+const contentQuestionCount = computed(
+  () =>
+    questions.value.filter(
+      (q) => Number(q.question_id) !== 0 && Number(q.is_medical_staff) !== 1,
+    ).length,
 )
 const SPLASH_CUE = '每日一练来咯，快来看看你掌握多少！'
 const SPLASH_START_CUE = '先答几道题，看看您的基础认知'
@@ -153,7 +162,8 @@ onMounted(async () => {
       watchProgress: detail.watch_progress,
     }
     warmVideo(detail.video_url)
-    questions.value = await listPublicQuestions(videoId)
+    // 学前传 pretest（含 question_id=0 医护固定题）；后测/重答传 posttest（不含固定题）
+    questions.value = await listPublicQuestions(videoId, apiStage.value)
 
     if (!questions.value.length) {
       if (!isPre.value) {
@@ -196,14 +206,17 @@ async function onSubmit(answers) {
   if (submitting.value) return
   submitting.value = true
   try {
+    // answers 与当前题单一一对应：学前含 { question_id: 0, user_answer: 'A'|'B' }；后测不含固定题
+    const payloadAnswers = questions.value.map((q, i) => ({
+      question_id: q.question_id,
+      user_answer: toApiAnswer(q, answers[i]),
+    }))
+
     if (isPre.value) {
       await submitPreExam({
         dr_id: drId.value,
         video_id: videoId,
-        answers: questions.value.map((q, i) => ({
-          question_id: q.question_id,
-          user_answer: toApiAnswer(q, answers[i]),
-        })),
+        answers: payloadAnswers,
       })
       toast('前测完成')
       speak('开始学习视频')
@@ -211,15 +224,12 @@ async function onSubmit(answers) {
       return
     }
 
-    // 再次答题走 3.9：只重评后测，前测沿用最近一条记录
+    // 再次答题走 3.9：只重评后测，前测（含医护身份）沿用最近一条记录
     const submit = isRetake.value ? submitRetakeExam : submitPostExam
     const data = await submit({
       dr_id: drId.value,
       video_id: videoId,
-      answers: questions.value.map((q, i) => ({
-        question_id: q.question_id,
-        user_answer: toApiAnswer(q, answers[i]),
-      })),
+      answers: payloadAnswers,
     })
     router.replace({ name: 'mobile-report', query: { examRecordId: data.exam_record_id, videoId: data.video_id } })
   } catch (e) {
@@ -267,8 +277,8 @@ async function onSubmit(answers) {
             isRetake
               ? '再答一遍后测题目，看看这次能不能提分'
               : isPre
-                ? '先答 3 道题，看看您的基础认知'
-                : '再看 3 道题，检验一下有没有记住'
+                ? `先答 ${contentQuestionCount || questions.length} 道题，看看您的基础认知`
+                : `再看 ${contentQuestionCount || questions.length} 道题，检验一下有没有记住`
           }}</b>
           <span>《{{ course.title }}》· 提交后可以看到每道题的对错与解析</span>
         </div>

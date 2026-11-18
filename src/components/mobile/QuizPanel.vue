@@ -102,7 +102,7 @@ function submit() {
       <div class="quiz__dots">
         <button
           v-for="(q, i) in questions"
-          :key="q.id || i"
+          :key="q.question_id ?? q.id ?? i"
           type="button"
           class="qdot"
           :class="{
