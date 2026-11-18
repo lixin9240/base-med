@@ -16,6 +16,8 @@ const error = ref('')
 const loading = ref(true)
 /** 英雄卡上的通过/失败浮层特效，播完卸掉 */
 const showBurst = ref(false)
+/** 底部「查看更多」弹窗：END / 二维码区 */
+const endModalOpen = ref(false)
 // TODO: 后端暂未返回答题/中奖人数统计，先使用占位数据
 const answeredPeople = 1286
 const winnerPeople = 357
@@ -161,6 +163,14 @@ function goLottery() {
     },
   })
 }
+
+function openEndModal() {
+  endModalOpen.value = true
+}
+
+function closeEndModal() {
+  endModalOpen.value = false
+}
 </script>
 
 <template>
@@ -280,6 +290,12 @@ function goLottery() {
           </div>
         </article>
       </section>
+
+      <section class="more-entry">
+        <button type="button" class="btn btn--primary btn--lg btn--block" @click="openEndModal">
+          查看更多
+        </button>
+      </section>
     </template>
 
     <div v-else class="empty">
@@ -288,6 +304,46 @@ function goLottery() {
       </div>
       <p class="empty__text">未找到这次答题记录</p>
     </div>
+
+    <Transition name="end-pop">
+      <div
+        v-if="endModalOpen"
+        class="end-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="关注我们"
+      >
+        <div class="end-modal__mask" @click="closeEndModal" />
+        <div class="end-modal__panel">
+          <div class="epilogue__dots" aria-hidden="true">
+            <span class="epilogue__dot epilogue__dot--navy" />
+            <span class="epilogue__dot epilogue__dot--blue" />
+            <span class="epilogue__dot epilogue__dot--gold" />
+          </div>
+          <p class="epilogue__end">= END =</p>
+          <p class="epilogue__cta">【关注我们，了解更多医学常识】</p>
+          <div class="epilogue__qr-wrap">
+            <img
+              class="epilogue__qr"
+              src="/ma.png"
+              alt="关注公众号二维码"
+              width="180"
+              height="180"
+              decoding="async"
+            />
+            <p class="epilogue__hint">长按二维码关注公众号</p>
+          </div>
+          <ul class="epilogue__credits">
+            <li>视频：青青</li>
+            <li>编辑：原野</li>
+            <li>审核：川禾</li>
+          </ul>
+          <button type="button" class="btn btn--primary btn--lg btn--block end-modal__close" @click="closeEndModal">
+            关闭
+          </button>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -789,6 +845,143 @@ function goLottery() {
   margin: var(--sp-2) 0 0;
   font-size: var(--fs-xs);
   color: var(--text-secondary);
+}
+
+/* ── 查看更多 / END 弹窗 ─────────────────────────────── */
+.more-entry {
+  margin: var(--sp-6) var(--sp-4) var(--sp-4);
+}
+
+.end-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-5);
+}
+
+.end-modal__mask {
+  position: absolute;
+  inset: 0;
+  background: rgb(8 28 21 / 0.58);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.end-modal__panel {
+  position: relative;
+  width: min(100%, 340px);
+  max-height: min(86vh, 640px);
+  overflow-y: auto;
+  padding: var(--sp-6) var(--sp-5) var(--sp-5);
+  border-radius: var(--r-xl);
+  background: #f5f7f9;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.end-pop-enter-active,
+.end-pop-leave-active {
+  transition: opacity 0.24s ease;
+}
+
+.end-pop-enter-active .end-modal__panel,
+.end-pop-leave-active .end-modal__panel {
+  transition: transform 0.24s ease;
+}
+
+.end-pop-enter-from,
+.end-pop-leave-to {
+  opacity: 0;
+}
+
+.end-pop-enter-from .end-modal__panel,
+.end-pop-leave-to .end-modal__panel {
+  transform: scale(0.92);
+}
+
+.epilogue__dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: var(--sp-3);
+}
+
+.epilogue__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.epilogue__dot--navy {
+  background: #005bac;
+}
+
+.epilogue__dot--blue {
+  background: #5b9bd5;
+}
+
+.epilogue__dot--gold {
+  background: #ffc000;
+}
+
+.epilogue__end {
+  margin: 0 0 var(--sp-4);
+  color: #005bac;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+}
+
+.epilogue__cta {
+  margin: 0 0 var(--sp-5);
+  color: var(--text-primary);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-bold);
+  line-height: 1.5;
+}
+
+.epilogue__qr-wrap {
+  margin: 0 auto var(--sp-5);
+}
+
+.epilogue__qr {
+  display: block;
+  width: 180px;
+  height: 180px;
+  margin: 0 auto;
+  padding: 8px;
+  object-fit: contain;
+  border-radius: var(--r-md);
+  background: #fff;
+  /* 微信内长按识别二维码：勿禁用系统长按菜单 */
+  -webkit-touch-callout: default;
+  -webkit-user-select: auto;
+  user-select: auto;
+  pointer-events: auto;
+}
+
+.epilogue__hint {
+  margin: var(--sp-3) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.epilogue__credits {
+  list-style: none;
+  margin: 0 0 var(--sp-5);
+  padding: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  line-height: 1.9;
+}
+
+.end-modal__close {
+  margin-top: var(--sp-1);
 }
 
 .review {
