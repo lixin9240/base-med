@@ -1,6 +1,11 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { exportAdminRecords, getAdminRecordDetail, listAdminRecords, listAdminVideos } from '@/api'
+import {
+  fetchAllExamRecords,
+  matchesMedicalStaff,
+  medicalStaffLabel,
+} from '@/utils/medicalStaffFilter'
 import { QUESTION_TYPE_LABEL } from '@/utils/question'
 
 const PAGE_SIZE = 20
@@ -77,12 +82,6 @@ function onVideoEnter() {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
 
-/** 身份展示文案 */
-function medicalStaffLabel(value) {
-  if (value === null || value === undefined || value === '') return '未采集'
-  return Number(value) === 1 ? '医护人员' : '非医护人员'
-}
-
 /** 把 2.5.1 接口返回的一条记录转成列表页展示需要的字段 */
 function toRow(item) {
   return {
@@ -107,12 +106,27 @@ async function refreshRecords() {
   loading.value = true
   loadError.value = ''
   try {
+    const medicalFilter =
+      filterMedicalStaff.value === '' ? undefined : Number(filterMedicalStaff.value)
+
+    // 选了身份：拉全量后前端兜底过滤 + 本地分页（后端未部署/未筛时仍可用）
+    if (medicalFilter === 0 || medicalFilter === 1) {
+      const all = await fetchAllExamRecords(listAdminRecords, {
+        videoId: filterVideo.value,
+        resultStatus: filterResult.value,
+      })
+      const filtered = all.filter((item) => matchesMedicalStaff(item, medicalFilter))
+      total.value = filtered.length
+      const start = (page.value - 1) * PAGE_SIZE
+      rows.value = filtered.slice(start, start + PAGE_SIZE).map(toRow)
+      return
+    }
+
     const data = await listAdminRecords({
       page: page.value,
       pageSize: PAGE_SIZE,
       videoId: filterVideo.value,
       resultStatus: filterResult.value,
-      isMedicalStaff: filterMedicalStaff.value === '' ? undefined : Number(filterMedicalStaff.value),
     })
     rows.value = data.list.map(toRow)
     total.value = data.total

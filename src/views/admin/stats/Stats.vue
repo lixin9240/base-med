@@ -3,10 +3,17 @@ import { computed, onMounted, ref } from 'vue'
 import {
   exportAdminStatistics,
   getAdminStatisticsOverview,
+  listAdminRecords,
   listAdminStatisticsVideos,
   listAdminStatisticsWrongQuestions,
 } from '@/api'
 import { PASS_PERCENT } from '@/store'
+import {
+  buildOverviewFromRecords,
+  buildVideoStatsFromRecords,
+  fetchAllExamRecords,
+  matchesMedicalStaff,
+} from '@/utils/medicalStaffFilter'
 
 const overview = ref(null)
 const videoStats = ref([])
@@ -79,13 +86,27 @@ async function refreshStatistics() {
   loadError.value = ''
   const scope = medicalStaffScope.value
   try {
-    const [overviewData, videos, questions] = await Promise.all([
-      getAdminStatisticsOverview(scope),
-      listAdminStatisticsVideos(scope),
-      listAdminStatisticsWrongQuestions(scope),
+    // 统计接口仍带筛选参数；同时拉答题记录做前端兜底重算（后端未部署时切换仍有效）
+    const [overviewData, videos, questions, allRecords] = await Promise.all([
+      getAdminStatisticsOverview(scope).catch(() => getAdminStatisticsOverview()),
+      listAdminStatisticsVideos(scope).catch(() => listAdminStatisticsVideos()),
+      listAdminStatisticsWrongQuestions(scope).catch(() => listAdminStatisticsWrongQuestions()),
+      fetchAllExamRecords(listAdminRecords),
     ])
-    overview.value = overviewData
-    videoStats.value = videos.map(toVideoRow)
+
+    const filtered = allRecords.filter((item) => matchesMedicalStaff(item, scope))
+    const hasStaffField = allRecords.some(
+      (item) => item.is_medical_staff !== undefined,
+    )
+
+    if (hasStaffField) {
+      overview.value = buildOverviewFromRecords(overviewData, filtered)
+      videoStats.value = buildVideoStatsFromRecords(videos, filtered).map(toVideoRow)
+    } else {
+      overview.value = overviewData
+      videoStats.value = videos.map(toVideoRow)
+    }
+    // 易错题依赖作答明细，前端无法可靠重算，仍用接口结果
     errorQuestions.value = questions.map(toQuestionRow)
   } catch (error) {
     overview.value = null
