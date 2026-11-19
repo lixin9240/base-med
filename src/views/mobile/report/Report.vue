@@ -53,7 +53,7 @@ onMounted(async () => {
     return
   }
   try {
-    const drId = currentDrId()
+    const drId = currentDrId(videoId)
     if (!drId) {
       router.replace('/mobile/home')
       return
