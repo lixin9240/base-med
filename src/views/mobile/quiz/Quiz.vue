@@ -142,7 +142,7 @@ function revealQuiz() {
 onMounted(async () => {
   try {
     videoId = entryVideoId() || videoId
-    drId.value = currentDrId()
+    drId.value = currentDrId(videoId)
     // 分享链接入口：直接打开 /mobile/quiz?videoId=X 时无 dr_id，先签发匿名编号再答题
     if (!drId.value && videoId) {
       drId.value = await issueDrId(videoId)

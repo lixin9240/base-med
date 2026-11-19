@@ -187,7 +187,7 @@ onMounted(async () => {
       return
     }
 
-    const drId = currentDrId()
+    const drId = currentDrId(videoId)
     if (!drId || !videoId) {
       router.replace('/mobile/home')
       return
@@ -249,7 +249,7 @@ onUnmounted(() => {
 })
 
 async function reportProgress() {
-  const drId = currentDrId()
+  const drId = currentDrId(videoId)
   const el = videoEl.value
   if (!drId || !videoId || !el) return
   try {
